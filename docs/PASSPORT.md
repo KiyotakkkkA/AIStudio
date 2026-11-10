@@ -551,20 +551,27 @@ One core in `zvs-host/src/kernel/`, three front-ends.
 pub trait NodeDef: Send + Sync {
     type Input: DeserializeOwned + JsonSchema + Send;  // schema also feeds tool exposure
     type Output: Serialize + JsonSchema;
-    const TYPE: &'static str;                // "llm.generate", "vector.search", "mail.send"
+    type Prepared: Send + Sync;              // what the node will do: plan, diff, element, window
+    fn node_type(&self) -> &str;             // "llm.generate", "vector.search", "mail.send"
     fn permission(&self) -> PermissionRequirement;  // resolved against the tool ceiling — §14
     fn permission_for(&self, input: &Value) -> PermissionRequirement;  // defaults to permission()
-    fn defers_approval(&self) -> bool;       // the node raises its own approval, see below
-    fn side_effect(&self) -> SideEffect;     // decides whether recovery may resume it
-    async fn run(&self, ctx: &StepContext, input: Self::Input) -> Result<Self::Output, AppError>;
+    fn side_effect(&self) -> bool;           // decides whether recovery may resume it
+    async fn prepare(&self, ctx: &StepContext, input: Self::Input) -> Result<Self::Prepared, AppError>;
+    fn access(&self, prepared: &Self::Prepared, base: AccessRequest) -> AccessRequest;
+    async fn execute(&self, ctx: &StepContext, admitted: Admitted<Self::Prepared>)
+        -> Result<Self::Output, AppError>;
+    async fn refused(&self, prepared: Self::Prepared, error: &AppError) {}  // undo what prepare began
 }
+
+pub trait PlainNode { /* Input, Output, permission, side_effect, execute(Admitted<Input>) */ }
+impl<T: PlainNode> NodeDef for T { /* Prepared = Input, access = base */ }
 
 pub struct StepContext {
     pub run_id: RunId,
     pub cancel: CancellationToken,           // cancellation is cooperative and universal
-    pub events: StepEmitter,                 // one path to the UI
-    pub approvals: ApprovalGate,             // request_approval(req).await -> ApprovalDecision
     pub services: KernelServices,            // narrow, explicit
+    link: Arc<dyn StepLink>,                 // events, approvals, questions, nested tool calls
+    gate: Option<SharedGate>,                // the access pipeline: screen and admit
 }
 ```
 
@@ -586,10 +593,32 @@ Core concepts:
   (`chat:`, `skill:<key>/`) returns `PermissionRequirement::AppFolder`, and the permission
   service resolves it to allow unless the tool is disabled or `off`; an explicit `ask` minimum
   (an agentic session in `ask` mode) still turns it into an approval.
-- **Deferred approval** — a node with `defers_approval()` does not suspend at admission. When
-  the tier says `ask`, admission hands it a ticket on the `StepContext` instead, and the node
-  raises one approval itself once it can show what it is about to do (`fs.apply`: the combined
-  diff, merged with any folder request into a single modal).
+- **Prepare, access, execute** (TASK_078) — nodes describe, the kernel decides. Every call,
+  graph step or model tool call, runs `screen → prepare → access → admit → execute` in the
+  registry: the gate first screens the bare requirement through the floor (a disabled, `off` or
+  unlisted tool fails before the node does any work); `prepare` resolves what the call will do
+  (the process plan, the combined diff, the browser element, the desktop windows, the letter);
+  `access` turns it into an `AccessRequest` (effect, resources, `always_ask`, the prompt the
+  person sees) on top of the base request built from `permission_for`; the gate runs the
+  pipeline and the person; only then does `execute` receive `Admitted<Prepared>`. `Admitted` is
+  made only from a `Clearance`, and a `Clearance` only inside `access/`, so a node cannot run
+  without admission. A refused or cancelled admission hands the prepared value back through
+  `refused` (the browser and the desktop agent close the action they opened). Nodes with nothing
+  to prepare implement `PlainNode`. A node with a side effect must declare its access: a node
+  whose `permission()` is `None` and whose `side_effect()` is true is refused at registration;
+  steps owned by the kernel itself (`chat.prepare`, `chat.persist`, scenario outputs, subagents)
+  declare `PermissionRequirement::Kernel`. The step timeout covers `execute` only, not the
+  approval.
+- **One person step** — `access/person.rs` is the only place an approval is created and
+  requested. It builds every approval kind from the request: plain (the gate), `process`,
+  `files`, `folder`, `apps`, the desktop action, the browser action and integration kinds such
+  as `mail`, with the same fields and key order as before. Resource grants (uncovered folders,
+  ungranted apps) are asked before the tool approval; a `files` effect with uncovered folders
+  merges both into one `folder` modal with the diff. Folder and app answers stay in their own
+  stores: the folder service and the computer agent attach an `Attendant` that records the
+  pending request and reads the answer. A grant needed in the middle of `execute` (a folder
+  passed to `fs.read`, an app whose window `computer.inspect` meets) goes through the same
+  builder (`access::grant`, `StepContext::admit`).
 - **Wake-up turn** — a chat turn the host starts when a background process started with
   `notify: true` ends (§14 *Background processes*). It is an ordinary chat run: the same graph,
   tools, approvals, questions, execution policy and run concurrency limits; it only opens with
@@ -1226,9 +1255,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   disabled or whose model is unavailable, and `auto-bypass` without a judge; `get` clears a
   judge that disappeared since, drops `auto-bypass` to `safety-ask` and stores the result.
   `decide(mode, family)` is the table above as a pure function. It is consulted through the
-  `ExecReview` port in `KernelServices` at every point an approval would be raised: the gate
-  in `RunService` for tools that do not defer, and the deferred approvals of `fs.apply`, the
-  process tools and the browser acting nodes. A tool declared destructive whose effect the
+  `ExecReview` port in `KernelServices`, by the gate (`access::Gatekeeper`) for every call the
+  tier sends to `ask`, with the effect the node declared in `access`. A tool declared destructive whose effect the
   host cannot see asks in every mode but `no-restrictions`. Rule packs are JSON
   (`{ id, allows, rules[] }`, each rule `files: { paths, operations }`, `process: { argv, cwd }`
   or `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
@@ -1267,9 +1295,17 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   decides nothing asks the person. The stages are **floor** (graph allow-list, tool disabled,
   tier `off`), **tier** (`admit_subject`), **mode** (`decide`), **rules** (`RuleSet::evaluate`)
   and **judge**. The floor and the tier fail closed: an error in them fails the call; an error
-  in a later stage asks. The gate in `RunService` runs floor → tier and, when the tier asks,
-  defers to the node or reviews through `ExecReview`; `ExecPolicyService::review` runs mode →
-  rules → judge. The stages wrap the checks above unchanged, so the table holds as written; the
+  in a later stage asks. The gate (`access::Gatekeeper`, wired by `RunService`) runs floor → tier and,
+  when the tier asks, reviews the node's effect through `ExecReview`; `ExecPolicyService::review`
+  runs mode → rules → judge. A request marked `always_ask` skips the review and goes to the
+  person in every mode. Since TASK_078 every driver goes through it: `fs.apply` (`Files`),
+  `shell.run` (`Process`), the browser (`Browser` for submit and download, `Plain` otherwise),
+  computer use (`Desktop { apps, sensitive }`), integrations (`Remote`, `always_ask` for a
+  per-call approval) and MCP tools (`Read` when the server marks the tool read-only,
+  `Opaque { destructive }` otherwise). Scenario tool steps raise a destructive tool to `ask` as
+  chat and skills do. Sensitive input into a terminal window (`computer/policy.rs`
+  `TERMINAL_APPS`) is the `Process` family and is not reviewable: rules and the judge never allow
+  it, so it asks in every mode but `no-restrictions` (DECISION: option a). The stages wrap the checks above unchanged, so the table holds as written; the
   floor row is the floor stage and no longer a family of the table.
 - No telemetry, no outbound calls the user did not configure. One narrow exception: **site
     icons** for the web sources a provider returned with an answer and saved browser bookmarks
@@ -1381,9 +1417,11 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   calls read and write cursors through `IntegrationToolCall::cursors`. The generic OAuth code
   (grant, PKCE authorize URL, code exchange, refresh, device flow, `trusted_https_url`) lives in
   `integrations/oauth.rs`; mail and git hosting use it, and the Copilot sign-in reuses the URL
-  check. A tool spec marked `approved_per_call` resolves at `ask` minimum,
-  defers its approval, and the provider's `approval()` builds the request the user sees; the
-  call then receives exactly the approved fields, so nothing other than what was shown runs.
+  check. A tool spec marked `approved_per_call` resolves at `ask` minimum; its
+  `prepare` asks the provider's `approval()` for the request the user sees, and `access` marks
+  it `always_ask`, so every such call reaches the person in every mode, `no-restrictions`
+  included; the call then receives exactly the approved fields, so nothing other than what was
+  shown runs.
 - **Mail** (`zvs-host/src/integrations/mail/`, TASK_049, DECISION: every send needs approval,
   with the letter shown). IMAP via `async-imap`, SMTP via `lettre`, parsing via `mail-parser`;
   rustls with the system root store and no way to disable verification (tests swap only the
@@ -1716,9 +1754,9 @@ exceed what Tools allows, only narrow it.
 > the address being opened, or of the current page. A node's `permission_for` passes the resolved tier as the minimum to
 > `PermissionService::admit_subject`, so the Tools page ceiling, `off` and a disabled tool still
 > win; on the Tools page navigate, click and type default to `auto` and submit and download to
-> `ask`. Every browser node defers approval and raises it itself, with scope `site:<origin>`
-> and, for an element, the target's role and name (TASK_047 extended this from the four acting
-> nodes so that every approval reaches the agent panel). The model sees elements only as opaque handles (`e12`) issued from
+> `ask`. Every browser node resolves its origin and element in `prepare` and declares them in
+> `access` (TASK_078); the person step raises the approval with scope `site:<origin>` and, for an
+> element, the target's role and name, and the node's attendant reports it to the agent panel. The model sees elements only as opaque handles (`e12`) issued from
 > the accessibility tree and kept per tab with their origin; the driver maps a handle to a
 > backend node id and refuses it when the page's origin has changed or the node is gone.
 > `credentials.rs` decides a credential or payment field from the input type, autocomplete

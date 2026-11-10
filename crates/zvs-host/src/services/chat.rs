@@ -71,6 +71,7 @@ use super::tool_loop::{
     CallOutcome, ChatTurn, LoopBudget, LoopCall, LoopHost, LoopTranscript, RoundHook, ToolLoop,
 };
 use super::vector_stores::VectorSearchOptions;
+use crate::access::Admitted;
 use crate::background::{BACKGROUND_TOOLS, BackgroundShells, status_line};
 use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
@@ -83,7 +84,7 @@ use crate::files::roots::SKILL_READ_ONLY;
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput};
 use crate::kernel::{
-    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, QuestionOutcome, RunObserver,
+    ApprovalDecision, NodeRegistry, PermissionRequirement, PlainNode, QuestionOutcome, RunObserver,
     StepContext, ToolStepRequest, VectorSearch,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
@@ -1555,7 +1556,7 @@ impl PrepareNode {
 }
 
 #[async_trait]
-impl NodeDef for PrepareNode {
+impl PlainNode for PrepareNode {
     type Input = ChatPrepareInput;
     type Output = ChatGenerateRequest;
 
@@ -1564,18 +1565,19 @@ impl NodeDef for PrepareNode {
     }
 
     fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::None
+        PermissionRequirement::Kernel
     }
 
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: ChatPrepareInput,
+        admitted: Admitted<ChatPrepareInput>,
     ) -> Result<ChatGenerateRequest, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let inner = &self.0;
         let conversation = inner.get(&input.conversation_id)?;
@@ -2674,7 +2676,7 @@ impl LoopHost for ChatLoopHost<'_> {
 }
 
 #[async_trait]
-impl NodeDef for GenerateChatNode {
+impl PlainNode for GenerateChatNode {
     type Input = ChatGenerateInput;
     type Output = GenerateOutput;
 
@@ -2690,17 +2692,18 @@ impl NodeDef for GenerateChatNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: ChatGenerateInput,
+        admitted: Admitted<ChatGenerateInput>,
     ) -> Result<GenerateOutput, AppError> {
+        let input = admitted.into_inner();
         self.respond(context, input.request).await
     }
 }
 
 #[async_trait]
-impl NodeDef for PersistNode {
+impl PlainNode for PersistNode {
     type Input = ChatPersistInput;
     type Output = MessageDto;
 
@@ -2709,18 +2712,19 @@ impl NodeDef for PersistNode {
     }
 
     fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::None
+        PermissionRequirement::Kernel
     }
 
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: ChatPersistInput,
+        admitted: Admitted<ChatPersistInput>,
     ) -> Result<MessageDto, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let inner = &self.0;
         let run_id = context.run_id.to_string();

@@ -481,7 +481,7 @@ impl Host {
             .expect("reviews");
         let verdict = self
             .policy
-            .review(&context, action)
+            .review(&context, &Effect::from(action.clone()))
             .await
             .expect("reviews through the port");
         assert_eq!(verdict, reviewed.verdict(), "{tool}");
@@ -629,5 +629,176 @@ async fn an_unlisted_tool_from_the_model_stops_at_the_floor() {
     assert_eq!(
         (decision.outcome, decision.stage, decision.authorisation()),
         (Outcome::Allow, StageName::Floor, None)
+    );
+}
+
+fn desktop(app: &str) -> Effect {
+    Effect::Desktop {
+        apps: vec![app.to_owned()],
+        sensitive: true,
+    }
+}
+
+#[test]
+fn sensitive_input_into_a_terminal_is_a_process_and_not_a_browser_action() {
+    assert_eq!(desktop("pwsh.exe").family(), Family::Process);
+    assert!(!desktop("pwsh.exe").reviewable());
+    assert_eq!(desktop("regedit.exe").family(), Family::Browser);
+    assert!(desktop("regedit.exe").reviewable());
+    let typing = Effect::Desktop {
+        apps: vec!["cmd.exe".to_owned()],
+        sensitive: false,
+    };
+    assert_eq!(typing.family(), Family::Benign);
+}
+
+#[tokio::test]
+async fn terminal_input_asks_in_every_mode_but_no_restrictions() {
+    let host = Host::new(VENDOR_PACK);
+    let context = StepContext::new(
+        RunId::new(new_id()),
+        CancellationToken::new(),
+        KernelServices::default(),
+        Arc::new(Silent),
+    );
+    for mode in MODES {
+        host.mode(mode);
+        let request = AccessRequest::review(context.run_id.to_string(), &desktop("pwsh.exe"));
+        let decision = host
+            .policy
+            .pipeline()
+            .decide(&request, &mut Pass::new(Some(&context)))
+            .await
+            .expect("decides");
+        let verdict = host
+            .policy
+            .review(&context, &desktop("pwsh.exe"))
+            .await
+            .expect("reviews");
+        if mode == ExecMode::NoRestrictions {
+            assert_eq!(decision.outcome, Outcome::Allow, "{mode}");
+            assert!(matches!(verdict, ReviewVerdict::Run(_)), "{mode}");
+        } else {
+            assert_eq!(
+                (decision.outcome, decision.stage),
+                (Outcome::Ask, StageName::Mode),
+                "{mode}"
+            );
+            assert_eq!(verdict, ReviewVerdict::Ask { reason: None }, "{mode}");
+        }
+    }
+}
+
+struct Answering {
+    requests: Mutex<Vec<ApprovalRequestDto>>,
+}
+
+impl StepLink for Answering {
+    fn emit(&self, _event: HostEventDraft) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    fn request_approval(
+        &self,
+        request: ApprovalRequestDto,
+    ) -> BoxFuture<'static, Result<ApprovalDecision, AppError>> {
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(request);
+        Box::pin(async { Ok(ApprovalDecision::Approved) })
+    }
+}
+
+#[tokio::test]
+async fn a_call_that_always_asks_reaches_the_person_in_no_restrictions() {
+    let host = Host::new(VENDOR_PACK);
+    host.mode(ExecMode::NoRestrictions);
+    host.tier("mail.send", ToolTier::Auto);
+    let approvals = Arc::new(
+        crate::services::approvals::ApprovalService::new(
+            host._database.shared(),
+            Arc::clone(&host.permissions),
+            std::time::Duration::from_secs(60),
+            Arc::new(FakeClock::default()),
+        )
+        .expect("an approval service"),
+    );
+    let keeper = super::Gatekeeper::new(&host.permissions, approvals, None);
+    let link = Arc::new(Answering {
+        requests: Mutex::new(Vec::new()),
+    });
+    let context = StepContext::new(
+        RunId::new(new_id()),
+        CancellationToken::new(),
+        KernelServices {
+            policy: Some(Arc::new(host.policy.clone())),
+            ..KernelServices::default()
+        },
+        link.clone(),
+    )
+    .recording();
+    let remote = Effect::Remote {
+        service: "send".to_owned(),
+        action: "Отправка письма".to_owned(),
+    };
+    let mut request = AccessRequest::new(Actor::run(""), "mail.send", remote.clone());
+    request.always_ask = true;
+    request.prompt.kind = Some("mail".to_owned());
+    request.prompt.action = Some("Отправка письма".to_owned());
+    request
+        .prompt
+        .fields
+        .push(("account".to_owned(), serde_json::json!("Поддержка")));
+    request
+        .prompt
+        .fields
+        .push(("subject".to_owned(), serde_json::json!("Отчёт")));
+    drop(
+        keeper
+            .admit(request, &context)
+            .await
+            .expect("approved by the person"),
+    );
+    let asked = link
+        .requests
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    assert_eq!(asked.len(), 1);
+    let keys: Vec<&str> = asked[0].keys().map(String::as_str).collect();
+    assert_eq!(
+        keys,
+        [
+            "id",
+            "runId",
+            "subject",
+            "scope",
+            "expiresAt",
+            "kind",
+            "tool",
+            "action",
+            "account"
+        ]
+    );
+    assert_eq!(asked[0]["kind"], "mail");
+    assert_eq!(asked[0]["subject"], "mail.send");
+    assert_eq!(
+        context.authorisation(),
+        Some(ToolAuthorisationDto::of(ToolAuthorisationKind::Approved))
+    );
+    let plain = AccessRequest::new(Actor::run(""), "mail.send", remote);
+    drop(
+        keeper
+            .admit(plain, &context)
+            .await
+            .expect("an ordinary call runs"),
+    );
+    assert_eq!(
+        link.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len(),
+        1
     );
 }

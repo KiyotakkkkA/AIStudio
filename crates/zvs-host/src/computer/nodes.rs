@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -9,20 +9,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
-    APPS_APPROVAL_KIND, AppError, AppErrorCode, ComputerAppDto, ComputerApproval, ComputerDisplay,
-    FolderAccessAnswer, ImageAttachmentDto, ToolAuthorisationDto, ToolAuthorisationKind, Validate,
+    AppError, AppErrorCode, ApprovalRequestDto, ComputerAppDto, ComputerApproval, ComputerDisplay,
+    FolderAccessAnswer, ImageAttachmentDto, ToolTier, Validate,
 };
 
 use super::agent::ComputerAgent;
 use super::policy::{AppClass, classify, normalize_app, sensitive_keys, valid_combo};
 use super::sidecar::DesktopFault;
-use crate::images::ImageLoader;
-use crate::kernel::{
-    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext, review_action,
+use crate::access::{
+    AccessRequest, Admitted, Asking, Attendant, Effect, Gating, GrantPrompt, Resource,
 };
+use crate::images::ImageLoader;
+use crate::kernel::{ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 use crate::platform::clock::SharedClock;
-use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
-use crate::services::approvals::ApprovalService;
 use crate::services::permissions::GLOBAL_SCOPE;
 
 pub const COMPUTER_SCREENSHOT: &str = "computer.screenshot";
@@ -551,10 +550,134 @@ pub enum Need {
     Sensitive,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Plan {
+    pub action: &'static str,
+    pub need: Need,
+    pub apps: Vec<String>,
+    pub detail: Option<String>,
+    pub missing: Vec<ComputerAppDto>,
+    pub reason: Option<String>,
+    pub asks: bool,
+    pub used: BTreeSet<String>,
+    pub answer: Option<FolderAccessAnswer>,
+}
+
+impl Plan {
+    pub const fn plain(action: &'static str) -> Self {
+        Self {
+            action,
+            need: Need::Plain,
+            apps: Vec::new(),
+            detail: None,
+            missing: Vec::new(),
+            reason: None,
+            asks: true,
+            used: BTreeSet::new(),
+            answer: None,
+        }
+    }
+}
+
+struct ComputerAttendant {
+    agent: ComputerAgent,
+    action: u64,
+    run: String,
+    conversation: String,
+    grant: Vec<ComputerAppDto>,
+    reason: Option<String>,
+    tool: String,
+    tool_action: &'static str,
+    apps: Vec<String>,
+    detail: Option<String>,
+    answer: Mutex<Option<FolderAccessAnswer>>,
+}
+
+impl ComputerAttendant {
+    fn answer(&self) -> Option<FolderAccessAnswer> {
+        *self.answer.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+fn approval_id(approval: &ApprovalRequestDto) -> String {
+    text_of(&Value::Object(approval.clone()), "/id")
+}
+
+impl Attendant for ComputerAttendant {
+    fn asking(&self, asking: Asking, approval: &ApprovalRequestDto) {
+        let id = approval_id(approval);
+        let approval = match asking {
+            Asking::Grant => {
+                self.agent
+                    .register_access(&id, &self.run, &self.conversation, self.grant.clone());
+                ComputerApproval {
+                    id,
+                    kind: "access".to_owned(),
+                    tool: COMPUTER_REQUEST_ACCESS.to_owned(),
+                    action: ACCESS_ACTION.to_owned(),
+                    apps: self.grant.clone(),
+                    detail: self.reason.clone(),
+                }
+            }
+            Asking::Tool => ComputerApproval {
+                id,
+                kind: "action".to_owned(),
+                tool: self.tool.clone(),
+                action: self.tool_action.to_owned(),
+                apps: self
+                    .apps
+                    .iter()
+                    .map(|app| ComputerAppDto {
+                        app: app.clone(),
+                        path: String::new(),
+                        icon: None,
+                    })
+                    .collect(),
+                detail: self.detail.clone(),
+            },
+        };
+        self.agent.awaiting(self.action, approval);
+    }
+
+    fn answered(
+        &self,
+        asking: Asking,
+        approval: &ApprovalRequestDto,
+        decision: Result<ApprovalDecision, AppError>,
+    ) -> Result<ApprovalDecision, AppError> {
+        self.agent.decided(self.action);
+        if asking == Asking::Tool {
+            return decision;
+        }
+        let answer = self.agent.take_answer(&approval_id(approval));
+        match decision? {
+            ApprovalDecision::Approved => {
+                if answer.is_none() {
+                    self.agent.grant_run(&self.run, &self.grant);
+                }
+                *self.answer.lock().unwrap_or_else(PoisonError::into_inner) = answer;
+                Ok(ApprovalDecision::Approved)
+            }
+            ApprovalDecision::Denied => {
+                Err(AppError::new(AppErrorCode::ApprovalDenied, ACCESS_DENIED))
+            }
+        }
+    }
+}
+
+fn grant_resources(apps: &[ComputerAppDto]) -> Vec<Resource> {
+    apps.iter()
+        .map(|app| Resource::App {
+            exe: app.app.clone(),
+            path: app.path.clone(),
+            icon: app.icon.clone(),
+        })
+        .collect()
+}
+
 #[derive(Clone)]
 pub struct Computer {
     agent: ComputerAgent,
-    approvals: Arc<ApprovalService>,
     images: Option<ImageLoader>,
     clock: SharedClock,
     own_pids: Arc<Vec<u32>>,
@@ -595,6 +718,15 @@ pub fn refusal(code: &str, window: &Value) -> AppError {
     AppError::new(code, message)
 }
 
+fn grant_prompt(detail: Option<String>) -> GrantPrompt {
+    GrantPrompt {
+        tool: Some(COMPUTER_REQUEST_ACCESS.to_owned()),
+        action: Some(ACCESS_ACTION.to_owned()),
+        scope: Some(ACCESS_SCOPE.to_owned()),
+        detail,
+    }
+}
+
 fn floor_code(code: &str) -> bool {
     matches!(
         code,
@@ -605,14 +737,12 @@ fn floor_code(code: &str) -> bool {
 impl Computer {
     pub fn new(
         agent: ComputerAgent,
-        approvals: Arc<ApprovalService>,
         images: Option<ImageLoader>,
         clock: SharedClock,
         own_pids: Vec<u32>,
     ) -> Self {
         Self {
             agent,
-            approvals,
             images,
             clock,
             own_pids: Arc::new(own_pids),
@@ -662,128 +792,53 @@ impl Computer {
         Ok(())
     }
 
-    async fn request_apps(
-        &self,
-        act: &Act<'_>,
-        apps: Vec<ComputerAppDto>,
-        reason: Option<String>,
-    ) -> Result<Option<FolderAccessAnswer>, AppError> {
+    async fn resolve_apps(&self, act: &Act<'_>, apps: Vec<ComputerAppDto>) -> Vec<ComputerAppDto> {
+        if apps.is_empty() {
+            return apps;
+        }
         let wanted = json!({ "apps": apps.iter().map(|app| json!({ "app": app.app, "path": app.path })).collect::<Vec<_>>() });
-        let apps: Vec<ComputerAppDto> = match self.call(act, "resolve", wanted).await {
+        match self.call(act, "resolve", wanted).await {
             Ok(resolved) => resolved
                 .get("apps")
                 .cloned()
                 .and_then(|apps| serde_json::from_value(apps).ok())
                 .unwrap_or(apps),
             Err(_) => apps,
-        };
-        let run = act.run();
-        let mut request = self
-            .approvals
-            .create(&run, COMPUTER_REQUEST_ACCESS, ACCESS_SCOPE)?;
-        request.insert("kind".to_owned(), json!(APPS_APPROVAL_KIND));
-        request.insert("tool".to_owned(), json!(COMPUTER_REQUEST_ACCESS));
-        request.insert("action".to_owned(), json!(ACCESS_ACTION));
-        request.insert("conversationId".to_owned(), json!(act.conversation));
-        request.insert("apps".to_owned(), json!(apps));
-        if let Some(reason) = &reason {
-            request.insert("detail".to_owned(), json!(reason));
-        }
-        let id = text_of(&Value::Object(request.clone()), "/id");
-        self.agent
-            .register_access(&id, &run, &act.conversation, apps.clone());
-        self.agent.awaiting(
-            act.action,
-            ComputerApproval {
-                id: id.clone(),
-                kind: "access".to_owned(),
-                tool: COMPUTER_REQUEST_ACCESS.to_owned(),
-                action: ACCESS_ACTION.to_owned(),
-                apps: apps.clone(),
-                detail: reason,
-            },
-        );
-        let decision = act.context.request_approval(request).await;
-        self.agent.decided(act.action);
-        let answer = self.agent.take_answer(&id);
-        match decision? {
-            ApprovalDecision::Approved => {
-                if answer.is_none() {
-                    self.agent.grant_run(&run, &apps);
-                }
-                Ok(answer)
-            }
-            ApprovalDecision::Denied => {
-                Err(AppError::new(AppErrorCode::ApprovalDenied, ACCESS_DENIED))
-            }
         }
     }
 
-    async fn authorise(
+    fn attendant(&self, act: &Act<'_>, tool: &str, plan: &Plan) -> ComputerAttendant {
+        ComputerAttendant {
+            agent: self.agent.clone(),
+            action: act.action,
+            run: act.run(),
+            conversation: act.conversation.clone(),
+            grant: plan.missing.clone(),
+            reason: plan.reason.clone(),
+            tool: tool.to_owned(),
+            tool_action: plan.action,
+            apps: plan.apps.clone(),
+            detail: plan.detail.clone(),
+            answer: Mutex::new(None),
+        }
+    }
+
+    async fn request_apps(
         &self,
         act: &Act<'_>,
         tool: &str,
-        need: Need,
-        action: &str,
-        apps: Vec<String>,
-        detail: Option<String>,
+        apps: Vec<ComputerAppDto>,
     ) -> Result<(), AppError> {
-        let ticket = act.context.take_deferred_approval();
-        if ticket.is_none() && need == Need::Plain {
-            return Ok(());
-        }
-        let reviewed = if need == Need::Sensitive {
-            ReviewedAction::Browser
-        } else {
-            ReviewedAction::Plain
+        let plan = Plan {
+            missing: self.resolve_apps(act, apps).await,
+            ..Plan::plain(ACCESS_ACTION)
         };
-        let reason = match review_action(act.context, reviewed).await? {
-            ReviewVerdict::Run(authorisation) => return act.context.authorise(authorisation),
-            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-            ReviewVerdict::Ask { reason } => reason,
-        };
-        let subject = ticket.map_or_else(|| tool.to_owned(), |ticket| ticket.subject);
-        let scope = apps
-            .first()
-            .map_or_else(|| GLOBAL_SCOPE.to_owned(), |app| format!("app:{app}"));
-        let mut request =
-            self.approvals
-                .create(&act.context.run_id.to_string(), &subject, &scope)?;
-        request.insert("tool".to_owned(), json!(tool));
-        request.insert("action".to_owned(), json!(action));
-        request.insert("apps".to_owned(), json!(apps));
-        if let Some(detail) = &detail {
-            request.insert("detail".to_owned(), json!(detail));
-        }
-        let id = text_of(&Value::Object(request.clone()), "/id");
-        self.agent.awaiting(
-            act.action,
-            ComputerApproval {
-                id,
-                kind: "action".to_owned(),
-                tool: tool.to_owned(),
-                action: action.to_owned(),
-                apps: apps
-                    .into_iter()
-                    .map(|app| ComputerAppDto {
-                        app,
-                        path: String::new(),
-                        icon: None,
-                    })
-                    .collect(),
-                detail,
-            },
-        );
-        let decision = act.context.request_approval(request).await;
-        self.agent.decided(act.action);
-        match decision? {
-            ApprovalDecision::Approved => act.context.authorise(
-                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
-            ),
-            ApprovalDecision::Denied => {
-                Err(AppError::new(AppErrorCode::ApprovalDenied, COMPUTER_DENIED))
-            }
-        }
+        let attendant = Arc::new(self.attendant(act, tool, &plan));
+        let mut request = AccessRequest::grants(tool, grant_resources(&plan.missing));
+        request.prompt.conversation = Some(act.conversation.clone());
+        request.prompt.grant = Some(grant_prompt(None));
+        request.prompt.attendant = Some(attendant);
+        act.context.admit(request).await.map(drop)
     }
 
     async fn capture(
@@ -895,10 +950,17 @@ pub trait ComputerStep: Send + Sync + 'static {
 
     fn label(input: &Self::Input) -> String;
 
+    async fn plan(
+        computer: &Computer,
+        act: &Act<'_>,
+        input: &Self::Input,
+    ) -> Result<Plan, AppError>;
+
     async fn act(
         computer: &Computer,
         act: &Act<'_>,
         input: Self::Input,
+        plan: Plan,
     ) -> Result<Self::Output, AppError>;
 }
 
@@ -916,10 +978,19 @@ impl<S> ComputerNode<S> {
     }
 }
 
+pub struct ComputerCall<I> {
+    input: I,
+    action: u64,
+    conversation: String,
+    plan: Plan,
+    attendant: Arc<ComputerAttendant>,
+}
+
 #[async_trait]
 impl<S: ComputerStep> NodeDef for ComputerNode<S> {
     type Input = S::Input;
     type Output = S::Output;
+    type Prepared = ComputerCall<S::Input>;
 
     fn node_type(&self) -> &str {
         S::KEY
@@ -929,15 +1000,15 @@ impl<S: ComputerStep> NodeDef for ComputerNode<S> {
         PermissionRequirement::tool(S::KEY)
     }
 
-    fn defers_approval(&self) -> bool {
-        true
-    }
-
     fn side_effect(&self) -> bool {
         S::SIDE_EFFECT
     }
 
-    async fn run(&self, context: &StepContext, input: S::Input) -> Result<S::Output, AppError> {
+    async fn prepare(
+        &self,
+        context: &StepContext,
+        input: S::Input,
+    ) -> Result<ComputerCall<S::Input>, AppError> {
         context.check_cancelled()?;
         let conversation = input.conversation().to_owned();
         conversation_present(&conversation)?;
@@ -949,11 +1020,89 @@ impl<S: ComputerStep> NodeDef for ComputerNode<S> {
             action,
             conversation,
         };
-        let result = S::act(&self.computer, &act, input).await;
-        agent.finish(action, result.as_ref().err());
+        let planned = match S::plan(&self.computer, &act, &input).await {
+            Ok(plan) => Ok(Plan {
+                missing: self.computer.resolve_apps(&act, plan.missing.clone()).await,
+                ..plan
+            }),
+            Err(error) => Err(error),
+        };
+        let plan = match planned {
+            Ok(plan) => plan,
+            Err(error) => {
+                agent.finish(action, Some(&error));
+                return Err(error);
+            }
+        };
+        let attendant = Arc::new(self.computer.attendant(&act, S::KEY, &plan));
+        Ok(ComputerCall {
+            input,
+            action,
+            conversation: act.conversation,
+            plan,
+            attendant,
+        })
+    }
+
+    fn access(&self, prepared: &ComputerCall<S::Input>, request: AccessRequest) -> AccessRequest {
+        let plan = &prepared.plan;
+        let sensitive = plan.need == Need::Sensitive;
+        let mut request = request.with_effect(Effect::Desktop {
+            apps: plan.apps.clone(),
+            sensitive,
+        });
+        if !plan.asks {
+            request.gating = Gating::Open;
+        } else if sensitive && request.minimum != ToolTier::Off {
+            request.minimum = ToolTier::Ask;
+        }
+        request.resources = grant_resources(&plan.missing);
+        request.prompt.conversation = Some(prepared.conversation.clone());
+        request.prompt.grant = Some(grant_prompt(plan.reason.clone()));
+        request.prompt.action = Some(plan.action.to_owned());
+        request.prompt.scope = Some(
+            plan.apps
+                .first()
+                .map_or_else(|| GLOBAL_SCOPE.to_owned(), |app| format!("app:{app}")),
+        );
+        if let Some(detail) = &plan.detail {
+            request
+                .prompt
+                .fields
+                .push(("detail".to_owned(), json!(detail)));
+        }
+        request.prompt.denied = Some(COMPUTER_DENIED.to_owned());
+        request.prompt.attendant = Some(Arc::clone(&prepared.attendant) as Arc<dyn Attendant>);
+        request
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<ComputerCall<S::Input>>,
+    ) -> Result<S::Output, AppError> {
+        let ComputerCall {
+            input,
+            action,
+            conversation,
+            mut plan,
+            attendant,
+        } = admitted.into_inner();
+        plan.answer = attendant.answer();
+        let act = Act {
+            context,
+            action,
+            conversation,
+        };
+        let result = S::act(&self.computer, &act, input, plan).await;
+        self.computer.agent().finish(action, result.as_ref().err());
         let output = result?;
         context.check_cancelled()?;
         Ok(output)
+    }
+
+    async fn refused(&self, prepared: ComputerCall<S::Input>, error: &AppError) {
+        self.computer.agent().finish(prepared.action, Some(error));
     }
 
     fn tool_meta(&self, input: &Value, output: &S::Output) -> Option<Value> {
@@ -990,21 +1139,20 @@ impl ComputerStep for Screenshot {
         )
     }
 
+    async fn plan(
+        _computer: &Computer,
+        _act: &Act<'_>,
+        _input: &ScreenshotInput,
+    ) -> Result<Plan, AppError> {
+        Ok(Plan::plain(SCREENSHOT_ACTION))
+    }
+
     async fn act(
         computer: &Computer,
         act: &Act<'_>,
         input: ScreenshotInput,
+        _plan: Plan,
     ) -> Result<CaptureOutput, AppError> {
-        computer
-            .authorise(
-                act,
-                Self::KEY,
-                Need::Plain,
-                SCREENSHOT_ACTION,
-                Vec::new(),
-                None,
-            )
-            .await?;
         let params = input
             .display
             .map_or_else(|| json!({}), |display| json!({ "display": display }));
@@ -1033,11 +1181,7 @@ impl ComputerStep for ActSteps {
         steps_label(&input.actions)
     }
 
-    async fn act(
-        computer: &Computer,
-        act: &Act<'_>,
-        input: ActInput,
-    ) -> Result<CaptureOutput, AppError> {
+    async fn plan(computer: &Computer, act: &Act<'_>, input: &ActInput) -> Result<Plan, AppError> {
         let actions = serde_json::to_value(&input.actions)
             .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, ACTION_FAILED))?;
         let probe = computer
@@ -1067,11 +1211,7 @@ impl ComputerStep for ActSteps {
                 system_keys = true;
             }
         }
-        if !missing.is_empty() {
-            computer.request_apps(act, missing, None).await?;
-        }
-        let grants = act.grants(computer);
-        if grants.is_empty() {
+        if missing.is_empty() && grants.is_empty() {
             return Err(AppError::new(AppErrorCode::PermissionDenied, NO_APPS));
         }
         let need = if sensitive.is_empty() && !system_keys {
@@ -1079,16 +1219,29 @@ impl ComputerStep for ActSteps {
         } else {
             Need::Sensitive
         };
-        computer
-            .authorise(
-                act,
-                Self::KEY,
-                need,
-                ACT_ACTION,
-                sensitive.into_iter().collect(),
-                Some(steps_label(&input.actions)),
-            )
-            .await?;
+        Ok(Plan {
+            need,
+            apps: sensitive.into_iter().collect(),
+            detail: Some(steps_label(&input.actions)),
+            missing,
+            used,
+            ..Plan::plain(ACT_ACTION)
+        })
+    }
+
+    async fn act(
+        computer: &Computer,
+        act: &Act<'_>,
+        input: ActInput,
+        plan: Plan,
+    ) -> Result<CaptureOutput, AppError> {
+        let actions = serde_json::to_value(&input.actions)
+            .map_err(|_| AppError::new(AppErrorCode::ValidationFailed, ACTION_FAILED))?;
+        let used = plan.used;
+        let grants = act.grants(computer);
+        if grants.is_empty() {
+            return Err(AppError::new(AppErrorCode::PermissionDenied, NO_APPS));
+        }
         let reply = computer
             .call(
                 act,
@@ -1142,14 +1295,20 @@ impl ComputerStep for Zoom {
         )
     }
 
+    async fn plan(
+        _computer: &Computer,
+        _act: &Act<'_>,
+        _input: &ZoomInput,
+    ) -> Result<Plan, AppError> {
+        Ok(Plan::plain(ZOOM_ACTION))
+    }
+
     async fn act(
         computer: &Computer,
         act: &Act<'_>,
         input: ZoomInput,
+        _plan: Plan,
     ) -> Result<CaptureOutput, AppError> {
-        computer
-            .authorise(act, Self::KEY, Need::Plain, ZOOM_ACTION, Vec::new(), None)
-            .await?;
         let (shot, path, image) = computer
             .capture(
                 act,
@@ -1220,21 +1379,20 @@ impl ComputerStep for Inspect {
         }
     }
 
+    async fn plan(
+        _computer: &Computer,
+        _act: &Act<'_>,
+        _input: &InspectInput,
+    ) -> Result<Plan, AppError> {
+        Ok(Plan::plain(INSPECT_ACTION))
+    }
+
     async fn act(
         computer: &Computer,
         act: &Act<'_>,
         input: InspectInput,
+        _plan: Plan,
     ) -> Result<TextOutput, AppError> {
-        computer
-            .authorise(
-                act,
-                Self::KEY,
-                Need::Plain,
-                INSPECT_ACTION,
-                Vec::new(),
-                None,
-            )
-            .await?;
         let params = |grants: BTreeSet<String>| {
             json!({
                 "query": input.query,
@@ -1258,7 +1416,7 @@ impl ComputerStep for Inspect {
                     &mut BTreeSet::new(),
                     &mut missing,
                 )?;
-                computer.request_apps(act, missing, None).await?;
+                computer.request_apps(act, Self::KEY, missing).await?;
                 computer
                     .call(act, "inspect", params(act.grants(computer)))
                     .await?
@@ -1301,14 +1459,20 @@ impl ComputerStep for Apps {
         APPS_ACTION.to_owned()
     }
 
+    async fn plan(
+        _computer: &Computer,
+        _act: &Act<'_>,
+        _input: &AppsInput,
+    ) -> Result<Plan, AppError> {
+        Ok(Plan::plain(APPS_ACTION))
+    }
+
     async fn act(
         computer: &Computer,
         act: &Act<'_>,
         _input: AppsInput,
+        _plan: Plan,
     ) -> Result<TextOutput, AppError> {
-        computer
-            .authorise(act, Self::KEY, Need::Plain, APPS_ACTION, Vec::new(), None)
-            .await?;
         let listing = computer.call(act, "windows", json!({})).await?;
         let grants = act.grants(computer);
         let mut lines = Vec::new();
@@ -1398,39 +1562,47 @@ impl ComputerStep for OpenApp {
         format!("Запуск «{}»", short(&input.app))
     }
 
-    async fn act(
+    async fn plan(
         computer: &Computer,
         act: &Act<'_>,
-        input: OpenAppInput,
-    ) -> Result<CaptureOutput, AppError> {
+        input: &OpenAppInput,
+    ) -> Result<Plan, AppError> {
         let app = normalize_app(&input.app)
             .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, INVALID_APP))?;
-        let window = json!({ "exe": app });
         let class = classify(&app);
         if class == AppClass::Forbidden {
-            return Err(refusal("forbidden", &window));
+            return Err(refusal("forbidden", &json!({ "exe": app })));
         }
-        if !act.grants(computer).contains(&app) {
-            computer
-                .request_apps(
-                    act,
-                    vec![ComputerAppDto {
-                        app: app.clone(),
-                        path: String::new(),
-                        icon: None,
-                    }],
-                    None,
-                )
-                .await?;
-        }
+        let missing = if act.grants(computer).contains(&app) {
+            Vec::new()
+        } else {
+            vec![ComputerAppDto {
+                app: app.clone(),
+                path: String::new(),
+                icon: None,
+            }]
+        };
         let need = if class == AppClass::Sensitive {
             Need::Sensitive
         } else {
             Need::Plain
         };
-        computer
-            .authorise(act, Self::KEY, need, OPEN_ACTION, vec![app.clone()], None)
-            .await?;
+        Ok(Plan {
+            need,
+            apps: vec![app],
+            missing,
+            ..Plan::plain(OPEN_ACTION)
+        })
+    }
+
+    async fn act(
+        computer: &Computer,
+        act: &Act<'_>,
+        input: OpenAppInput,
+        _plan: Plan,
+    ) -> Result<CaptureOutput, AppError> {
+        let app = normalize_app(&input.app)
+            .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, INVALID_APP))?;
         let launched = computer
             .call(
                 act,
@@ -1468,44 +1640,40 @@ impl ComputerStep for RequestAccess {
         format!("Доступ: {}", short(&input.apps.join(", ")))
     }
 
-    async fn act(
+    async fn plan(
         computer: &Computer,
         act: &Act<'_>,
-        input: AccessInput,
+        input: &AccessInput,
+    ) -> Result<Plan, AppError> {
+        let apps = wanted_apps(computer, act, input)?;
+        Ok(Plan {
+            missing: apps
+                .iter()
+                .map(|app| ComputerAppDto {
+                    app: app.clone(),
+                    path: String::new(),
+                    icon: None,
+                })
+                .collect(),
+            reason: (!apps.is_empty()).then(|| input.reason.trim().to_owned()),
+            asks: false,
+            ..Plan::plain(ACCESS_ACTION)
+        })
+    }
+
+    async fn act(
+        _computer: &Computer,
+        _act: &Act<'_>,
+        _input: AccessInput,
+        plan: Plan,
     ) -> Result<TextOutput, AppError> {
-        let mut apps = Vec::new();
-        for raw in &input.apps {
-            let app = normalize_app(raw)
-                .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, INVALID_APP))?;
-            if classify(&app) == AppClass::Forbidden {
-                return Err(refusal("forbidden", &json!({ "exe": app })));
-            }
-            if !apps.contains(&app) {
-                apps.push(app);
-            }
-        }
-        let granted = act.grants(computer);
-        apps.retain(|app| !granted.contains(app));
-        let _ = act.context.take_deferred_approval();
+        let apps: Vec<String> = plan.missing.iter().map(|app| app.app.clone()).collect();
         if apps.is_empty() {
             return Ok(TextOutput {
                 text: "Access to these apps is already granted.".to_owned(),
                 untrusted: false,
             });
         }
-        let answer = computer
-            .request_apps(
-                act,
-                apps.iter()
-                    .map(|app| ComputerAppDto {
-                        app: app.clone(),
-                        path: String::new(),
-                        icon: None,
-                    })
-                    .collect(),
-                Some(input.reason.trim().to_owned()),
-            )
-            .await?;
         let sensitive: Vec<&str> = apps
             .iter()
             .filter(|app| classify(app) == AppClass::Sensitive)
@@ -1514,7 +1682,7 @@ impl ComputerStep for RequestAccess {
         let mut text = format!(
             "The user granted access to {} {}.",
             apps.join(", "),
-            scope_text(answer)
+            scope_text(plan.answer)
         );
         if !sensitive.is_empty() {
             text.push_str(&format!(
@@ -1527,6 +1695,27 @@ impl ComputerStep for RequestAccess {
             untrusted: false,
         })
     }
+}
+
+fn wanted_apps(
+    computer: &Computer,
+    act: &Act<'_>,
+    input: &AccessInput,
+) -> Result<Vec<String>, AppError> {
+    let mut apps = Vec::new();
+    for raw in &input.apps {
+        let app = normalize_app(raw)
+            .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, INVALID_APP))?;
+        if classify(&app) == AppClass::Forbidden {
+            return Err(refusal("forbidden", &json!({ "exe": app })));
+        }
+        if !apps.contains(&app) {
+            apps.push(app);
+        }
+    }
+    let granted = act.grants(computer);
+    apps.retain(|app| !granted.contains(app));
+    Ok(apps)
 }
 
 pub fn register_computer_nodes(nodes: &NodeRegistry, computer: &Computer) -> Result<(), AppError> {

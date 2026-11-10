@@ -11,7 +11,8 @@ use zvs_contract::validate::check;
 use zvs_contract::{AppError, McpCallResultDto, Validate};
 
 use super::registry::NodeRegistry;
-use super::types::{NodeDef, PermissionRequirement, StepContext};
+use super::types::{PermissionRequirement, PlainNode, StepContext};
+use crate::access::{AccessRequest, Admitted, Effect};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpNodeTarget {
@@ -19,8 +20,21 @@ pub struct McpNodeTarget {
     pub server_id: String,
     pub tool: String,
     pub read_only: bool,
+    pub destructive: bool,
     pub timeout: Option<Duration>,
     pub read_resource: bool,
+}
+
+impl McpNodeTarget {
+    pub const fn effect(&self) -> Effect {
+        if self.destructive {
+            Effect::Opaque { destructive: true }
+        } else if self.read_only {
+            Effect::Read
+        } else {
+            Effect::Opaque { destructive: false }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,7 +80,7 @@ pub struct McpToolNode {
 }
 
 #[async_trait]
-impl NodeDef for McpToolNode {
+impl PlainNode for McpToolNode {
     type Input = McpNodeInput;
     type Output = McpCallResultDto;
 
@@ -82,11 +96,21 @@ impl NodeDef for McpToolNode {
         !self.target.read_only
     }
 
-    async fn run(
+    fn access(&self, _input: &McpNodeInput, request: AccessRequest) -> AccessRequest {
+        let effect = self.target.effect();
+        if request.effect.benign() || !effect.benign() {
+            request.with_effect(effect)
+        } else {
+            request
+        }
+    }
+
+    async fn execute(
         &self,
         context: &StepContext,
-        input: McpNodeInput,
+        admitted: Admitted<McpNodeInput>,
     ) -> Result<McpCallResultDto, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         (self.call)(
             McpCallTarget {

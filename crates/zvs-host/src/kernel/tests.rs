@@ -20,6 +20,7 @@ use zvs_contract::{
 };
 
 use super::*;
+use crate::access::Admitted;
 use crate::data::Database;
 use crate::data::repositories::{Repositories, RunDraft};
 use crate::data::schema::StepRow;
@@ -125,7 +126,11 @@ where
     registry
         .register(FnNode::new(
             node_type,
-            PermissionRequirement::None,
+            if side_effect_free {
+                PermissionRequirement::None
+            } else {
+                PermissionRequirement::Kernel
+            },
             !side_effect_free,
             run,
         ))
@@ -1273,7 +1278,7 @@ fn typed_nodes_publish_json_schema_for_tool_exposure() {
 struct MapNodeAgain;
 
 #[async_trait]
-impl NodeDef for MapNodeAgain {
+impl PlainNode for MapNodeAgain {
     type Input = Value;
     type Output = Value;
 
@@ -1289,7 +1294,12 @@ impl NodeDef for MapNodeAgain {
         false
     }
 
-    async fn run(&self, _context: &StepContext, input: Value) -> Result<Value, AppError> {
+    async fn execute(
+        &self,
+        _context: &StepContext,
+        admitted: Admitted<Value>,
+    ) -> Result<Value, AppError> {
+        let input = admitted.into_inner();
         Ok(input)
     }
 }
@@ -1374,6 +1384,7 @@ fn detached(
     cancel: CancellationToken,
 ) -> StepContext {
     StepContext::new(RunId::new(new_id()), cancel, services, link)
+        .with_gate(Arc::new(crate::access::OpenGate))
 }
 
 #[tokio::test]
@@ -1640,7 +1651,11 @@ fn register_crash_work(registry: &NodeRegistry, side_effect_free: bool, calls: A
     registry
         .register(FnNode::new(
             "crash.work",
-            PermissionRequirement::None,
+            if side_effect_free {
+                PermissionRequirement::None
+            } else {
+                PermissionRequirement::Kernel
+            },
             !side_effect_free,
             move |context: StepContext, input: String| {
                 calls.fetch_add(1, Ordering::SeqCst);
@@ -1770,8 +1785,7 @@ fn a_vector_search_tool_call_carries_its_hits_as_citations_for_display_only() {
     }]))
     .expect("hits");
     let node = super::nodes::VectorSearchNode;
-    let meta = node
-        .tool_meta(&json!({ "storeId": store, "query": "x" }), &hits)
+    let meta = PlainNode::tool_meta(&node, &json!({ "storeId": store, "query": "x" }), &hits)
         .expect("a meta");
     assert_eq!(
         meta,
@@ -1786,5 +1800,198 @@ fn a_vector_search_tool_call_carries_its_hits_as_citations_for_display_only() {
             "related": null,
         }] })
     );
-    assert!(node.tool_meta(&json!({ "query": "x" }), &hits).is_none());
+    assert!(PlainNode::tool_meta(&node, &json!({ "query": "x" }), &hits).is_none());
+}
+
+#[derive(Default)]
+struct RecordingGate {
+    requests: Mutex<Vec<crate::access::AccessRequest>>,
+    refuse: bool,
+}
+
+#[async_trait]
+impl crate::access::AccessGate for RecordingGate {
+    async fn screen(
+        &self,
+        _request: &crate::access::AccessRequest,
+        _context: &StepContext,
+    ) -> Result<(), AppError> {
+        Ok(())
+    }
+
+    async fn admit(
+        &self,
+        request: crate::access::AccessRequest,
+        context: &StepContext,
+    ) -> Result<crate::access::Clearance, AppError> {
+        self.requests
+            .lock()
+            .expect("requests")
+            .push(request.clone());
+        if self.refuse {
+            return Err(AppError::new(AppErrorCode::PermissionDenied, "refused"));
+        }
+        crate::access::AccessGate::admit(&crate::access::OpenGate, request, context).await
+    }
+}
+
+fn gated(gate: &Arc<RecordingGate>) -> StepContext {
+    StepContext::new(
+        RunId::new(new_id()),
+        CancellationToken::new(),
+        KernelServices::default(),
+        Arc::new(RecordingLink::default()),
+    )
+    .with_gate(Arc::clone(gate) as crate::access::SharedGate)
+}
+
+fn noop(_context: StepContext, _input: Value) -> futures::future::Ready<Result<Value, AppError>> {
+    futures::future::ready(Ok(Value::Null))
+}
+
+#[test]
+fn a_node_with_a_side_effect_and_no_access_is_refused_at_registration() {
+    let registry = NodeRegistry::new();
+    let refused = registry
+        .register(FnNode::new(
+            "undeclared",
+            PermissionRequirement::None,
+            true,
+            noop,
+        ))
+        .expect_err("an undeclared side effect is refused");
+    assert_eq!(refused.code, AppErrorCode::ValidationFailed);
+    assert_eq!(refused.message, UNDECLARED_ACCESS);
+    assert!(registry.get("undeclared").is_err());
+    registry
+        .register(FnNode::new(
+            "kernel",
+            PermissionRequirement::Kernel,
+            true,
+            noop,
+        ))
+        .expect("a kernel step registers");
+    registry
+        .register(FnNode::new(
+            "tool",
+            PermissionRequirement::tool("tool"),
+            true,
+            noop,
+        ))
+        .expect("a tool registers");
+    registry
+        .register(FnNode::new(
+            "pure",
+            PermissionRequirement::None,
+            false,
+            noop,
+        ))
+        .expect("a pure step registers");
+}
+
+#[tokio::test]
+async fn a_node_runs_only_after_the_gate_admits_it() {
+    let registry = NodeRegistry::new();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&calls);
+    registry
+        .register(FnNode::new(
+            "guarded",
+            PermissionRequirement::tool("guarded"),
+            true,
+            move |_context: StepContext, _input: Value| {
+                counter.fetch_add(1, Ordering::SeqCst);
+                async { Ok(Value::Null) }
+            },
+        ))
+        .expect("registers");
+    let node = registry.get("guarded").expect("a node");
+    let refusing = Arc::new(RecordingGate {
+        refuse: true,
+        ..RecordingGate::default()
+    });
+    let refused = node
+        .execute(&gated(&refusing), json!({}))
+        .await
+        .expect_err("refused");
+    assert_eq!(refused.code, AppErrorCode::PermissionDenied);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let no_gate = StepContext::new(
+        RunId::new(new_id()),
+        CancellationToken::new(),
+        KernelServices::default(),
+        Arc::new(RecordingLink::default()),
+    );
+    assert_eq!(
+        node.execute(&no_gate, json!({}))
+            .await
+            .expect_err("no gate")
+            .message,
+        NO_PERMISSION_SERVICE
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let open = Arc::new(RecordingGate::default());
+    node.execute(&gated(&open), json!({}))
+        .await
+        .expect("admitted");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let requests = open.requests.lock().expect("requests").clone();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].tool, "guarded");
+    assert_eq!(requests[0].actor.origin, AdmissionOrigin::Graph);
+}
+
+#[tokio::test]
+async fn mcp_tools_describe_their_effect_from_the_server_annotations() {
+    use crate::access::Effect;
+    let registry = NodeRegistry::new();
+    let caller: McpToolCaller = Arc::new(|_target, _arguments, _cancel| {
+        Box::pin(async { Err(AppError::new(AppErrorCode::NotFound, "offline")) })
+    });
+    for (key, read_only, destructive) in [
+        ("mcp.read", true, false),
+        ("mcp.delete", false, true),
+        ("mcp.other", false, false),
+    ] {
+        register_mcp_tool_node(
+            &registry,
+            McpNodeTarget {
+                key: key.to_owned(),
+                server_id: "server".to_owned(),
+                tool: key.to_owned(),
+                read_only,
+                destructive,
+                timeout: None,
+                read_resource: false,
+            },
+            Arc::clone(&caller),
+        )
+        .expect("registers");
+    }
+    let effect = |key: &str, raised: bool| {
+        let registry = &registry;
+        let key = key.to_owned();
+        async move {
+            let gate = Arc::new(RecordingGate::default());
+            let node = registry.get(&key).expect("a node");
+            let _ = node.execute_tool(&gated(&gate), json!({}), raised).await;
+            let request = gate.requests.lock().expect("requests")[0].clone();
+            assert_eq!(request.actor.origin, AdmissionOrigin::Model);
+            request.effect
+        }
+    };
+    assert_eq!(effect("mcp.read", false).await, Effect::Read);
+    assert_eq!(
+        effect("mcp.delete", false).await,
+        Effect::Opaque { destructive: true }
+    );
+    assert_eq!(
+        effect("mcp.other", false).await,
+        Effect::Opaque { destructive: false }
+    );
+    assert_eq!(effect("mcp.other", true).await, Effect::Declared);
+    assert_eq!(
+        effect("mcp.delete", true).await,
+        Effect::Opaque { destructive: true }
+    );
 }

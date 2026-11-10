@@ -42,6 +42,21 @@ pub const SENSITIVE_APPS: &[&str] = &[
     "devenv.exe",
 ];
 
+pub const TERMINAL_APPS: &[&str] = &[
+    "cmd.exe",
+    "powershell.exe",
+    "powershell_ise.exe",
+    "pwsh.exe",
+    "windowsterminal.exe",
+    "wt.exe",
+    "openconsole.exe",
+    "conhost.exe",
+    "wsl.exe",
+    "wslhost.exe",
+    "bash.exe",
+    "mintty.exe",
+];
+
 static APP_NAME: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[\p{L}\p{N} ._()+\-]+$").expect("a valid pattern"));
 
@@ -72,6 +87,10 @@ pub fn classify(app: &str) -> AppClass {
     } else {
         AppClass::Normal
     }
+}
+
+pub fn terminal(app: &str) -> bool {
+    TERMINAL_APPS.contains(&app)
 }
 
 fn key_names(combo: &str) -> Vec<String> {
@@ -127,6 +146,13 @@ mod tests {
         assert_eq!(classify("pwsh.exe"), AppClass::Sensitive);
         assert_eq!(classify("windowsterminal.exe"), AppClass::Sensitive);
         assert_eq!(classify("notepad.exe"), AppClass::Normal);
+        assert!(terminal("pwsh.exe"));
+        assert!(!terminal("regedit.exe"));
+        assert!(
+            TERMINAL_APPS
+                .iter()
+                .all(|app| classify(app) == AppClass::Sensitive)
+        );
     }
 
     #[test]

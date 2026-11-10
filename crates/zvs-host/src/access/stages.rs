@@ -185,6 +185,9 @@ impl Stage for ModeStage {
                 Step::Decide(Decision::allow(StageName::Mode).from_source(mode.as_str()))
             }
             ModeDecision::Ask => Step::Decide(Decision::ask(StageName::Mode)),
+            ModeDecision::Review if !request.effect.reviewable() => {
+                Step::Decide(Decision::ask(StageName::Mode))
+            }
             ModeDecision::Review => Step::Continue,
         })
     }

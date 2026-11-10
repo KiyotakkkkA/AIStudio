@@ -51,6 +51,13 @@ envelopes. `KernelServices` exposes provider driver acquisition, vector search a
 
 ## Permissions and approvals
 
+Every call runs `screen → prepare → access → admit → execute` (`registry.rs`). The gate on the
+`StepContext` (`access::AccessGate`, wired by `RunService`) screens the base requirement through
+the floor, then admits the node's `AccessRequest`; `execute` receives `Admitted<Prepared>`, which
+only the access module can make. Nodes with nothing to prepare implement `PlainNode`. A node with
+a side effect must declare a tool permission or `PermissionRequirement::Kernel`, or registration
+fails with `UNDECLARED_ACCESS`. The step timeout covers `execute`, not the approval.
+
 `PermissionService::admit` composes the node requirement, the global ceiling and every
 matching graph `permissionScopes` entry using `off > ask > auto`. A scenario's subject also
 adds its scenario scope (`admit_subject`). Scope names are `skill:<id>`, `scenario:<id>` and

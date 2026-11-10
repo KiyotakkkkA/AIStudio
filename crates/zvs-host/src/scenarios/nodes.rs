@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, HostEventDraft, ToolListFilter, ToolMode, Validate, log_line,
+    AppError, AppErrorCode, HostEventDraft, ToolListFilter, ToolMode, ToolTier, Validate, log_line,
     resolve_tool_mode,
 };
 
@@ -21,10 +21,11 @@ use super::template::{
     TemplateScope, UNTRUSTED_INPUT_INSTRUCTION, carries_untrusted, civil_date, fence_untrusted,
     render, text_of,
 };
+use crate::access::Admitted;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall};
 use crate::kernel::knowledge_nodes::KNOWLEDGE_SEARCH;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
-use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
+use crate::kernel::{NodeRegistry, PermissionRequirement, PlainNode, StepContext, ToolStepRequest};
 use crate::services::MemoryService;
 use crate::services::chat::GenerateChatNode;
 use crate::services::chat_memory::{
@@ -182,7 +183,7 @@ impl Validate for Payload {
 struct TriggerNode(&'static str);
 
 #[async_trait]
-impl NodeDef for TriggerNode {
+impl PlainNode for TriggerNode {
     type Input = StepInput;
     type Output = Payload;
 
@@ -198,7 +199,12 @@ impl NodeDef for TriggerNode {
         false
     }
 
-    async fn run(&self, context: &StepContext, input: StepInput) -> Result<Payload, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<StepInput>,
+    ) -> Result<Payload, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let pinned = input.upstream();
         let event = if input.event.is_null() {
@@ -248,7 +254,7 @@ fn with_text(value: Value, text: &str) -> Value {
 }
 
 #[async_trait]
-impl NodeDef for OutputNode {
+impl PlainNode for OutputNode {
     type Input = StepInput;
     type Output = Payload;
 
@@ -257,14 +263,19 @@ impl NodeDef for OutputNode {
     }
 
     fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::None
+        PermissionRequirement::Kernel
     }
 
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(&self, context: &StepContext, input: StepInput) -> Result<Payload, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<StepInput>,
+    ) -> Result<Payload, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let effects = self.effects.get()?;
         let text = input.body();
@@ -476,7 +487,7 @@ impl AgentNode {
 }
 
 #[async_trait]
-impl NodeDef for AgentNode {
+impl PlainNode for AgentNode {
     type Input = StepInput;
     type Output = AgentOutput;
 
@@ -492,7 +503,12 @@ impl NodeDef for AgentNode {
         true
     }
 
-    async fn run(&self, context: &StepContext, input: StepInput) -> Result<AgentOutput, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<StepInput>,
+    ) -> Result<AgentOutput, AppError> {
+        let input = admitted.into_inner();
         let model = slot_params(input.model.as_ref());
         let provider_id = model
             .get("providerId")
@@ -657,13 +673,7 @@ impl AgentNode {
         if tool.key == KNOWLEDGE_SEARCH {
             arguments.insert("scope".to_owned(), json!(session.stores));
         }
-        let Some(invocation) = context.invoke_tool(ToolStepRequest {
-            key: tool.key.clone(),
-            input: Value::Object(arguments),
-            label: format!("call{index}"),
-            minimum_tier: None,
-            on_approval: None,
-        }) else {
+        let Some(invocation) = context.invoke_tool(tool_request(tool, arguments, index)) else {
             return Ok(shape("refused", UNKNOWN_TOOL.to_owned()));
         };
         match invocation.await {
@@ -692,6 +702,20 @@ impl AgentNode {
                 Ok(shape("failed", error.message))
             }
         }
+    }
+}
+
+pub fn tool_request(
+    tool: &OfferedTool,
+    arguments: Map<String, Value>,
+    index: u64,
+) -> ToolStepRequest {
+    ToolStepRequest {
+        key: tool.key.clone(),
+        input: Value::Object(arguments),
+        label: format!("call{index}"),
+        minimum_tier: tool.destructive.then_some(ToolTier::Ask),
+        on_approval: None,
     }
 }
 

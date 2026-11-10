@@ -16,13 +16,14 @@ use super::plan::{
     signature, summary,
 };
 use super::store::{SessionStore, session_tools};
+use crate::access::Admitted;
 use crate::background::BACKGROUND_TOOLS;
 use crate::commands::PROCESS_TOOLS;
 use crate::data::schema::{AgenticSessionRow, TranscriptCall, TranscriptEntry};
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, ToolCall, ToolSpec};
 use crate::files::FILE_TOOLS;
 use crate::kernel::nodes::PROVIDERS_UNAVAILABLE;
-use crate::kernel::{NodeDef, PermissionRequirement, StepContext, ToolStepRequest};
+use crate::kernel::{PermissionRequirement, PlainNode, StepContext, ToolStepRequest};
 use crate::services::chat::{FILE_TOOLS_RULES, GenerateChatNode, PROCESS_TOOLS_RULES};
 use crate::services::chat_tools::{
     OfferedTool, TOOL_RESULT_MAX_CHARS, TOOL_RESULTS_INSTRUCTION, cap_text, fence_tool_result,
@@ -532,7 +533,7 @@ impl SessionNode {
 }
 
 #[async_trait]
-impl NodeDef for SessionNode {
+impl PlainNode for SessionNode {
     type Input = SessionInput;
     type Output = SessionOutput;
 
@@ -548,11 +549,12 @@ impl NodeDef for SessionNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: SessionInput,
+        admitted: Admitted<SessionInput>,
     ) -> Result<SessionOutput, AppError> {
+        let input = admitted.into_inner();
         let id = input.session_id;
         let row = self.store.load(&id)?;
         if row.status != AgenticSessionStatus::Running

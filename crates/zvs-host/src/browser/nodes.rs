@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
-    AppError, AppErrorCode, BrowserAgentApproval, BrowserAuthorisation, BrowserSiteAction,
-    BrowserSiteDecision, ToolAuthorisationDto, ToolAuthorisationKind, Validate,
+    AppError, AppErrorCode, ApprovalRequestDto, BrowserAgentApproval, BrowserAuthorisation,
+    BrowserSiteAction, BrowserSiteDecision, Validate,
 };
 
 use super::agent::BrowserAgent;
@@ -21,11 +21,8 @@ use super::capability::{BrowserCapability, site_origin, site_scope};
 use super::grants::{BrowserGrants, SITE_BLOCKED, site_action};
 use super::page::{PageElement, fence_page};
 use super::policy::navigation_url;
-use crate::kernel::{
-    ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext, review_action,
-};
-use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
-use crate::services::approvals::ApprovalService;
+use crate::access::{AccessRequest, Admitted, Asking, Attendant, Cleared, Effect, Resource};
+use crate::kernel::{ApprovalDecision, NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 use crate::services::permissions::GLOBAL_SCOPE;
 
 pub const NAVIGATE_DESCRIPTION: &str = "Opens an HTTP or HTTPS URL in the active browser tab. file:, data:, javascript: and other schemes are blocked.";
@@ -290,23 +287,16 @@ pub fn element_label(target: &ElementTarget) -> String {
 pub struct Browser {
     port: SharedAutomation,
     grants: BrowserGrants,
-    approvals: Arc<ApprovalService>,
     agent: BrowserAgent,
     images: Option<crate::images::ImageLoader>,
     clock: crate::platform::clock::SharedClock,
 }
 
 impl Browser {
-    pub fn new(
-        port: SharedAutomation,
-        grants: BrowserGrants,
-        approvals: Arc<ApprovalService>,
-        agent: BrowserAgent,
-    ) -> Self {
+    pub fn new(port: SharedAutomation, grants: BrowserGrants, agent: BrowserAgent) -> Self {
         Self {
             port,
             grants,
-            approvals,
             agent,
             images: None,
             clock: Arc::new(crate::platform::clock::SystemClock),
@@ -364,101 +354,105 @@ impl Browser {
             .map_or_else(|| handle.to_owned(), |target| element_label(&target))
     }
 
-    async fn authorise(
+    fn scope(
         &self,
-        act: &Act<'_>,
         capability: BrowserCapability,
-        action: &str,
-        origin: Option<String>,
-        target: Option<&ElementTarget>,
-        extra: Option<(&str, Value)>,
-    ) -> Result<(), AppError> {
-        let decided = self.grants.decision(origin.as_deref(), capability);
+        scope: Scope,
+    ) -> Result<(Scope, Option<BrowserAuthorisation>), AppError> {
+        let decided = self.grants.decision(scope.origin.as_deref(), capability);
         if decided.decision == BrowserSiteDecision::Block {
             return Err(AppError::new(AppErrorCode::PermissionDenied, SITE_BLOCKED));
         }
-        let Some(ticket) = act.context.take_deferred_approval() else {
-            let granted = decided
-                .updated_at
-                .filter(|_| decided.site && decided.decision == BrowserSiteDecision::Allow);
-            self.agent.authorised(
-                act.action,
-                granted.map_or(BrowserAuthorisation::Auto, |at| {
-                    BrowserAuthorisation::Granted { at }
-                }),
-            );
-            return Ok(());
-        };
-        let reviewed = if matches!(
-            capability,
-            BrowserCapability::Submit | BrowserCapability::Download
-        ) {
-            ReviewedAction::Browser
-        } else {
-            ReviewedAction::Plain
-        };
-        let reason = match review_action(act.context, reviewed).await? {
-            ReviewVerdict::Run(authorisation) => {
-                self.agent
-                    .authorised(act.action, BrowserAuthorisation::Auto);
-                return act.context.authorise(authorisation);
-            }
-            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-            ReviewVerdict::Ask { reason } => reason,
-        };
-        let scope = origin
-            .as_deref()
-            .map_or_else(|| GLOBAL_SCOPE.to_owned(), site_scope);
-        let mut request =
-            self.approvals
-                .create(&act.context.run_id.to_string(), &ticket.subject, &scope)?;
-        request.insert("tool".to_owned(), json!(capability.key()));
-        request.insert("action".to_owned(), json!(action));
-        if let Some(origin) = &origin {
-            request.insert("origin".to_owned(), json!(origin));
+        let granted = decided
+            .updated_at
+            .filter(|_| decided.site && decided.decision == BrowserSiteDecision::Allow)
+            .map(|at| BrowserAuthorisation::Granted { at });
+        Ok((scope, granted))
+    }
+}
+
+pub struct Scope {
+    pub action: &'static str,
+    pub origin: Option<String>,
+    pub target: Option<ElementTarget>,
+    pub extra: Option<(&'static str, Value)>,
+}
+
+impl Scope {
+    pub const fn page(action: &'static str, origin: Option<String>) -> Self {
+        Self {
+            action,
+            origin,
+            target: None,
+            extra: None,
         }
-        if let Some(target) = target {
-            request.insert(
-                "target".to_owned(),
-                json!({ "role": target.role, "name": target.name }),
-            );
+    }
+
+    pub fn element(action: &'static str, target: ElementTarget) -> Self {
+        Self {
+            action,
+            origin: Some(target.origin.clone()),
+            target: Some(target),
+            extra: None,
         }
-        let text = extra
-            .as_ref()
-            .and_then(|(key, value)| (*key == "text").then(|| value.as_str()).flatten())
-            .map(str::to_owned);
-        if let Some((key, value)) = extra {
-            request.insert(key.to_owned(), value);
+    }
+}
+
+struct BrowserAttendant {
+    agent: BrowserAgent,
+    action: u64,
+    capability: BrowserCapability,
+    label: &'static str,
+    origin: Option<String>,
+    target: Option<String>,
+    text: Option<String>,
+    granted: Option<BrowserAuthorisation>,
+}
+
+impl Attendant for BrowserAttendant {
+    fn cleared(&self, by: Cleared) {
+        match by {
+            Cleared::Admission => self.agent.authorised(
+                self.action,
+                self.granted.unwrap_or(BrowserAuthorisation::Auto),
+            ),
+            Cleared::Review => self
+                .agent
+                .authorised(self.action, BrowserAuthorisation::Auto),
+            Cleared::Person => {}
         }
-        let id = request
+    }
+
+    fn asking(&self, _asking: Asking, approval: &ApprovalRequestDto) {
+        let id = approval
             .get("id")
             .and_then(Value::as_str)
             .unwrap_or_default()
             .to_owned();
         self.agent.awaiting(
-            act.action,
+            self.action,
             BrowserAgentApproval {
                 id,
-                tool: capability.key().to_owned(),
-                can_always: capability.grantable() && origin.is_some(),
-                origin: origin.unwrap_or_default(),
-                target: target.map_or_else(|| action.to_owned(), element_label),
-                text,
+                tool: self.capability.key().to_owned(),
+                can_always: self.capability.grantable() && self.origin.is_some(),
+                origin: self.origin.clone().unwrap_or_default(),
+                target: self.target.clone().unwrap_or_else(|| self.label.to_owned()),
+                text: self.text.clone(),
             },
         );
-        let decision = act.context.request_approval(request).await;
+    }
+
+    fn answered(
+        &self,
+        _asking: Asking,
+        _approval: &ApprovalRequestDto,
+        decision: Result<ApprovalDecision, AppError>,
+    ) -> Result<ApprovalDecision, AppError> {
         self.agent.decided(
-            act.action,
+            self.action,
             matches!(decision, Ok(ApprovalDecision::Approved)),
         );
-        match decision? {
-            ApprovalDecision::Approved => act.context.authorise(
-                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
-            ),
-            ApprovalDecision::Denied => {
-                Err(AppError::new(AppErrorCode::ApprovalDenied, BROWSER_DENIED))
-            }
-        }
+        decision
     }
 }
 
@@ -473,6 +467,8 @@ pub trait BrowserStep: Send + Sync + 'static {
     }
 
     fn label(browser: &Browser, input: &Self::Input) -> String;
+
+    fn scope(browser: &Browser, input: &Self::Input) -> Result<Scope, AppError>;
 
     async fn act(
         browser: &Browser,
@@ -495,10 +491,30 @@ impl<S> BrowserNode<S> {
     }
 }
 
+pub struct BrowserCall<I> {
+    input: I,
+    action: u64,
+    handle: Option<String>,
+    scope: Scope,
+    granted: Option<BrowserAuthorisation>,
+}
+
+impl<S: BrowserStep> BrowserNode<S> {
+    async fn release(&self, action: u64, handle: Option<&String>, error: Option<&AppError>) {
+        if handle.is_some() {
+            let _ = self.browser.port.highlight(None).await;
+        }
+        self.browser
+            .agent
+            .finish(action, error.map(|error| error.message.as_str()));
+    }
+}
+
 #[async_trait]
 impl<S: BrowserStep> NodeDef for BrowserNode<S> {
     type Input = S::Input;
     type Output = S::Output;
+    type Prepared = BrowserCall<S::Input>;
 
     fn node_type(&self) -> &str {
         S::CAPABILITY.key()
@@ -512,15 +528,15 @@ impl<S: BrowserStep> NodeDef for BrowserNode<S> {
         self.browser.requirement(S::CAPABILITY, input)
     }
 
-    fn defers_approval(&self) -> bool {
-        true
-    }
-
     fn side_effect(&self) -> bool {
         S::CAPABILITY.side_effect()
     }
 
-    async fn run(&self, context: &StepContext, input: S::Input) -> Result<S::Output, AppError> {
+    async fn prepare(
+        &self,
+        context: &StepContext,
+        input: S::Input,
+    ) -> Result<BrowserCall<S::Input>, AppError> {
         context.check_cancelled()?;
         let browser = &self.browser;
         let action = browser
@@ -536,17 +552,98 @@ impl<S: BrowserStep> NodeDef for BrowserNode<S> {
         if let Some(handle) = &handle {
             let _ = browser.port.highlight(Some(handle)).await;
         }
-        let result = S::act(browser, &Act { context, action }, input).await;
-        if handle.is_some() {
-            let _ = browser.port.highlight(None).await;
+        let scoped =
+            S::scope(browser, &input).and_then(|scope| browser.scope(S::CAPABILITY, scope));
+        match scoped {
+            Ok((scope, granted)) => Ok(BrowserCall {
+                input,
+                action,
+                handle,
+                scope,
+                granted,
+            }),
+            Err(error) => {
+                self.release(action, handle.as_ref(), Some(&error)).await;
+                Err(error)
+            }
         }
-        browser.agent.finish(
-            action,
-            result.as_ref().err().map(|error| error.message.as_str()),
+    }
+
+    fn access(&self, prepared: &BrowserCall<S::Input>, request: AccessRequest) -> AccessRequest {
+        let capability = S::CAPABILITY;
+        let scope = &prepared.scope;
+        let effect = if matches!(
+            capability,
+            BrowserCapability::Submit | BrowserCapability::Download
+        ) {
+            Effect::Browser
+        } else {
+            Effect::Plain
+        };
+        let mut request = request.with_effect(effect);
+        if let Some(origin) = &scope.origin {
+            request.resources.push(Resource::Site(origin.clone()));
+        }
+        request.prompt.action = Some(scope.action.to_owned());
+        request.prompt.scope = Some(
+            scope
+                .origin
+                .as_deref()
+                .map_or_else(|| GLOBAL_SCOPE.to_owned(), site_scope),
         );
+        if let Some(target) = &scope.target {
+            request.prompt.fields.push((
+                "target".to_owned(),
+                json!({ "role": target.role, "name": target.name }),
+            ));
+        }
+        let text = scope
+            .extra
+            .as_ref()
+            .and_then(|(key, value)| (*key == "text").then(|| value.as_str()).flatten())
+            .map(str::to_owned);
+        if let Some((key, value)) = &scope.extra {
+            request
+                .prompt
+                .fields
+                .push(((*key).to_owned(), value.clone()));
+        }
+        request.prompt.denied = Some(BROWSER_DENIED.to_owned());
+        request.prompt.attendant = Some(Arc::new(BrowserAttendant {
+            agent: self.browser.agent.clone(),
+            action: prepared.action,
+            capability,
+            label: scope.action,
+            origin: scope.origin.clone(),
+            target: scope.target.as_ref().map(element_label),
+            text,
+            granted: prepared.granted,
+        }));
+        request
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<BrowserCall<S::Input>>,
+    ) -> Result<S::Output, AppError> {
+        let BrowserCall {
+            input,
+            action,
+            handle,
+            ..
+        } = admitted.into_inner();
+        let result = S::act(&self.browser, &Act { context, action }, input).await;
+        self.release(action, handle.as_ref(), result.as_ref().err())
+            .await;
         let output = result?;
         context.check_cancelled()?;
         Ok(output)
+    }
+
+    async fn refused(&self, prepared: BrowserCall<S::Input>, error: &AppError) {
+        self.release(prepared.action, prepared.handle.as_ref(), Some(error))
+            .await;
     }
 
     fn tool_meta(&self, input: &Value, output: &S::Output) -> Option<Value> {
@@ -579,22 +676,17 @@ impl BrowserStep for Navigate {
         short(&input.url)
     }
 
+    fn scope(_browser: &Browser, input: &NavigateInput) -> Result<Scope, AppError> {
+        let url = navigation_url(&input.url).map_err(|_| refused(BLOCKED_ADDRESS))?;
+        Ok(Scope::page(NAVIGATE_ACTION, site_origin(&url)))
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         input: NavigateInput,
     ) -> Result<PageOutput, AppError> {
         let url = navigation_url(&input.url).map_err(|_| refused(BLOCKED_ADDRESS))?;
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                NAVIGATE_ACTION,
-                site_origin(&url),
-                None,
-                None,
-            )
-            .await?;
         Ok(PageOutput::of(browser.port.navigate(&url).await?))
     }
 }
@@ -609,21 +701,15 @@ impl BrowserStep for ReadPage {
         browser.port.origin().unwrap_or_default()
     }
 
+    fn scope(browser: &Browser, _input: &PageInput) -> Result<Scope, AppError> {
+        Ok(Scope::page(READ_ACTION, browser.port.origin()))
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         _input: PageInput,
     ) -> Result<ReadPageOutput, AppError> {
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                READ_ACTION,
-                browser.port.origin(),
-                None,
-                None,
-            )
-            .await?;
         let snapshot = browser.port.read_page().await?;
         Ok(ReadPageOutput {
             text: page_text(&snapshot.page, &snapshot.text),
@@ -646,21 +732,15 @@ impl BrowserStep for Screenshot {
         browser.port.origin().unwrap_or_default()
     }
 
+    fn scope(browser: &Browser, _input: &ScreenshotInput) -> Result<Scope, AppError> {
+        Ok(Scope::page(SCREENSHOT_ACTION, browser.port.origin()))
+    }
+
     async fn act(
         browser: &Browser,
         act: &Act<'_>,
         input: ScreenshotInput,
     ) -> Result<ScreenshotOutput, AppError> {
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                SCREENSHOT_ACTION,
-                browser.port.origin(),
-                None,
-                None,
-            )
-            .await?;
         let shot = browser.port.screenshot().await?;
         let loader = browser
             .images
@@ -716,21 +796,15 @@ impl BrowserStep for Find {
         }
     }
 
+    fn scope(browser: &Browser, _input: &FindInput) -> Result<Scope, AppError> {
+        Ok(Scope::page(FIND_ACTION, browser.port.origin()))
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         input: FindInput,
     ) -> Result<FindOutput, AppError> {
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                FIND_ACTION,
-                browser.port.origin(),
-                None,
-                None,
-            )
-            .await?;
         let found = browser
             .port
             .find(&input.query, input.role.as_deref())
@@ -775,22 +849,18 @@ impl BrowserStep for Click {
         browser.element_text(&input.handle)
     }
 
+    fn scope(browser: &Browser, input: &ElementInput) -> Result<Scope, AppError> {
+        Ok(Scope::element(
+            CLICK_ACTION,
+            browser.element(&input.handle)?,
+        ))
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         input: ElementInput,
     ) -> Result<PageOutput, AppError> {
-        let target = browser.element(&input.handle)?;
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                CLICK_ACTION,
-                Some(target.origin.clone()),
-                Some(&target),
-                None,
-            )
-            .await?;
         Ok(PageOutput::of(browser.port.click(&input.handle).await?))
     }
 }
@@ -813,22 +883,18 @@ impl BrowserStep for Type {
         )
     }
 
+    fn scope(browser: &Browser, input: &TypeInput) -> Result<Scope, AppError> {
+        Ok(Scope {
+            extra: Some(("text", json!(input.text))),
+            ..Scope::element(TYPE_ACTION, browser.element(&input.handle)?)
+        })
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         input: TypeInput,
     ) -> Result<PageOutput, AppError> {
-        let target = browser.element(&input.handle)?;
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                TYPE_ACTION,
-                Some(target.origin.clone()),
-                Some(&target),
-                Some(("text", json!(input.text))),
-            )
-            .await?;
         Ok(PageOutput::of(
             browser
                 .port
@@ -852,22 +918,18 @@ impl BrowserStep for Submit {
         browser.element_text(&input.handle)
     }
 
+    fn scope(browser: &Browser, input: &ElementInput) -> Result<Scope, AppError> {
+        Ok(Scope::element(
+            SUBMIT_ACTION,
+            browser.element(&input.handle)?,
+        ))
+    }
+
     async fn act(
         browser: &Browser,
-        act: &Act<'_>,
+        _act: &Act<'_>,
         input: ElementInput,
     ) -> Result<PageOutput, AppError> {
-        let target = browser.element(&input.handle)?;
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                SUBMIT_ACTION,
-                Some(target.origin.clone()),
-                Some(&target),
-                None,
-            )
-            .await?;
         Ok(PageOutput::of(browser.port.submit(&input.handle).await?))
     }
 }
@@ -886,22 +948,18 @@ impl BrowserStep for Download {
         browser.element_text(&input.handle)
     }
 
+    fn scope(browser: &Browser, input: &ElementInput) -> Result<Scope, AppError> {
+        Ok(Scope::element(
+            DOWNLOAD_ACTION,
+            browser.element(&input.handle)?,
+        ))
+    }
+
     async fn act(
         browser: &Browser,
         act: &Act<'_>,
         input: ElementInput,
     ) -> Result<DownloadOutput, AppError> {
-        let target = browser.element(&input.handle)?;
-        browser
-            .authorise(
-                act,
-                Self::CAPABILITY,
-                DOWNLOAD_ACTION,
-                Some(target.origin.clone()),
-                Some(&target),
-                None,
-            )
-            .await?;
         let file = browser
             .port
             .download(&input.handle, &act.context.cancel)

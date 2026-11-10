@@ -61,7 +61,6 @@ async fn rig() -> Rig {
     let service = IntegrationService::new(IntegrationServiceOptions {
         providers: vec![provider.clone()],
         clock: host.clock.clone(),
-        approvals: Some(services.runs.approvals()),
         ..IntegrationServiceOptions::new(
             host.database.shared(),
             services.tools.clone(),
@@ -752,13 +751,13 @@ async fn send_through_the_node(
     Vec<zvs_contract::ApprovalRequestDto>,
 ) {
     let key = account_tool_key(SEND, &account.id.to_string());
+    let services = rig.host.shared();
     let node = rig.host.nodes.get(&key).expect("a node");
     let input = json!({ "to": ["ivan@example.com"], "subject": "Отчёт", "text": "Готово" });
     assert_eq!(
         node.permission_for(&input),
         crate::kernel::PermissionRequirement::tool_at(key.clone(), zvs_contract::ToolTier::Ask)
     );
-    assert!(node.defers_approval());
     let link = Arc::new(DecidingLink {
         decision,
         requests: std::sync::Mutex::new(Vec::new()),
@@ -769,11 +768,11 @@ async fn send_through_the_node(
         crate::kernel::KernelServices::default(),
         link.clone(),
     )
-    .deferring();
-    context.defer_approval(crate::kernel::DeferredApproval {
-        subject: key,
-        scope: "global".to_owned(),
-    });
+    .with_gate(Arc::new(crate::access::Gatekeeper::new(
+        &services.runs.permissions(),
+        services.runs.approvals(),
+        None,
+    )));
     let outcome = node.execute(&context, input).await;
     let requests = link
         .requests

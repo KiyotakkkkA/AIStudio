@@ -524,7 +524,6 @@ pub fn test_services(system: SystemService) -> TestServices {
     crate::commands::register_command_nodes(
         &nodes,
         &folders,
-        runs.approvals(),
         crate::commands::CommandToolOptions {
             roots,
             shells: Some(shells.clone()),
@@ -587,7 +586,6 @@ pub fn test_services(system: SystemService) -> TestServices {
     let integrations = crate::integrations::IntegrationService::new(
         crate::integrations::IntegrationServiceOptions {
             clock: clock.clone(),
-            approvals: Some(runs.approvals()),
             ..crate::integrations::IntegrationServiceOptions::new(
                 database.shared(),
                 tools.clone(),

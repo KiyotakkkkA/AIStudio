@@ -14,7 +14,9 @@ use zvs_contract::{
 use super::action::{ReviewVerdict, ReviewedAction};
 use super::judge::{JudgeOutcome, ask_judge, judge_prompt};
 use super::rules::{RuleSet, RuleText, VENDOR_PACK};
-use crate::access::{AccessPipeline, AccessRequest, JudgeStage, ModeStage, Pass, RulesStage};
+use crate::access::{
+    AccessPipeline, AccessRequest, Effect, JudgeStage, ModeStage, Pass, RulesStage,
+};
 use crate::data::{Database, Repositories};
 use crate::kernel::{ExecReview, StepContext};
 use crate::platform::clock::SharedClock;
@@ -312,10 +314,10 @@ impl ExecReview for ExecPolicyService {
     async fn review(
         &self,
         context: &StepContext,
-        action: &ReviewedAction,
+        effect: &Effect,
     ) -> Result<ReviewVerdict, AppError> {
-        let request = AccessRequest::review(context.run_id.to_string(), action);
-        let mut pass = Pass::new(Some(context)).reviewing(action);
+        let request = AccessRequest::review(context.run_id.to_string(), effect);
+        let mut pass = Pass::new(Some(context));
         let decision = self.pipeline().decide(&request, &mut pass).await?;
         Ok(decision.verdict())
     }

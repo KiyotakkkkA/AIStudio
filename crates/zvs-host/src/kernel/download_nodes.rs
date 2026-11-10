@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use zvs_contract::{AppError, AppErrorCode, DownloadFetchInput, DownloadReportDto, HostEventDraft};
 
 use super::registry::NodeRegistry;
-use super::types::{NodeDef, PermissionRequirement, StepContext};
+use super::types::{PermissionRequirement, PlainNode, StepContext};
+use crate::access::Admitted;
 use crate::downloads::DownloadProgress;
 
 pub const DOWNLOADS_UNAVAILABLE: &str = "Сервис загрузок недоступен";
@@ -12,7 +13,7 @@ pub const DOWNLOADS_UNAVAILABLE: &str = "Сервис загрузок недо�
 pub struct DownloadFetchNode;
 
 #[async_trait]
-impl NodeDef for DownloadFetchNode {
+impl PlainNode for DownloadFetchNode {
     type Input = DownloadFetchInput;
     type Output = DownloadReportDto;
 
@@ -28,11 +29,12 @@ impl NodeDef for DownloadFetchNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: DownloadFetchInput,
+        admitted: Admitted<DownloadFetchInput>,
     ) -> Result<DownloadReportDto, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let Some(downloads) = &context.services.downloads else {
             return Err(AppError::new(AppErrorCode::Conflict, DOWNLOADS_UNAVAILABLE));

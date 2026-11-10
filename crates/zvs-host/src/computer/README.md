@@ -35,10 +35,13 @@ policy, the approvals, the session state shown in the overlay, and the kernel to
 2. **Window check** for each target: the app's own windows (by pid) are refused; an unknown
    executable is refused; `classify` refuses forbidden apps outright and marks sensitive ones;
    apps without a grant are collected.
-3. **Grants.** Missing apps trigger an access request in the same call; with no grant at all
-   the call fails with `NO_APPS`.
+3. **Grants.** Missing apps are declared as resources; the access pipeline asks for them in the
+   same call, before the action approval. With no grant at all the call fails with `NO_APPS`.
 4. **Approval need.** `Plain` by default; `Sensitive` when a target app is sensitive or a key
-   combo is a system combo. Sensitive actions need explicit approval every time.
+   combo is a system combo. Steps 1–4 run in `prepare`, and `access` declares
+   `Effect::Desktop { apps, sensitive }`; a sensitive action is raised to `ask` so it is reviewed
+   every time. Sensitive input into a terminal window (`TERMINAL_APPS`) is the `Process` family
+   and is never allowed by rules or the judge: it asks in every mode but `no-restrictions`.
 5. **Act.** The sidecar performs the actions (password fields are refused on its side, text
    is capped at `TEXT_MAX`) and returns a screenshot; each action is shown in the overlay as
    running, waiting or done.

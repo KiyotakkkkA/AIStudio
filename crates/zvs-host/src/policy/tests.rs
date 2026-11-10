@@ -243,7 +243,7 @@ impl Host {
 
     async fn review(&self, context: &StepContext, action: ReviewedAction) -> ReviewVerdict {
         self.policy
-            .review(context, &action)
+            .review(context, &crate::access::Effect::from(action))
             .await
             .expect("reviews the action")
     }

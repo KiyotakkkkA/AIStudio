@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
     AppError, AppErrorCode, FILE_CHANGES_MAX, FileChangeKind, FileChangesDto, FileDiffDto,
-    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
+    ToolTier, Validate,
 };
 
 use super::commit::{Fault, commit, snapshot};
@@ -19,13 +19,15 @@ use super::plan::{Change, Edit, Plan, RealDisk, plan};
 use super::roots::{Located, RootKind, SKILL_READ_ONLY, VirtualRoots, is_virtual};
 use super::text::{Decoded, content_hash, decode};
 use super::walk::{WalkOptions, walk};
+use crate::access::Admitted;
+use crate::access::{AccessRequest, Effect, Gating};
 use crate::chat_files::within_quota;
 use crate::conversations::{ConversationFolders, is_owner};
-use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, review_action};
+use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, PlainNode, StepContext};
 use crate::platform::ids::new_id;
 use crate::platform::long_path::extended;
-use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
-use crate::workspace::{AccessPlan, FolderAccessService, FolderTarget, Review};
+use crate::policy::ReviewedAction;
+use crate::workspace::{CHANGES_DENIED, FolderAccess, FolderAccessService, FolderTarget};
 
 pub const FS_LIST: &str = "fs.list";
 pub const FS_READ: &str = "fs.read";
@@ -269,7 +271,7 @@ impl Validate for FsListOutput {
 struct FsListNode(Tools);
 
 #[async_trait]
-impl NodeDef for FsListNode {
+impl PlainNode for FsListNode {
     type Input = FsListInput;
     type Output = FsListOutput;
 
@@ -289,11 +291,12 @@ impl NodeDef for FsListNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: FsListInput,
+        admitted: Admitted<FsListInput>,
     ) -> Result<FsListOutput, AppError> {
+        let input = admitted.into_inner();
         let root = self
             .0
             .folder(
@@ -559,7 +562,7 @@ fn read_one(
 struct FsReadNode(Tools);
 
 #[async_trait]
-impl NodeDef for FsReadNode {
+impl PlainNode for FsReadNode {
     type Input = FsReadInput;
     type Output = FsReadOutput;
 
@@ -586,7 +589,7 @@ impl NodeDef for FsReadNode {
         ) {
             PermissionRequirement::app_folder(FS_READ)
         } else {
-            self.permission()
+            PlainNode::permission(self)
         }
     }
 
@@ -594,11 +597,12 @@ impl NodeDef for FsReadNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: FsReadInput,
+        admitted: Admitted<FsReadInput>,
     ) -> Result<FsReadOutput, AppError> {
+        let input = admitted.into_inner();
         if input.paths.iter().any(|target| target.view_image) && !input.image_viewing {
             return Err(AppError::new(
                 AppErrorCode::ValidationFailed,
@@ -795,7 +799,7 @@ fn search(
 struct FsSearchNode(Tools);
 
 #[async_trait]
-impl NodeDef for FsSearchNode {
+impl PlainNode for FsSearchNode {
     type Input = FsSearchInput;
     type Output = FsSearchOutput;
 
@@ -815,11 +819,12 @@ impl NodeDef for FsSearchNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: FsSearchInput,
+        admitted: Admitted<FsSearchInput>,
     ) -> Result<FsSearchOutput, AppError> {
+        let input = admitted.into_inner();
         let pattern = if input.regex {
             input.query.clone()
         } else {
@@ -1086,10 +1091,17 @@ fn summary(changes: &[FileDiffDto]) -> String {
 
 struct FsApplyNode(Tools);
 
+pub struct FsApply {
+    conversation_id: String,
+    planned: Plan,
+    folder: Option<FolderAccess>,
+}
+
 #[async_trait]
 impl NodeDef for FsApplyNode {
     type Input = FsApplyInput;
     type Output = FsApplyOutput;
+    type Prepared = FsApply;
 
     fn node_type(&self) -> &str {
         FS_APPLY
@@ -1109,20 +1121,15 @@ impl NodeDef for FsApplyNode {
         }
     }
 
-    fn defers_approval(&self) -> bool {
-        true
-    }
-
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(
+    async fn prepare(
         &self,
         context: &StepContext,
         input: FsApplyInput,
-    ) -> Result<FsApplyOutput, AppError> {
-        let approval = context.take_deferred_approval();
+    ) -> Result<FsApply, AppError> {
         let tools = &self.0;
         let paths = change_paths(&input.changes);
         let mut located: Vec<Option<Located>> = Vec::with_capacity(paths.len());
@@ -1143,10 +1150,10 @@ impl NodeDef for FsApplyNode {
             .map(|(path, _)| FolderTarget::file(path))
             .collect();
         let call = tools.folders.call(&input.conversation_id, FS_APPLY);
-        let access = if real.is_empty() {
-            AccessPlan::empty()
+        let folder = if real.is_empty() {
+            None
         } else {
-            tools.folders.resolve(&call, &real)?
+            Some(tools.folders.plan(&call, &real)?)
         };
         let mut bases: Vec<PathBuf> = Vec::new();
         for found in located.iter().flatten() {
@@ -1154,7 +1161,10 @@ impl NodeDef for FsApplyNode {
                 bases.push(found.base.clone());
             }
         }
-        let mut granted = access.resolved.iter().map(|target| target.path.clone());
+        let mut granted = folder
+            .iter()
+            .flat_map(|folder| folder.resolved.iter())
+            .map(|target| target.path.clone());
         let resolved: Vec<PathBuf> = located
             .into_iter()
             .map(|found| {
@@ -1182,6 +1192,47 @@ impl NodeDef for FsApplyNode {
                 .collect();
             within_quota(base, &sized)?;
         }
+        Ok(FsApply {
+            conversation_id: input.conversation_id,
+            planned,
+            folder,
+        })
+    }
+
+    fn access(&self, prepared: &FsApply, request: AccessRequest) -> AccessRequest {
+        let planned = &prepared.planned;
+        if planned.files.is_empty() {
+            return AccessRequest {
+                gating: Gating::Open,
+                ..request
+            };
+        }
+        let action = ReviewedAction::files(planned.changes.clone(), |path| {
+            planned
+                .files
+                .iter()
+                .any(|file| path_text(&file.path) == path && file.before.is_some())
+        });
+        let mut request = request.with_effect(Effect::from(action));
+        if let Some(folder) = &prepared.folder {
+            request = folder.describe(request, APPLY_ACTION);
+        }
+        request.prompt.conversation = Some(prepared.conversation_id.clone());
+        request.prompt.action = Some(APPLY_ACTION.to_owned());
+        request.prompt.denied = Some(CHANGES_DENIED.to_owned());
+        request
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<FsApply>,
+    ) -> Result<FsApplyOutput, AppError> {
+        let FsApply {
+            conversation_id,
+            planned,
+            folder,
+        } = admitted.into_inner();
         if planned.files.is_empty() {
             return Ok(FsApplyOutput {
                 text: summary(&[]),
@@ -1189,47 +1240,13 @@ impl NodeDef for FsApplyNode {
                 paths: Vec::new(),
             });
         }
-        let (approval, reason) = match approval {
-            Some(ticket) => {
-                let action = ReviewedAction::files(planned.changes.clone(), |path| {
-                    planned
-                        .files
-                        .iter()
-                        .any(|file| path_text(&file.path) == path && file.before.is_some())
-                });
-                match review_action(context, action).await? {
-                    ReviewVerdict::Run(authorisation) => {
-                        context.authorise(authorisation)?;
-                        (None, None)
-                    }
-                    ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-                    ReviewVerdict::Ask { reason } => (Some(ticket), reason),
-                }
-            }
-            None => (None, None),
-        };
-        let asked = approval.is_some();
-        tools
-            .folders
-            .confirm(
-                context,
-                &call,
-                APPLY_ACTION,
-                access,
-                Some(Review {
-                    approval,
-                    changes: planned.changes.clone(),
-                }),
-            )
-            .await?;
-        if asked {
-            context.authorise(
-                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
-            )?;
+        if let Some(folder) = &folder {
+            folder.touch()?;
         }
-        context.check_cancelled()?;
-        let owner = if is_owner(&input.conversation_id) {
-            input.conversation_id.as_str()
+        let tools = &self.0;
+        let run = context.run_id.to_string();
+        let owner = if is_owner(&conversation_id) {
+            conversation_id.as_str()
         } else {
             run.as_str()
         };

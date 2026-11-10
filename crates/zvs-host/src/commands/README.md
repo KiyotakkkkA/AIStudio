@@ -14,22 +14,24 @@ redirections and substitutions cannot be smuggled into an approved command.
 
 ## Pipeline: one `shell.run` call
 
-1. **Tier.** The node always asks (`permission_for` → `ToolTier::Ask`) and defers the
-   approval to its own `run`, so the approval request can carry the resolved program,
-   working folder and script source instead of raw arguments.
+1. **Tier.** The node always asks (`permission_for` → `ToolTier::Ask`). Steps 2–4 run in
+   `prepare`, before admission, so the approval can carry the resolved program, working folder
+   and script source instead of raw arguments; `execute` receives the admitted plan.
 2. **Program.** `argv[0] = skill:<key>/scripts/<file>` resolves through `skill_script`: the
    skill library locates the file, `ScriptRuntime` picks `uv` for `.py` or Node.js for
    `.js/.mjs/.cjs`, and the toolchain launcher builds the command. Otherwise `shell_spec`
    looks the program up in the connected toolchain folders first, then `PATH`, honouring
    `PATHEXT`, and fails with `PROGRAM_NOT_FOUND`.
 3. **Working folder.** `cwd` (a path or `chat:`), else the conversation's working folder, else
-   the chat folder for skill scripts. A folder outside the grants raises a folder approval.
+   the chat folder for skill scripts. A folder outside the grants is declared as a resource in
+   `access`, and the person step asks for it before the process approval.
 4. **Environment.** `PATH` is set to the toolchain folders; skill scripts get
    `ZVS_SKILL_DIR`, `ZVS_SCRATCH_DIR` and `ZVS_CHAT_DIR`; Python gets `PYTHONUTF8=1` and
    `PYTHONIOENCODING=utf-8` so output decodes predictably.
-5. **Approval.** A `ProcessPlanDto` (program, argv, cwd, reason, background flag, and the
-   script source when known) goes to the approval service. The execution policy
-   (`../policy`) may auto-allow it by rule; otherwise the user decides.
+5. **Approval.** `access` declares `Effect::Process` with the `ProcessPlanDto` (program, argv,
+   cwd, reason, background flag, and the script source when known). The access pipeline
+   (`../access`) reviews it through the execution policy (`../policy`), which may allow it by
+   rule; otherwise the person step raises the `process` approval and the user decides.
 6. **Run.** Foreground runs go through `toolchain::run_process` with time and output limits
    and the step's cancellation token. `background: true` hands the process to
    `BackgroundShells` and returns its id at once; `notify: true` asks the chat to continue

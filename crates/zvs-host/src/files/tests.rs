@@ -370,7 +370,7 @@ impl Host {
             .nodes
             .register(FnNode::new(
                 TOUCH,
-                PermissionRequirement::None,
+                PermissionRequirement::Kernel,
                 true,
                 |_: StepContext, input: Value| async move {
                     std::fs::write(

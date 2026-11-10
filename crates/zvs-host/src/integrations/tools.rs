@@ -1,29 +1,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 use tokio_util::sync::CancellationToken;
-use zvs_contract::{AppError, AppErrorCode, ToolAuthorisationDto, ToolAuthorisationKind, ToolTier};
+use zvs_contract::{AppError, AppErrorCode, ToolTier};
 
 use super::IntegrationApproval;
-use crate::kernel::{
-    ApprovalDecision, McpNodeInput, NodeDef, NodeRegistry, PermissionRequirement, StepContext,
-};
-use crate::services::ApprovalService;
+use crate::access::{AccessRequest, Admitted, Effect};
+use crate::kernel::{McpNodeInput, NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 
 pub const APPROVAL_UNAVAILABLE: &str =
     "Действие выполняется только после подтверждения, а подтверждение сейчас недоступно";
-
-const RESERVED: &[&str] = &[
-    "id",
-    "runId",
-    "subject",
-    "scope",
-    "expiresAt",
-    "kind",
-    "tool",
-    "action",
-];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IntegrationCallTarget {
@@ -77,49 +64,18 @@ pub struct IntegrationToolNodeSpec {
 struct IntegrationToolNode {
     spec: IntegrationToolNodeSpec,
     gateway: SharedGateway,
-    approvals: Option<Arc<ApprovalService>>,
 }
 
-impl IntegrationToolNode {
-    async fn approve(
-        &self,
-        context: &StepContext,
-        input: &Map<String, Value>,
-    ) -> Result<Map<String, Value>, AppError> {
-        let ticket = context.take_deferred_approval().ok_or_else(unavailable)?;
-        let approvals = self.approvals.as_ref().ok_or_else(unavailable)?;
-        let plan = self
-            .gateway
-            .approval(&self.spec.target, input, &context.cancel)
-            .await?
-            .ok_or_else(unavailable)?;
-        context.check_cancelled()?;
-        let mut request =
-            approvals.create(&context.run_id.to_string(), &ticket.subject, &ticket.scope)?;
-        request.insert("kind".to_owned(), json!(plan.kind));
-        request.insert("tool".to_owned(), json!(self.spec.key));
-        request.insert("action".to_owned(), json!(plan.action));
-        for (key, value) in &plan.fields {
-            if !RESERVED.contains(&key.as_str()) {
-                request.insert(key.clone(), value.clone());
-            }
-        }
-        match context.request_approval(request).await? {
-            ApprovalDecision::Approved => {
-                context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Approved))?;
-                Ok(plan.fields)
-            }
-            ApprovalDecision::Denied => {
-                Err(AppError::new(AppErrorCode::ApprovalDenied, plan.denied))
-            }
-        }
-    }
+pub struct IntegrationCall {
+    input: Map<String, Value>,
+    plan: Option<IntegrationApproval>,
 }
 
 #[async_trait]
 impl NodeDef for IntegrationToolNode {
     type Input = McpNodeInput;
     type Output = Value;
+    type Prepared = IntegrationCall;
 
     fn node_type(&self) -> &str {
         &self.spec.key
@@ -137,27 +93,65 @@ impl NodeDef for IntegrationToolNode {
         }
     }
 
-    fn defers_approval(&self) -> bool {
-        self.spec.per_call_approval
-    }
-
     fn side_effect(&self) -> bool {
         self.spec.side_effect
     }
 
-    async fn run(&self, context: &StepContext, input: McpNodeInput) -> Result<Value, AppError> {
+    async fn prepare(
+        &self,
+        context: &StepContext,
+        input: McpNodeInput,
+    ) -> Result<IntegrationCall, AppError> {
         context.check_cancelled()?;
-        let approved = if self.spec.per_call_approval {
-            Some(self.approve(context, &input.0).await?)
+        let plan = if self.spec.per_call_approval {
+            let plan = self
+                .gateway
+                .approval(&self.spec.target, &input.0, &context.cancel)
+                .await?
+                .ok_or_else(unavailable)?;
+            context.check_cancelled()?;
+            Some(plan)
         } else {
             None
         };
+        Ok(IntegrationCall {
+            input: input.0,
+            plan,
+        })
+    }
+
+    fn access(&self, prepared: &IntegrationCall, request: AccessRequest) -> AccessRequest {
+        let Some(plan) = &prepared.plan else {
+            return request;
+        };
+        let mut request = request.with_effect(Effect::Remote {
+            service: self.spec.target.tool.clone(),
+            action: plan.action.clone(),
+        });
+        request.always_ask = true;
+        request.prompt.kind = Some(plan.kind.clone());
+        request.prompt.action = Some(plan.action.clone());
+        request.prompt.fields = plan
+            .fields
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        request.prompt.denied = Some(plan.denied.clone());
+        request
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<IntegrationCall>,
+    ) -> Result<Value, AppError> {
+        let IntegrationCall { input, plan } = admitted.into_inner();
         context.check_cancelled()?;
         self.gateway
             .call(
                 self.spec.target.clone(),
-                input.0,
-                approved,
+                input,
+                plan.map(|plan| plan.fields),
                 context.cancel.clone(),
             )
             .await
@@ -168,12 +162,7 @@ pub fn register_integration_tool_node(
     nodes: &NodeRegistry,
     spec: IntegrationToolNodeSpec,
     gateway: SharedGateway,
-    approvals: Option<Arc<ApprovalService>>,
 ) -> Result<(), AppError> {
     nodes.unregister(&spec.key);
-    nodes.register(IntegrationToolNode {
-        spec,
-        gateway,
-        approvals,
-    })
+    nodes.register(IntegrationToolNode { spec, gateway })
 }

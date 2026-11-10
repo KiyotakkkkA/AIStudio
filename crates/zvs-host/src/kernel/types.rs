@@ -16,19 +16,21 @@ use zvs_contract::{
     VectorSearchHitDto, VectorStoreDto, log_line,
 };
 
+use crate::access::{AccessRequest, Admitted, Clearance, SharedGate};
 pub use crate::data::schema::ApprovalDecision;
 use crate::downloads::SharedDownloadExecutor;
 use crate::drivers::ai::ProviderRegistry;
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::sidecar::SharedSidecarJobs;
 use crate::indexing::{IndexContext, IndexingService};
-use crate::policy::{ReviewVerdict, ReviewedAction};
+use crate::policy::ReviewVerdict;
 use crate::services::graph::GraphService;
 use crate::services::vector_stores::{VectorSearchOptions, VectorStoreService};
 
 pub const CANCELLED_MESSAGE: &str = "Выполнение отменено";
 pub const NO_QUESTION_SERVICE: &str = "Вопросы пользователю недоступны в этом запуске";
 pub const TOOL_AUTHORISED: &str = "Tool call authorised";
+pub const NO_PERMISSION_SERVICE: &str = "Сервис разрешений недоступен";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuestionOutcome {
@@ -39,6 +41,7 @@ pub enum QuestionOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PermissionRequirement {
     None,
+    Kernel,
     Tool {
         tool: String,
         tier: Option<ToolTier>,
@@ -69,7 +72,7 @@ impl PermissionRequirement {
 
     pub fn tool_key(&self) -> Option<&str> {
         match self {
-            Self::None => None,
+            Self::None | Self::Kernel => None,
             Self::Tool { tool, .. } | Self::AppFolder { tool } => Some(tool),
         }
     }
@@ -255,18 +258,8 @@ pub trait ExecReview: Send + Sync {
     async fn review(
         &self,
         context: &StepContext,
-        action: &ReviewedAction,
+        effect: &crate::access::Effect,
     ) -> Result<ReviewVerdict, AppError>;
-}
-
-pub async fn review_action(
-    context: &StepContext,
-    action: ReviewedAction,
-) -> Result<ReviewVerdict, AppError> {
-    match &context.services.policy {
-        Some(policy) => policy.review(context, &action).await,
-        None => Ok(ReviewVerdict::Ask { reason: None }),
-    }
 }
 
 pub type ApprovalObserver =
@@ -311,19 +304,13 @@ pub trait StepLink: Send + Sync {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DeferredApproval {
-    pub subject: String,
-    pub scope: String,
-}
-
 #[derive(Clone)]
 pub struct StepContext {
     pub run_id: RunId,
     pub cancel: CancellationToken,
     pub services: KernelServices,
     link: Arc<dyn StepLink>,
-    deferred: Option<Arc<Mutex<Option<DeferredApproval>>>>,
+    gate: Option<SharedGate>,
     authorisation: Option<Arc<Mutex<Option<ToolAuthorisationDto>>>>,
 }
 
@@ -339,7 +326,7 @@ impl StepContext {
             cancel,
             services,
             link,
-            deferred: None,
+            gate: None,
             authorisation: None,
         }
     }
@@ -351,25 +338,31 @@ impl StepContext {
         }
     }
 
-    pub fn deferring(self) -> Self {
+    #[must_use]
+    pub fn with_gate(self, gate: SharedGate) -> Self {
         Self {
-            deferred: Some(Arc::new(Mutex::new(None))),
+            gate: Some(gate),
             ..self
         }
     }
 
-    pub fn defer_approval(&self, approval: DeferredApproval) -> bool {
-        let Some(slot) = &self.deferred else {
-            return false;
-        };
-        *slot.lock().unwrap_or_else(PoisonError::into_inner) = Some(approval);
-        true
+    pub fn gate(&self) -> Option<SharedGate> {
+        self.gate.clone()
     }
 
-    pub fn take_deferred_approval(&self) -> Option<DeferredApproval> {
-        self.deferred
-            .as_ref()
-            .and_then(|slot| slot.lock().unwrap_or_else(PoisonError::into_inner).take())
+    pub async fn screen(&self, request: &AccessRequest) -> Result<(), AppError> {
+        match &self.gate {
+            Some(gate) => gate.screen(request, self).await,
+            None if Clearance::open(request).is_some() => Ok(()),
+            None => Err(no_gate()),
+        }
+    }
+
+    pub async fn admit(&self, request: AccessRequest) -> Result<Clearance, AppError> {
+        match &self.gate {
+            Some(gate) => gate.admit(request, self).await,
+            None => Clearance::open(&request).ok_or_else(no_gate),
+        }
     }
 
     pub fn recording(self) -> Self {
@@ -438,6 +431,10 @@ impl StepContext {
     }
 }
 
+fn no_gate() -> AppError {
+    AppError::new(AppErrorCode::PermissionDenied, NO_PERMISSION_SERVICE)
+}
+
 pub fn cancelled() -> AppError {
     AppError::new(AppErrorCode::RunCancelled, CANCELLED_MESSAGE)
 }
@@ -445,6 +442,43 @@ pub fn cancelled() -> AppError {
 #[async_trait]
 pub trait NodeDef: Send + Sync + 'static {
     type Input: DeserializeOwned + JsonSchema + Validate + Send + 'static;
+    type Output: Serialize + JsonSchema + Validate + Send + 'static;
+    type Prepared: Send + Sync + 'static;
+
+    fn node_type(&self) -> &str;
+
+    fn permission(&self) -> PermissionRequirement;
+
+    fn permission_for(&self, _input: &Value) -> PermissionRequirement {
+        self.permission()
+    }
+
+    fn side_effect(&self) -> bool;
+
+    async fn prepare(
+        &self,
+        context: &StepContext,
+        input: Self::Input,
+    ) -> Result<Self::Prepared, AppError>;
+
+    fn access(&self, prepared: &Self::Prepared, request: AccessRequest) -> AccessRequest;
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<Self::Prepared>,
+    ) -> Result<Self::Output, AppError>;
+
+    async fn refused(&self, _prepared: Self::Prepared, _error: &AppError) {}
+
+    fn tool_meta(&self, _input: &Value, _output: &Self::Output) -> Option<Value> {
+        None
+    }
+}
+
+#[async_trait]
+pub trait PlainNode: Send + Sync + 'static {
+    type Input: DeserializeOwned + JsonSchema + Validate + Send + Sync + 'static;
     type Output: Serialize + JsonSchema + Validate + Send + 'static;
 
     fn node_type(&self) -> &str;
@@ -455,20 +489,63 @@ pub trait NodeDef: Send + Sync + 'static {
         self.permission()
     }
 
-    fn defers_approval(&self) -> bool {
-        false
-    }
-
     fn side_effect(&self) -> bool;
 
-    async fn run(
+    fn access(&self, _input: &Self::Input, request: AccessRequest) -> AccessRequest {
+        request
+    }
+
+    async fn execute(
         &self,
         context: &StepContext,
-        input: Self::Input,
+        admitted: Admitted<Self::Input>,
     ) -> Result<Self::Output, AppError>;
 
     fn tool_meta(&self, _input: &Value, _output: &Self::Output) -> Option<Value> {
         None
+    }
+}
+
+#[async_trait]
+impl<T: PlainNode> NodeDef for T {
+    type Input = T::Input;
+    type Output = T::Output;
+    type Prepared = T::Input;
+
+    fn node_type(&self) -> &str {
+        PlainNode::node_type(self)
+    }
+
+    fn permission(&self) -> PermissionRequirement {
+        PlainNode::permission(self)
+    }
+
+    fn permission_for(&self, input: &Value) -> PermissionRequirement {
+        PlainNode::permission_for(self, input)
+    }
+
+    fn side_effect(&self) -> bool {
+        PlainNode::side_effect(self)
+    }
+
+    async fn prepare(&self, _context: &StepContext, input: T::Input) -> Result<T::Input, AppError> {
+        Ok(input)
+    }
+
+    fn access(&self, prepared: &T::Input, request: AccessRequest) -> AccessRequest {
+        PlainNode::access(self, prepared, request)
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<T::Input>,
+    ) -> Result<T::Output, AppError> {
+        PlainNode::execute(self, context, admitted).await
+    }
+
+    fn tool_meta(&self, input: &Value, output: &T::Output) -> Option<Value> {
+        PlainNode::tool_meta(self, input, output)
     }
 }
 
@@ -498,9 +575,9 @@ impl<I, O, F> FnNode<I, O, F> {
 }
 
 #[async_trait]
-impl<I, O, F, Fut> NodeDef for FnNode<I, O, F>
+impl<I, O, F, Fut> PlainNode for FnNode<I, O, F>
 where
-    I: DeserializeOwned + JsonSchema + Validate + Send + 'static,
+    I: DeserializeOwned + JsonSchema + Validate + Send + Sync + 'static,
     O: Serialize + JsonSchema + Validate + Send + 'static,
     F: Fn(StepContext, I) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<O, AppError>> + Send + 'static,
@@ -520,7 +597,7 @@ where
         self.side_effect
     }
 
-    async fn run(&self, context: &StepContext, input: I) -> Result<O, AppError> {
-        (self.run)(context.clone(), input).await
+    async fn execute(&self, context: &StepContext, admitted: Admitted<I>) -> Result<O, AppError> {
+        (self.run)(context.clone(), admitted.into_inner()).await
     }
 }

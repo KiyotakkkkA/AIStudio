@@ -4,24 +4,24 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Value, json};
 use zvs_contract::{
-    AppError, AppErrorCode, ConversationId, FILES_APPROVAL_KIND, FOLDER_APPROVAL_KIND, FileDiffDto,
-    FolderAccessAnswer, FolderGrantChatDto, FolderGrantDto, FolderGrantId, FolderGrantScope,
-    FolderRequestEntryDto, RunId, WorkingFolderAccess,
+    AppError, AppErrorCode, ApprovalRequestDto, ConversationId, FolderAccessAnswer,
+    FolderGrantChatDto, FolderGrantDto, FolderGrantId, FolderGrantScope, FolderRequestEntryDto,
+    RunId, WorkingFolderAccess,
 };
 
 use super::paths::{
     ForbiddenFolders, GrantTarget, TargetKind, canonical, covers, grant_target, relative_to,
     resolve, same_folder,
 };
+use crate::access::{AccessRequest, Asking, Attendant, Resource};
 use crate::data::schema::{ConversationRow, FolderGrantRow};
 use crate::data::{DataError, Database, Repositories};
-use crate::kernel::{ApprovalDecision, DeferredApproval, StepContext};
+use crate::kernel::{ApprovalDecision, StepContext};
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
 use crate::services::approvals::{ApprovalService, NO_LONGER_PENDING};
-use crate::services::permissions::GLOBAL_SCOPE;
 
-pub const FOLDER_SUBJECT: &str = "folder.access";
+pub use crate::access::FOLDER_SUBJECT;
 pub const FOLDER_FORBIDDEN: &str = "Папка недоступна: системные папки, корни дисков, сетевые и съёмные диски и данные приложения закрыты для доступа";
 pub const FOLDER_ACCESS_DENIED: &str = "Доступ к папке не предоставлен";
 pub const FOLDER_NOT_FOUND: &str = "Папка не найдена";
@@ -72,16 +72,10 @@ impl AccessPlan {
     }
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct Review {
-    pub approval: Option<DeferredApproval>,
-    pub changes: Vec<FileDiffDto>,
-}
-
 pub struct FolderCall {
     conversation_id: String,
     tool: String,
-    once: Mutex<Vec<PathBuf>>,
+    once: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl FolderCall {
@@ -95,12 +89,125 @@ impl FolderCall {
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
     }
+}
 
-    fn hold(&self, folders: &[PathBuf]) {
-        self.once
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .extend(folders.iter().cloned());
+fn hold(once: &Mutex<Vec<PathBuf>>, folders: &[PathBuf]) {
+    once.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .extend(folders.iter().cloned());
+}
+
+pub struct FolderAccess {
+    pub resolved: Vec<GrantTarget>,
+    folders: Vec<PathBuf>,
+    entries: Vec<FolderRequestEntryDto>,
+    used: Vec<String>,
+    conversation_id: String,
+    tool: String,
+    attendant: Arc<FolderAttendant>,
+    service: FolderAccessService,
+}
+
+impl FolderAccess {
+    pub fn needs_grant(&self) -> bool {
+        !self.folders.is_empty()
+    }
+
+    pub fn resources(&self) -> Vec<Resource> {
+        self.entries
+            .iter()
+            .map(|entry| Resource::Folder {
+                path: entry.path.clone(),
+                creates: entry.creates.clone(),
+            })
+            .collect()
+    }
+
+    pub fn describe(&self, mut request: AccessRequest, action: &str) -> AccessRequest {
+        request.prompt.conversation = Some(self.conversation_id.clone());
+        request.prompt.action = Some(action.to_owned());
+        if self.needs_grant() {
+            request.resources.extend(self.resources());
+            request.prompt.attendant = Some(Arc::clone(&self.attendant) as Arc<dyn Attendant>);
+        }
+        request
+    }
+
+    pub fn request(&self, action: &str) -> AccessRequest {
+        self.describe(AccessRequest::grants(self.tool.clone(), Vec::new()), action)
+    }
+
+    pub fn touch(&self) -> Result<(), AppError> {
+        if self.used.is_empty() {
+            return Ok(());
+        }
+        let now = self.service.inner.clock.now();
+        self.service
+            .read(|repositories| Ok(repositories.folder_grants.touch(&self.used, now)?))
+    }
+}
+
+struct FolderAttendant {
+    service: FolderAccessService,
+    conversation_id: String,
+    folders: Vec<PathBuf>,
+    entries: Vec<FolderRequestEntryDto>,
+    once: Arc<Mutex<Vec<PathBuf>>>,
+}
+
+fn approval_id(approval: &ApprovalRequestDto) -> String {
+    approval
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned()
+}
+
+impl Attendant for FolderAttendant {
+    fn asking(&self, asking: Asking, approval: &ApprovalRequestDto) {
+        if asking != Asking::Grant {
+            return;
+        }
+        let run_id = approval
+            .get("runId")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        self.service.pending().insert(
+            approval_id(approval),
+            Pending {
+                run_id,
+                conversation_id: self.conversation_id.clone(),
+                folders: self.folders.clone(),
+                answer: None,
+            },
+        );
+    }
+
+    fn answered(
+        &self,
+        asking: Asking,
+        approval: &ApprovalRequestDto,
+        decision: Result<ApprovalDecision, AppError>,
+    ) -> Result<ApprovalDecision, AppError> {
+        if asking != Asking::Grant {
+            return decision;
+        }
+        let answer = self
+            .service
+            .pending()
+            .remove(&approval_id(approval))
+            .and_then(|pending| pending.answer);
+        match (decision?, answer) {
+            (ApprovalDecision::Approved, Some(answer)) if answer != FolderAccessAnswer::Deny => {
+                hold(&self.once, &self.folders);
+                Ok(ApprovalDecision::Approved)
+            }
+            _ => Err(
+                AppError::new(AppErrorCode::PermissionDenied, FOLDER_ACCESS_DENIED)
+                    .with_detail("folders", json!(self.entries)),
+            ),
+        }
     }
 }
 
@@ -219,7 +326,7 @@ impl FolderAccessService {
         FolderCall {
             conversation_id: conversation_id.to_owned(),
             tool: tool.to_owned(),
-            once: Mutex::new(Vec::new()),
+            once: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -490,50 +597,33 @@ impl FolderAccessService {
         targets: &[FolderTarget],
     ) -> Result<Vec<GrantTarget>, AppError> {
         context.check_cancelled()?;
-        let plan = self.resolve(call, targets)?;
-        self.confirm(context, call, action, plan, None).await
+        let access = self.plan(call, targets)?;
+        access.touch()?;
+        if access.needs_grant() {
+            crate::access::grant(&self.inner.approvals, context, access.request(action)).await?;
+        }
+        Ok(access.resolved)
     }
 
-    pub async fn confirm(
+    pub fn approvals(&self) -> &Arc<ApprovalService> {
+        &self.inner.approvals
+    }
+
+    pub fn plan(
         &self,
-        context: &StepContext,
         call: &FolderCall,
-        action: &str,
-        plan: AccessPlan,
-        review: Option<Review>,
-    ) -> Result<Vec<GrantTarget>, AppError> {
-        context.check_cancelled()?;
+        targets: &[FolderTarget],
+    ) -> Result<FolderAccess, AppError> {
+        let plan = self.resolve(call, targets)?;
+        Ok(self.access(call, plan))
+    }
+
+    pub fn access(&self, call: &FolderCall, plan: AccessPlan) -> FolderAccess {
         let AccessPlan {
             resolved,
             folders,
             used,
         } = plan;
-        if !used.is_empty() {
-            let now = self.inner.clock.now();
-            self.read(|repositories| Ok(repositories.folder_grants.touch(&used, now)?))?;
-        }
-        let approval = review.as_ref().and_then(|review| review.approval.clone());
-        if folders.is_empty() {
-            let (Some(approval), Some(review)) = (approval, review) else {
-                return Ok(resolved);
-            };
-            let mut request = self.inner.approvals.create(
-                &context.run_id.to_string(),
-                &approval.subject,
-                &approval.scope,
-            )?;
-            request.insert("kind".to_owned(), json!(FILES_APPROVAL_KIND));
-            request.insert("conversationId".to_owned(), json!(call.conversation_id));
-            request.insert("tool".to_owned(), json!(call.tool));
-            request.insert("action".to_owned(), json!(action));
-            request.insert("changes".to_owned(), json!(review.changes));
-            return match context.request_approval(request).await? {
-                ApprovalDecision::Approved => Ok(resolved),
-                ApprovalDecision::Denied => {
-                    Err(AppError::new(AppErrorCode::ApprovalDenied, CHANGES_DENIED))
-                }
-            };
-        }
         let entries: Vec<FolderRequestEntryDto> = folders
             .iter()
             .map(|folder| {
@@ -555,50 +645,22 @@ impl FolderAccessService {
                 }
             })
             .collect();
-        let run_id = context.run_id.to_string();
-        let (subject, scope) = approval.map_or_else(
-            || (FOLDER_SUBJECT.to_owned(), GLOBAL_SCOPE.to_owned()),
-            |approval| (approval.subject, approval.scope),
-        );
-        let mut request = self.inner.approvals.create(&run_id, &subject, &scope)?;
-        request.insert("kind".to_owned(), json!(FOLDER_APPROVAL_KIND));
-        request.insert("conversationId".to_owned(), json!(call.conversation_id));
-        request.insert("tool".to_owned(), json!(call.tool));
-        request.insert("action".to_owned(), json!(action));
-        request.insert("folders".to_owned(), json!(entries));
-        if let Some(review) = &review
-            && !review.changes.is_empty()
-        {
-            request.insert("changes".to_owned(), json!(review.changes));
-        }
-        let id = request
-            .get("id")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
-        self.pending().insert(
-            id.clone(),
-            Pending {
-                run_id,
-                conversation_id: call.conversation_id.clone(),
-                folders: folders.clone(),
-                answer: None,
-            },
-        );
-        let decision = context.request_approval(request).await;
-        let answer = self
-            .pending()
-            .remove(&id)
-            .and_then(|pending| pending.answer);
-        match (decision?, answer) {
-            (ApprovalDecision::Approved, Some(answer)) if answer != FolderAccessAnswer::Deny => {
-                call.hold(&folders);
-                Ok(resolved)
-            }
-            _ => Err(
-                AppError::new(AppErrorCode::PermissionDenied, FOLDER_ACCESS_DENIED)
-                    .with_detail("folders", json!(entries)),
-            ),
+        let attendant = Arc::new(FolderAttendant {
+            service: self.clone(),
+            conversation_id: call.conversation_id.clone(),
+            folders: folders.clone(),
+            entries: entries.clone(),
+            once: Arc::clone(&call.once),
+        });
+        FolderAccess {
+            resolved,
+            folders,
+            entries,
+            used,
+            conversation_id: call.conversation_id.clone(),
+            tool: call.tool.clone(),
+            attendant,
+            service: self.clone(),
         }
     }
 

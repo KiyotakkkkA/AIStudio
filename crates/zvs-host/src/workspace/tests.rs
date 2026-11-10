@@ -197,7 +197,7 @@ impl Host {
             .nodes
             .register(FnNode::new(
                 NODE,
-                PermissionRequirement::None,
+                PermissionRequirement::Kernel,
                 true,
                 move |context: StepContext, input: Value| {
                     let folders = folders.clone();

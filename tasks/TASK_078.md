@@ -2,7 +2,7 @@
 task: TASK_078
 title: Drivers on the pipeline — prepare, access and the Admitted token
 phase: A — Access pipeline (APS)
-status: todo
+status: done
 depends_on: [TASK_077]
 unblocks: [TASK_082, TASK_083]
 estimate: 4 h
@@ -110,19 +110,94 @@ send asks in `no-restrictions` too.
 
 ## Definition of done
 
-- [ ] No node calls `review_action`, `approvals.create` or `request_approval` directly
-- [ ] `defers_approval` and `DeferredApproval` are gone
-- [ ] `execute` cannot be called without `Admitted`
-- [ ] Computer sensitive input, scenario destructive tools and MCP effects covered by tests
-- [ ] Golden fixtures unchanged
-- [ ] PASSPORT §8 rewritten for prepare / access; driver READMEs updated
-- [ ] Rust and renderer gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] No node calls `review_action`, `approvals.create` or `request_approval` directly
+- [x] `defers_approval` and `DeferredApproval` are gone
+- [x] `execute` cannot be called without `Admitted`
+- [x] Computer sensitive input, scenario destructive tools and MCP effects covered by tests
+- [x] Golden fixtures unchanged
+- [x] PASSPORT §8 rewritten for prepare / access; driver READMEs updated
+- [x] Rust and renderer gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+
+- Kernel (`kernel/types.rs`, `registry.rs`, `scheduler.rs`): `NodeDef` has `type Prepared`,
+  `prepare`, `access`, `execute(Admitted<Prepared>)` and `refused`; `PlainNode` is the short form
+  for nodes with nothing to prepare (blanket `impl<T: PlainNode> NodeDef for T`, `Prepared =
+  Input`), and its `execute` also takes `Admitted`. The registry runs `screen → prepare → access
+  → admit → execute` for graph steps and model tool calls alike; a destructive minimum is applied
+  after `access` (`AccessRequest::raised`). `StepContext` carries the gate (`SharedGate`);
+  `SchedulerOptions::admit` and `RunServiceOptions::admit` take an `AccessGate`.
+- `access/`: `Clearance` and `Admitted` (`admitted.rs`; only `access/` makes a `Clearance`),
+  `AccessGate` and `Gatekeeper` (`gate.rs`: floor → tier, review through `ExecReview` with the
+  node's effect, resource grants, tool approval, recheck, record), and the one approval builder
+  (`person.rs`) for the plain, `process`, `files`, `folder`, `apps`, desktop, browser and
+  integration kinds, with the old fields and key order. `AccessRequest` gained `gating`,
+  `always_ask` and `prompt` (action, scope, fields, denial message, grant prompt, `Attendant`);
+  `Effect` gained `Read`; `Resource::Folder` carries `creates`, `Resource::App` an icon.
+- The six drivers moved: `shell.run` (plan and cwd folder in `prepare`), `fs.apply` (plan, quota
+  and ledger in `prepare`, merged folder + diff modal), the browser (origin, element and site
+  block in `prepare`; `BrowserStep::scope`; an attendant keeps the agent panel events), computer
+  use (`ComputerStep::plan`; missing apps as resources; app answers through an attendant),
+  integrations (`always_ask` with the provider's plan) and folder access (`FolderAccessService::
+  plan`, `FolderAccess::describe`, a folder attendant over the pending-answer map).
+  `defers_approval`, `DeferredApproval`, `take_deferred_approval`, `review_action`, the
+  per-driver `authorise` / `approve` / `request_apps` / `confirm` functions are gone.
+- Drifts: `Effect::Desktop { apps, sensitive }`; sensitive input into a terminal window
+  (`computer/policy.rs` `TERMINAL_APPS`) is the `Process` family and not reviewable (M19).
+  Scenario tool steps pass `destructive` (`scenarios/nodes.rs` `tool_request`, M20). MCP targets
+  carry `destructive`: read-only → `Effect::Read`, destructive → `Opaque { destructive: true }`,
+  otherwise `Opaque { destructive: false }` (L21).
+- Registration refuses a node with a side effect whose `permission()` is `None`
+  (`UNDECLARED_ACCESS`); kernel-owned steps (`chat.prepare`, `chat.persist`, scenario outputs,
+  subagents) declare the new `PermissionRequirement::Kernel`.
+- Tests: registration refusal, admission before execution and the no-gate refusal, MCP effects
+  through a recording gate (`kernel/tests.rs`); terminal input family and the four modes,
+  `always_ask` reaching the person in `no-restrictions` with the mail key order
+  (`access/tests.rs`); the scenario destructive tier (`scenarios/tests.rs`); `TERMINAL_APPS` ⊂
+  sensitive apps (`computer/policy.rs`). The mail node test now goes through a real
+  `Gatekeeper`. Every existing driver test passes unchanged in its assertions.
+- PASSPORT §11 (*Prepare, access, execute*, *One person step*, replacing *Deferred approval*),
+  §14 (*Execution policy*, *Access pipeline*), the integrations and browser passages;
+  READMEs of `access`, `kernel`, `commands`, `files`, `workspace`, `computer`, `integrations`.
+
 **Deviated from plan:**
+
+- DECISION asked: the user chose (a). Terminal input asks in every mode but `no-restrictions`:
+  `Effect::reviewable()` is false for it, so the mode stage asks instead of handing it to rules
+  or the judge.
+- `access(&self, &Prepared, base: AccessRequest) -> AccessRequest` takes the base request the
+  kernel builds from `permission_for`, so a node only refines it and the actor stays the gate's.
+  Default implementations come through `PlainNode`, because stable Rust has no defaults for
+  associated types.
+- "Registered without `access`" is read as "a side effect with `PermissionRequirement::None`":
+  a trait cannot tell whether a default method was overridden.
+- There is no `GrantsStage` in the stage list. The folder and app stores compute what is
+  uncovered (the folder plan in `prepare`, the computer grants), the node declares it as
+  resources, and the person step asks with the store's `Attendant`. A grant met during
+  `execute` (`fs.list` / `fs.read` / `fs.search` through `ensure_access`, a window
+  `computer.inspect` meets) goes through `access::grant` or `StepContext::admit`.
+- Resource grants are asked after the review and before the tool approval. `shell.run` with an
+  uncovered `cwd` used to ask for the folder first; now a rule `deny` refuses it without a
+  folder prompt. Every tool approval is followed by the tier recheck (only the plain gate did
+  it before).
+- The step timeout covers `execute` only, as before it did not cover admission.
+- An `approved_per_call` integration tool whose tier allows used to fail with
+  `APPROVAL_UNAVAILABLE`; it now asks.
+- The unused approval services were removed from `Browser::new`, `Computer::new`,
+  `register_command_nodes`, `ShellRunNode::new` and `IntegrationServiceOptions`.
+- Not run: the manual check (`fs.apply` overwrite, `shell.run`, `browser.submit`, a computer
+  click, a mail send in the app). The driver tests that assert the approval DTOs, and the new
+  `always_ask` test for `no-restrictions`, cover the same paths.
+
 **Next session should know:**
+
+- `access/person.rs` is the only place that calls `approvals.create` and `request_approval`;
+  TASK_082 can replace the folder and app attendants with one grant store behind the same
+  resource list.
+- `Gating::Open` is used for steps with nothing to admit, for an `fs.apply` batch that changes
+  nothing and for `computer.request_access` (its apps prompt is the approval).
+- Test-only helpers: `access::OpenGate`, `access::admitted` and `ShellRunNode::run` exist under
+  `cfg(test)`.

@@ -263,7 +263,6 @@ impl Host {
     fn shell_node(&self, limits: ProcessLimits) -> ShellRunNode {
         ShellRunNode::new(
             &self.services.folders,
-            self.services.runs.approvals(),
             CommandToolOptions {
                 limits,
                 ..self.options(None)
@@ -847,7 +846,6 @@ async fn a_background_program_that_finishes_is_reported_to_the_wake_up() {
     let host = Host::new();
     let node = ShellRunNode::new(
         &host.services.folders,
-        host.services.runs.approvals(),
         CommandToolOptions {
             shells: Some(host.services.shells.clone()),
             ..host.options(None)

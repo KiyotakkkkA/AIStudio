@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
+use async_trait::async_trait;
 use futures::FutureExt;
 use futures::future::{BoxFuture, Shared, join_all};
 use serde_json::json;
@@ -12,31 +13,26 @@ use zvs_contract::{
     AppError, AppErrorCode, HostEvent, HostEventDraft, RunApprovalDto, RunCountsDto, RunDetailDto,
     RunDto, RunHandleDto, RunId, RunKind, RunListFilter, RunPageDto, RunProgressDto, RunStatus,
     RunSummaryDto, RunsClearFinishedOutput, StartRunInput, StepDto, StepId, StepStatus, StreamId,
-    ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate, log_line,
+    Validate, log_line,
 };
 
 use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
 use super::permissions::{PermissionContext, PermissionService};
 use super::questions::QuestionService;
 pub use crate::access::OUTSIDE_ALLOWED_TOOLS;
-use crate::access::{
-    AccessPipeline, AccessRequest, Actor, Decision, Effect, FloorStage, Outcome, Pass, StageName,
-    TierStage,
-};
+use crate::access::{AccessGate, AccessRequest, Actor, Clearance, Gatekeeper, Gating, SharedGate};
 use crate::data::repositories::{RunCursor, RunDraft, RunPageQuery, encode_run_cursor};
 use crate::data::schema::{RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::scheduler::step_event;
 use crate::kernel::{
-    AdmissionOrigin, AdmitHook, ApprovalDecision, ApprovalHook, DeferredApproval, Finish,
-    KernelServices, NodeRegistry, Observers, PermissionRequirement, QuestionHook, RunObserver,
-    RunStream, RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription, review_action,
+    ApprovalDecision, ApprovalHook, Finish, KernelServices, NodeRegistry, Observers, QuestionHook,
+    RunObserver, RunStream, RunWatcher, Scheduler, SchedulerOptions, StepContext, Subscription,
 };
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::events::{EventBus, StreamOptions};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
-use crate::policy::{ReviewVerdict, rule_denied};
 use crate::tools::ToolRegistry;
 
 pub const DEFAULT_GRACE: Duration = Duration::from_millis(500);
@@ -63,7 +59,7 @@ pub struct RunServiceOptions {
     pub approval_timeout: Duration,
     pub attention_window: Duration,
     pub approval: Option<ApprovalHook>,
-    pub admit: Option<AdmitHook>,
+    pub admit: Option<SharedGate>,
     pub runtime: Option<Handle>,
     pub tools: Option<ToolRegistry>,
 }
@@ -97,9 +93,7 @@ struct ActiveRun {
 
 struct Gate {
     database: Arc<Database>,
-    approvals: Arc<ApprovalService>,
-    admission: AccessPipeline,
-    folder: AccessPipeline,
+    keeper: Gatekeeper,
     tools: Option<ToolRegistry>,
     clock: SharedClock,
 }
@@ -112,124 +106,54 @@ impl Gate {
         tools: Option<ToolRegistry>,
         clock: SharedClock,
     ) -> Self {
-        let admission = AccessPipeline::new(vec![
-            Box::new(FloorStage::new(Arc::clone(permissions), tools.clone())),
-            Box::new(TierStage::new(Arc::clone(permissions))),
-        ]);
-        let folder = AccessPipeline::new(vec![Box::new(
-            FloorStage::new(Arc::clone(permissions), tools.clone()).without_shortcuts(),
-        )]);
         Self {
             database,
-            approvals,
-            admission,
-            folder,
+            keeper: Gatekeeper::new(permissions, approvals, tools.as_ref()),
             tools,
             clock,
         }
     }
 
-    fn request(run: &RunRow, tool: &str, origin: AdmissionOrigin, effect: Effect) -> AccessRequest {
-        AccessRequest::new(
-            Actor {
-                run_id: run.id.clone(),
-                kind: Some(run.kind),
-                origin,
-                listed: run.graph.allows_tool(tool),
-                scopes: permission_context(run).scopes,
-            },
-            tool,
-            effect,
-        )
-    }
-
-    async fn admit_app_folder(
-        &self,
-        tool: &str,
-        context: &StepContext,
-        origin: AdmissionOrigin,
-    ) -> Result<(), AppError> {
+    fn actor(&self, request: &mut AccessRequest, context: &StepContext) -> Result<(), AppError> {
         let run = read_run(&self.database, &context.run_id.to_string())?;
-        let request = Self::request(&run, tool, origin, Effect::Plain);
-        let decision = self
-            .folder
-            .decide(&request, &mut Pass::new(Some(context)))
-            .await?;
-        if decision.outcome == Outcome::Deny {
-            return Err(decision.refusal(tool));
-        }
-        context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Auto))
-    }
-
-    async fn admit_tool(
-        &self,
-        tool: String,
-        tier: Option<ToolTier>,
-        context: StepContext,
-        origin: AdmissionOrigin,
-    ) -> Result<(), AppError> {
-        let run = read_run(&self.database, &context.run_id.to_string())?;
-        let minimum = tier.unwrap_or(ToolTier::Auto);
-        let effect = if minimum == ToolTier::Ask {
-            Effect::Declared
-        } else {
-            Effect::Plain
+        request.actor = Actor {
+            run_id: run.id.clone(),
+            kind: Some(run.kind),
+            origin: request.actor.origin,
+            listed: run.graph.allows_tool(&request.tool),
+            scopes: permission_context(&run).scopes,
         };
-        let request = Self::request(&run, &tool, origin, effect).at_least(minimum);
-        let decision = self
-            .admission
-            .decide(&request, &mut Pass::new(Some(&context)))
-            .await?;
-        match decision.outcome {
-            Outcome::Deny => return Err(decision.refusal(&tool)),
-            Outcome::Allow => {
-                return match decision.authorisation() {
-                    Some(authorisation) => context.authorise(authorisation),
-                    None => Ok(()),
-                };
-            }
-            Outcome::Ask => {}
-        }
-        let scope = request
-            .actor
-            .scopes
-            .first()
-            .map_or("global", String::as_str);
-        if context.defer_approval(DeferredApproval {
-            subject: tool.clone(),
-            scope: scope.to_owned(),
-        }) {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl AccessGate for Gate {
+    async fn screen(&self, request: &AccessRequest, context: &StepContext) -> Result<(), AppError> {
+        if request.gating == Gating::Open {
             return Ok(());
         }
-        let reason = match review_action(&context, request.effect.reviewed()).await? {
-            ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
-            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-            ReviewVerdict::Ask { reason } => reason,
-        };
-        let approval = self.approvals.create(&run.id, &tool, scope)?;
-        let answer = context.request_approval(approval).await?;
-        if answer != ApprovalDecision::Approved {
-            return Err(AppError::new(
-                AppErrorCode::ApprovalDenied,
-                "Approval denied",
-            ));
+        let mut request = request.clone();
+        self.actor(&mut request, context)?;
+        self.keeper.screen(&request, context).await
+    }
+
+    async fn admit(
+        &self,
+        mut request: AccessRequest,
+        context: &StepContext,
+    ) -> Result<Clearance, AppError> {
+        if request.gating == Gating::Open {
+            request.actor.run_id = context.run_id.to_string();
+            return self.keeper.admit(request, context).await;
         }
-        let recheck = self
-            .admission
-            .decide(&request, &mut Pass::new(Some(&context)))
-            .await?;
-        if recheck.outcome == Outcome::Deny {
-            return Err(AppError::new(
-                AppErrorCode::PermissionDenied,
-                "Permission revoked",
-            ));
+        self.actor(&mut request, context)?;
+        let tool = request.tool.clone();
+        let clearance = self.keeper.admit(request, context).await?;
+        if let Some(tools) = &self.tools {
+            tools.record_use(&tool, self.clock.now())?;
         }
-        context.authorise(
-            Decision::allow(StageName::Person)
-                .because(reason)
-                .authorisation()
-                .unwrap_or_else(|| ToolAuthorisationDto::of(ToolAuthorisationKind::Approved)),
-        )
+        Ok(clearance)
     }
 }
 
@@ -366,37 +290,14 @@ impl RunService {
                 async move { asked.wait(request, &cancel).await }.boxed()
             })
         };
-        let admit = options.admit.unwrap_or_else(|| {
-            let gate = Arc::new(Gate::new(
+        let admit: SharedGate = options.admit.unwrap_or_else(|| {
+            Arc::new(Gate::new(
                 Arc::clone(&options.database),
                 &permissions,
                 Arc::clone(&approvals),
                 options.tools.clone(),
                 options.clock.clone(),
-            ));
-            Arc::new(move |requirement, context, origin| {
-                let gate = Arc::clone(&gate);
-                async move {
-                    match requirement {
-                        PermissionRequirement::None => Ok(()),
-                        PermissionRequirement::Tool { tool, tier } => {
-                            gate.admit_tool(tool.clone(), tier, context, origin).await?;
-                            if let Some(tools) = &gate.tools {
-                                tools.record_use(&tool, gate.clock.now())?;
-                            }
-                            Ok(())
-                        }
-                        PermissionRequirement::AppFolder { tool } => {
-                            gate.admit_app_folder(&tool, &context, origin).await?;
-                            if let Some(tools) = &gate.tools {
-                                tools.record_use(&tool, gate.clock.now())?;
-                            }
-                            Ok(())
-                        }
-                    }
-                }
-                .boxed()
-            })
+            ))
         });
         let scheduler = Arc::new(SchedulerOptions {
             database: Arc::clone(&options.database),

@@ -35,7 +35,7 @@ use crate::platform::external::{OPEN_FAILED, UrlOpener};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
 use crate::services::secrets::USER_SECRET;
-use crate::services::{ApprovalService, SecretCreateInput, SecretService};
+use crate::services::{SecretCreateInput, SecretService};
 use crate::tools::{ToolDescriptor, ToolRegistry};
 use crate::workers::{Backoff, WorkerBody, WorkerFault, WorkerSpec, WorkerSupervisor};
 
@@ -70,7 +70,6 @@ pub struct IntegrationServiceOptions {
     pub secrets: Arc<SecretService>,
     pub workers: WorkerSupervisor,
     pub providers: Vec<Arc<dyn IntegrationProvider>>,
-    pub approvals: Option<Arc<ApprovalService>>,
     pub opener: Option<UrlOpener>,
     pub events: Option<EventBus>,
     pub clock: SharedClock,
@@ -93,7 +92,6 @@ impl IntegrationServiceOptions {
             secrets,
             workers,
             providers: Vec::new(),
-            approvals: None,
             opener: None,
             events: None,
             clock: Arc::new(SystemClock),
@@ -792,7 +790,6 @@ impl IntegrationService {
                     per_call_approval: spec.per_call_approval,
                 },
                 self.gateway(),
-                self.inner.options.approvals.clone(),
             )?;
         }
         Ok(())

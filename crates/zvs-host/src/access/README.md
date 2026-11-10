@@ -4,58 +4,70 @@ The access pipeline system (APS): one engine that decides whether a tool call ru
 person or is refused, and records which stage decided it. The proposal and the audit behind it
 are in `docs/APS_AUDIT.md`; PASSPORT §14 _Access pipeline_ is the binding summary.
 
-TASK_077 built the engine behind the existing gate with no change in behaviour: the stages wrap
-the checks that already existed, in the modules where they already live.
+TASK_077 built the engine behind the existing gate with no change in behaviour. TASK_078 moved
+every driver onto it: nodes describe what they will do, this module decides, and nothing else in
+the host creates or requests an approval.
 
 ## Files
 
-| File          | Contents                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------- |
-| `request.rs`  | `AccessRequest` (actor, tool, minimum tier, effect, resources), `Actor`, `Effect`, `Resource`           |
-| `decision.rs` | `Decision { outcome, stage, source, reason, trail }`, `Outcome`, `StageName`; audit record and refusals |
-| `pipeline.rs` | `Stage` trait, `Step`, the per-call scratch `Pass`, `AccessPipeline`                                    |
-| `stages.rs`   | `FloorStage`, `TierStage`, `ModeStage`, `RulesStage`, `JudgeStage`                                      |
-| `tests.rs`    | The pipeline contract and the PASSPORT decision table end to end                                        |
+| File          | Contents                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `request.rs`  | `AccessRequest` (actor, tool, gating, minimum tier, effect, resources, `always_ask`, prompt), `Effect`, `Attendant` |
+| `decision.rs` | `Decision { outcome, stage, source, reason, trail }`, `Outcome`, `StageName`; audit record and refusals             |
+| `pipeline.rs` | `Stage` trait, `Step`, the per-call scratch `Pass`, `AccessPipeline`                                                |
+| `stages.rs`   | `FloorStage`, `TierStage`, `ModeStage`, `RulesStage`, `JudgeStage`                                                  |
+| `gate.rs`     | `AccessGate` (the kernel's port), `Gatekeeper` (every stage and the person in order), `review`                      |
+| `person.rs`   | The one approval builder: tool approvals, folder and app grants, `grant` for a grant needed during `execute`        |
+| `admitted.rs` | `Clearance` (made only here) and `Admitted<P>` (made only from a `Clearance`)                                       |
+| `tests.rs`    | The pipeline contract, the PASSPORT decision table end to end, terminal input, `always_ask`                         |
 
-## Pipeline
+## A call through the gate
 
-`AccessPipeline::decide` runs its stages in order. Each returns `Step::Continue` or
-`Step::Decide(Decision)`; the first decision wins and carries the trail of visited stages. A
-pipeline that runs out of stages asks the person (`StageName::Person`).
+The kernel registry runs `screen → prepare → access → admit → execute` for graph steps and model
+tool calls alike (`kernel/registry.rs`):
 
-A stage that fails:
+1. **Screen.** The base request built from `permission_for` passes the floor alone, so a
+   disabled, `off` or unlisted tool fails before the node does any work.
+2. **Prepare.** The node resolves what the call will do (`NodeDef::prepare`).
+3. **Access.** The node refines the base request (`NodeDef::access`): the effect, the resources
+   it needs granted, `always_ask`, and the prompt the person sees (action, scope, extra fields,
+   denial message, an `Attendant`). A model call with a destructive minimum is raised after this
+   (`AccessRequest::raised`), so a node cannot lower it.
+4. **Admit.** `Gatekeeper::admit`:
+   - `Gating::Open` (no tool, a kernel step, an empty `fs.apply`, `computer.request_access`)
+     asks only for the resources it lists;
+   - `Gating::AppFolder` runs the floor, records `auto` and asks for resources;
+   - `Gating::Tool` runs floor → tier. An allow records the tier's authorisation. An ask is
+     reviewed through `ExecReview` (mode → rules → judge) with the node's effect, unless the
+     request is `always_ask`. Resource grants are asked next; a `Files` effect that still asks
+     merges into the folder modal with the diff. Otherwise the tool approval follows, the tier is
+     checked again, and the call is recorded as `approved` with the reason.
+5. **Execute.** The node receives `Admitted<Prepared>`. A refused or cancelled admission returns
+   the prepared value through `NodeDef::refused`.
 
-- **fails closed** (`Stage::fails_closed`, the floor and the tier): the error is returned and the
-  call does not run;
-- otherwise (mode, rules, judge): the decision is `Ask` at that stage with source `error`, and
-  the failure is logged;
-- a cancelled run (`RunCancelled`) is returned as an error from any stage.
+`Clearance` has a private constructor, and `Admitted` is made only from one, so a node cannot
+execute without passing the gate. Without a gate on the `StepContext`, only an open request with
+no resources is cleared.
 
-## Stages
+## Person step
 
-| Stage        | Wraps                                                                         | Decides                                                       |
-| ------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `FloorStage` | graph allow-list, graph shortcuts, tool enabled, `PermissionService::refused` | deny `unlisted`, `disabled`, `off`; allow `graph` (no record) |
-| `TierStage`  | `PermissionService::admit_subject`, `granted`                                 | allow `auto` or `granted`, ask, deny                          |
-| `ModeStage`  | `ExecPolicyService::get`, `policy::decide`                                    | allow `policy:<mode>`, ask, or continue on `Review`           |
-| `RulesStage` | `ExecPolicyService::rules`, `RuleSet::evaluate`                               | deny, ask, allow by rule; continue on `review` or unmatched   |
-| `JudgeStage` | `ExecPolicyService::judge` (`ask_judge`)                                      | allow by the judge or ask                                     |
+`person.rs` builds every approval kind the renderer knows, with the fields and key order the
+drivers produced before: plain (gate), `process`, `files`, `folder`, `apps`, the desktop action
+(`apps`, `detail`), the browser action (`origin`, `target`, `text`) and the integration kinds
+(`mail` and the rest, from the provider's plan). The scope is the prompt's scope (`site:<origin>`,
+`app:<exe>`), else the run's first permission scope, else `global`.
 
-Two pipelines are assembled today:
-
-- **Admission** (`services/runs.rs`, `Gate`): floor → tier. An app-folder tool runs the floor
-  alone. When the tier asks, the gate hands the ticket to a deferring node, or reviews the call
-  through the `ExecReview` port and raises the approval.
-- **Review** (`ExecPolicyService::pipeline`, behind `ExecReview::review`): mode → rules → judge.
-  Deferring nodes reach it through `review_action` as before.
-
-`Decision::authorisation` gives the record kept on the tool call (`ToolAuthorisationDto`), and
-`Decision::refusal` the error a denied call fails with; both reproduce what the gate wrote
-before. A rule `allow` is still recorded with kind `judge` (audit finding L6, TASK_083).
+Folder and app answers stay in their stores (TASK_082 merges them). The `Attendant` attached by
+the folder service (`workspace/service.rs`) or the computer agent (`computer/nodes.rs`) records
+the pending request when it is raised and reads the answer when it is settled; the browser's
+attendant reports the approval and the authorisation to the agent panel.
 
 ## Effects
 
 `Effect` covers every `ReviewedAction` (`From<ReviewedAction>`, `Effect::reviewed`) and adds
-`Desktop { apps, sensitive }`, `Remote { service, action }` and `Opaque { destructive }`, which
-no driver produces yet. Their family follows what they replace: a sensitive desktop action is
-`Browser`, a remote action and a destructive opaque tool are `Declared`, the rest are benign.
+`Read`, `Desktop { apps, sensitive }`, `Remote { service, action }` and
+`Opaque { destructive }`. Their family follows what they replace: `Read`, a non-sensitive desktop
+action and a non-destructive opaque tool are benign; a remote action and a destructive opaque
+tool are `Declared`; sensitive desktop input is `Browser`, except into a terminal window
+(`computer/policy.rs` `TERMINAL_APPS`), which is `Process` and not reviewable: the mode stage
+asks instead of handing it to rules or the judge, so it runs unasked only in `no-restrictions`.

@@ -77,7 +77,6 @@ async fn rig() -> Rig {
     let service = IntegrationService::new(IntegrationServiceOptions {
         providers: vec![provider],
         clock: host.clock.clone(),
-        approvals: Some(services.runs.approvals()),
         ..IntegrationServiceOptions::new(
             host.database.shared(),
             services.tools.clone(),

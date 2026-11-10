@@ -968,7 +968,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     register_command_nodes(
         &nodes,
         &folders,
-        runs.approvals(),
         CommandToolOptions {
             roots,
             shells: Some(shells.clone()),
@@ -986,13 +985,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     register_browser_nodes(
         &nodes,
-        &BrowserTools::new(
-            Arc::new(workspace.clone()),
-            grants.clone(),
-            runs.approvals(),
-            agent.clone(),
-        )
-        .with_images(
+        &BrowserTools::new(Arc::new(workspace.clone()), grants.clone(), agent.clone()).with_images(
             zvs_host::images::ImageLoader::new(artifacts.clone()),
             clock.clone(),
         ),
@@ -1057,7 +1050,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         &nodes,
         &Computer::new(
             computer_agent.clone(),
-            runs.approvals(),
             Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
             clock.clone(),
             vec![std::process::id()],
@@ -1088,7 +1080,6 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::new(GitHostingProvider::github(http.client().clone()).with_clock(clock.clone())),
             Arc::new(GitHostingProvider::gitlab(http.client().clone()).with_clock(clock.clone())),
         ],
-        approvals: Some(runs.approvals()),
         opener: Some(workspace_url_opener(&workspace, browser_settings.clone())),
         events: Some(events.clone()),
         ..IntegrationServiceOptions::new(

@@ -326,7 +326,6 @@ impl Host {
         });
         let computer = Computer::new(
             agent.clone(),
-            services.runs.approvals(),
             Some(crate::images::ImageLoader::new(services.artifacts.clone())),
             clock,
             vec![OWN_PID],

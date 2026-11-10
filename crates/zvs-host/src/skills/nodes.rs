@@ -16,12 +16,13 @@ use zvs_contract::{
 
 use super::library::{AuthoredSkill, SkillLibrary};
 use super::turn::{SkillTurn, presented, result_limit};
+use crate::access::Admitted;
 use crate::commands::SHELL_RUN;
 use crate::drivers::ai::{ChatMessage, GenerateRequest};
 use crate::files::roots::SKILL_ROOT;
 use crate::files::{FS_APPLY, FS_LIST, FS_READ};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateRole};
-use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext, ToolStepRequest};
+use crate::kernel::{NodeRegistry, PermissionRequirement, PlainNode, StepContext, ToolStepRequest};
 use crate::services::chat::GenerateChatNode;
 use crate::services::chat_tools::{
     CHAT_TOOL_CALLS, CHAT_TOOL_ROUNDS, OfferedTool, TOOL_BUDGET_NOTE, TOOL_RESULTS_INSTRUCTION,
@@ -218,7 +219,7 @@ struct SkillLoadNode(SkillLibrary);
 struct SkillSaveNode(SkillLibrary);
 
 #[async_trait]
-impl NodeDef for SkillSaveNode {
+impl PlainNode for SkillSaveNode {
     type Input = SkillSaveInput;
     type Output = SkillSaveOutput;
 
@@ -234,11 +235,12 @@ impl NodeDef for SkillSaveNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: SkillSaveInput,
+        admitted: Admitted<SkillSaveInput>,
     ) -> Result<SkillSaveOutput, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let saved = self
             .0
@@ -270,7 +272,7 @@ impl NodeDef for SkillSaveNode {
 }
 
 #[async_trait]
-impl NodeDef for SkillLoadNode {
+impl PlainNode for SkillLoadNode {
     type Input = SkillLoadInput;
     type Output = SkillLoadOutput;
 
@@ -286,11 +288,12 @@ impl NodeDef for SkillLoadNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: SkillLoadInput,
+        admitted: Admitted<SkillLoadInput>,
     ) -> Result<SkillLoadOutput, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let loaded = self.0.load(&input.key)?;
         let mut remaining = READ_FIRST_BUDGET;
@@ -530,7 +533,7 @@ impl SkillGenerateNode {
 }
 
 #[async_trait]
-impl NodeDef for SkillGenerateNode {
+impl PlainNode for SkillGenerateNode {
     type Input = SkillGenerateInput;
     type Output = SkillGenerateOutput;
 
@@ -546,11 +549,12 @@ impl NodeDef for SkillGenerateNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: SkillGenerateInput,
+        admitted: Admitted<SkillGenerateInput>,
     ) -> Result<SkillGenerateOutput, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let providers = context
             .services

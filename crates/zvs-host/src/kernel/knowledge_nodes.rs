@@ -9,7 +9,8 @@ use zvs_contract::{
 };
 
 use super::registry::NodeRegistry;
-use super::types::{NodeDef, PermissionRequirement, StepContext, VectorSearch};
+use super::types::{PermissionRequirement, PlainNode, StepContext, VectorSearch};
+use crate::access::Admitted;
 use crate::services::chat_history::{ChunkPiece, join_chunks};
 use crate::services::rerank::hit_text;
 use crate::services::retrieval_merge::{
@@ -232,7 +233,7 @@ fn passage(store: &VectorStoreDto, hit: &VectorSearchHitDto) -> KnowledgePassage
 pub struct KnowledgeSearchNode;
 
 #[async_trait]
-impl NodeDef for KnowledgeSearchNode {
+impl PlainNode for KnowledgeSearchNode {
     type Input = KnowledgeSearchInput;
     type Output = KnowledgeResult;
 
@@ -248,11 +249,12 @@ impl NodeDef for KnowledgeSearchNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: KnowledgeSearchInput,
+        admitted: Admitted<KnowledgeSearchInput>,
     ) -> Result<KnowledgeResult, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         require_scope(&input.scope)?;
         let query = js_slice(js_trim(&input.query), QUERY_MAX_CHARS).to_owned();

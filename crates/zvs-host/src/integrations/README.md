@@ -81,6 +81,7 @@ a `304`. Its tools follow the tool tier like any other tool.
 
 Each plugin tool is a kernel node keyed per account (`account_tool_key`). By default it is
 gated by the tool's tier on the «Инструменты» page. A spec marked `approved_per_call`
-(`mail.send`) always asks: the node raises the tier to `Ask` and defers the approval to its own
-`run`, so the request can show the concrete recipient and text. `side_effect` marks tools that
+(`mail.send`) always asks: the node raises the tier to `Ask`, its `prepare` asks the provider
+for the approval plan, and its `access` marks the request `always_ask`, so the person step shows
+the concrete recipient and text in every execution mode, `no-restrictions` included. `side_effect` marks tools that
 must not be replayed on recovery.

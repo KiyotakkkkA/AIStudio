@@ -236,13 +236,7 @@ impl Host {
             grants: grants.clone(),
             limit: Arc::new(move || cap.load(Ordering::SeqCst)),
         });
-        let browser = Browser::new(
-            port.clone(),
-            grants.clone(),
-            services.runs.approvals(),
-            agent.clone(),
-        )
-        .with_images(
+        let browser = Browser::new(port.clone(), grants.clone(), agent.clone()).with_images(
             crate::images::ImageLoader::new(services.artifacts.clone()),
             clock.clone(),
         );

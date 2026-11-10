@@ -45,9 +45,12 @@ user changed in the meantime.
      format: content is edited with LF and re-encoded with the file's BOM and CRLF choice. The
      result is a list of `PlannedFile { path, before, after }` plus a `FileDiffDto` per file.
 2. **Check** the chat-folder quota for chat paths and the read ledger for existing files.
-3. **Approve.** The combined diff goes to the user (or is auto-approved by the execution
-   policy). A batch that only touches the conversation's own folder needs neither a folder
-   grant nor diff confirmation. `skill:` paths are refused (`SKILL_READ_ONLY`).
+3. **Approve.** Steps 1 and 2 run in `prepare`; `access` declares `Effect::Files` with the
+   combined diff and any uncovered folders, and the access pipeline (`../access`) reviews it
+   through the execution policy or asks the user, folders and diff in one modal. `execute`
+   commits only the admitted plan. A batch that only touches the conversation's own folder
+   needs neither a folder grant nor diff confirmation; a batch that changes nothing asks
+   nothing. `skill:` paths are refused (`SKILL_READ_ONLY`).
 4. **Commit** (`commit.rs`), on a blocking thread:
    - `unchanged_since_plan` re-reads every file and aborts if anything changed while the user
      was looking at the diff;

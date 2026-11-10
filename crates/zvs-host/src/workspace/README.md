@@ -6,11 +6,11 @@ with live updates. Every file, process and document tool resolves paths through 
 
 ## Files
 
-| File          | Contents                                                                                      |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| `service.rs`  | `FolderAccessService`: working folder, grants, revoke, `covered`, `ensure_access` / `confirm` |
-| `paths.rs`    | Path normalisation and comparison, `covers`, `ForbiddenFolders`, removable-drive detection    |
-| `explorer.rs` | `ExplorerService`: list and read inside a conversation's root, file watching with debounce    |
+| File          | Contents                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `service.rs`  | `FolderAccessService`: working folder, grants, revoke, `covered`, `plan`, `ensure_access`  |
+| `paths.rs`    | Path normalisation and comparison, `covers`, `ForbiddenFolders`, removable-drive detection |
+| `explorer.rs` | `ExplorerService`: list and read inside a conversation's root, file watching with debounce |
 
 ## Path comparison (`paths.rs`)
 
@@ -26,10 +26,13 @@ A grant is a folder plus a scope: `conversation` (only that dialog) or `always`.
 When several folders are requested at once, `minimal` keeps only the outermost ones, so a
 request never lists a folder already covered by another in the same request.
 
-`ensure_access` / `confirm` run inside a kernel step: if the target is covered, the call
-proceeds; otherwise the step raises a folder approval listing the minimal folders, and the
-user's answer (this conversation, always, or deny) becomes a grant or a refusal. The CLI
-shows the same request in its access prompt.
+`plan` resolves the targets of a call into a `FolderAccess`: the resolved paths, the minimal
+uncovered folders and the grants it used. A node declares the uncovered folders as resources in
+its `access` (`FolderAccess::describe`), and the access pipeline raises the folder approval
+before the call runs; `ensure_access` does the same for a folder met during `execute`, through
+`access::grant`. The service's `Attendant` records the pending request and turns the user's
+answer (this conversation, always, once, or deny) into a grant or a refusal. The CLI shows the
+same request in its access prompt.
 
 ## Forbidden folders (`ForbiddenFolders`)
 

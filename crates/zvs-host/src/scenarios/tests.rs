@@ -1352,3 +1352,23 @@ fn the_memory_slot_takes_history_facts_and_stores_once_each() {
         )]
     );
 }
+
+#[test]
+fn a_scenario_tool_call_raises_a_destructive_tool_to_ask_as_chat_and_skills_do() {
+    let tool = |destructive: bool| crate::services::chat_tools::OfferedTool {
+        key: "fs.apply".to_owned(),
+        name: "fs_apply".to_owned(),
+        description: String::new(),
+        parameters: json!({}),
+        destructive,
+        read_only: false,
+        source: zvs_contract::OfferedToolSource::Base,
+        server: None,
+        plugin: None,
+    };
+    let destructive = super::nodes::tool_request(&tool(true), Map::new(), 2);
+    assert_eq!(destructive.minimum_tier, Some(zvs_contract::ToolTier::Ask));
+    assert_eq!(destructive.label, "call2");
+    let plain = super::nodes::tool_request(&tool(false), Map::new(), 3);
+    assert_eq!(plain.minimum_tier, None);
+}

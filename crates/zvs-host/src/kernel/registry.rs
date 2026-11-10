@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::sync::{Arc, PoisonError, RwLock};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use schemars::JsonSchema;
@@ -7,19 +8,55 @@ use schemars::generate::SchemaSettings;
 use serde_json::Value;
 use zvs_contract::{AppError, AppErrorCode, GraphBinding, RunGraph, Validate};
 
-use super::types::{NodeDef, PermissionRequirement, StepContext};
+use super::types::{AdmissionOrigin, NodeDef, PermissionRequirement, StepContext};
+use crate::access::AccessRequest;
+
+pub const STEP_TIMED_OUT: &str = "Превышено время выполнения шага";
+pub const UNDECLARED_ACCESS: &str =
+    "A node with a side effect must declare its access: a tool permission or the kernel";
 
 #[async_trait]
 trait ErasedNode: Send + Sync {
     fn permission_for(&self, input: &Value) -> PermissionRequirement;
 
-    async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError>;
-
-    async fn execute_tool(
+    async fn execute(
         &self,
         context: &StepContext,
         input: Value,
+        call: Call,
     ) -> Result<(Value, Option<Value>), AppError>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Call {
+    pub origin: AdmissionOrigin,
+    pub raised: bool,
+    pub limit: Option<Duration>,
+}
+
+impl Call {
+    pub const GRAPH: Self = Self {
+        origin: AdmissionOrigin::Graph,
+        raised: false,
+        limit: None,
+    };
+
+    pub const fn model(raised: bool) -> Self {
+        Self {
+            origin: AdmissionOrigin::Model,
+            raised,
+            limit: None,
+        }
+    }
+
+    fn shape(self, mut request: AccessRequest) -> AccessRequest {
+        request.actor.origin = self.origin;
+        if self.raised {
+            request.raised()
+        } else {
+            request
+        }
+    }
 }
 
 fn output_value<T: serde::Serialize>(output: T) -> Result<Value, AppError> {
@@ -33,20 +70,35 @@ impl<N: NodeDef> ErasedNode for N {
         NodeDef::permission_for(self, input)
     }
 
-    async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError> {
-        let input: N::Input = zvs_contract::parse(input)?;
-        let output = self.run(context, input).await?;
-        output.validate()?;
-        output_value(output)
-    }
-
-    async fn execute_tool(
+    async fn execute(
         &self,
         context: &StepContext,
         input: Value,
+        call: Call,
     ) -> Result<(Value, Option<Value>), AppError> {
+        let base = call.shape(AccessRequest::of(&NodeDef::permission_for(self, &input)));
+        context.screen(&base).await?;
         let typed: N::Input = zvs_contract::parse(input.clone())?;
-        let output = self.run(context, typed).await?;
+        let prepared = self.prepare(context, typed).await?;
+        let request = call.shape(self.access(&prepared, base));
+        let clearance = match context.admit(request).await {
+            Ok(clearance) => clearance,
+            Err(error) => {
+                self.refused(prepared, &error).await;
+                return Err(error);
+            }
+        };
+        if let Err(error) = context.check_cancelled() {
+            self.refused(prepared, &error).await;
+            return Err(error);
+        }
+        let work = NodeDef::execute(self, context, clearance.admit(prepared));
+        let output = match call.limit {
+            Some(limit) => tokio::time::timeout(limit, work)
+                .await
+                .unwrap_or_else(|_| Err(AppError::new(AppErrorCode::RunFailed, STEP_TIMED_OUT)))?,
+            None => work.await?,
+        };
         output.validate()?;
         let meta = self.tool_meta(&input, &output);
         Ok((output_value(output)?, meta))
@@ -121,7 +173,6 @@ fn absent_not_null(schema: &mut Value) {
 pub struct RegisteredNode {
     node_type: String,
     permission: PermissionRequirement,
-    defers_approval: bool,
     side_effect: bool,
     input_schema: Value,
     output_schema: Value,
@@ -133,7 +184,6 @@ impl RegisteredNode {
         Self {
             node_type: node.node_type().to_owned(),
             permission: node.permission(),
-            defers_approval: node.defers_approval(),
             side_effect: node.side_effect(),
             input_schema: input_schema::<N::Input>(),
             output_schema: json_schema::<N::Output>(),
@@ -153,10 +203,6 @@ impl RegisteredNode {
         self.node.permission_for(input)
     }
 
-    pub const fn defers_approval(&self) -> bool {
-        self.defers_approval
-    }
-
     pub const fn side_effect(&self) -> bool {
         self.side_effect
     }
@@ -174,15 +220,32 @@ impl RegisteredNode {
     }
 
     pub async fn execute(&self, context: &StepContext, input: Value) -> Result<Value, AppError> {
-        self.node.execute(context, input).await
+        self.execute_within(context, input, None).await
+    }
+
+    pub async fn execute_within(
+        &self,
+        context: &StepContext,
+        input: Value,
+        limit: Option<Duration>,
+    ) -> Result<Value, AppError> {
+        let call = Call {
+            limit,
+            ..Call::GRAPH
+        };
+        self.node
+            .execute(context, input, call)
+            .await
+            .map(|(output, _)| output)
     }
 
     pub async fn execute_tool(
         &self,
         context: &StepContext,
         input: Value,
+        raised: bool,
     ) -> Result<(Value, Option<Value>), AppError> {
-        self.node.execute_tool(context, input).await
+        self.node.execute(context, input, Call::model(raised)).await
     }
 }
 
@@ -202,6 +265,12 @@ impl NodeRegistry {
 
     pub fn register<N: NodeDef>(&self, node: N) -> Result<(), AppError> {
         let registered = RegisteredNode::new(node);
+        if registered.side_effect && registered.permission == PermissionRequirement::None {
+            return Err(
+                AppError::new(AppErrorCode::ValidationFailed, UNDECLARED_ACCESS)
+                    .with_detail("nodeType", registered.node_type),
+            );
+        }
         let mut nodes = self.nodes.write().unwrap_or_else(PoisonError::into_inner);
         if nodes
             .iter()

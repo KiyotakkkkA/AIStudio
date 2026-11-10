@@ -15,12 +15,14 @@ use zvs_contract::{
 };
 
 use super::registry::NodeRegistry;
+pub use super::registry::STEP_TIMED_OUT;
 use super::stream::RunStream;
+pub use super::types::NO_PERMISSION_SERVICE;
 use super::types::{
-    AdmissionOrigin, ApprovalDecision, ApprovalObserver, KernelServices, NO_QUESTION_SERVICE,
-    PermissionRequirement, QuestionOutcome, StepContext, StepLink, ToolStepFuture, ToolStepRequest,
-    ToolStepResult, cancelled,
+    ApprovalDecision, ApprovalObserver, KernelServices, NO_QUESTION_SERVICE, QuestionOutcome,
+    StepContext, StepLink, ToolStepFuture, ToolStepRequest, ToolStepResult, cancelled,
 };
+use crate::access::SharedGate;
 use crate::data::repositories::RunPatch;
 use crate::data::schema::{RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
@@ -33,10 +35,8 @@ pub const INTERRUPTED_MESSAGE: &str = "Выполнение прервано";
 pub const EXHAUSTED_MESSAGE: &str = "Попытки исчерпаны";
 pub const NO_READY_NODES: &str = "Нет доступных узлов";
 pub const ONLY_KERNEL_ENDS: &str = "Only the kernel can end a run";
-pub const NO_PERMISSION_SERVICE: &str = "Сервис разрешений недоступен";
 pub const NO_APPROVAL_SERVICE: &str = "Сервис согласования недоступен";
 pub const NODE_PANICKED: &str = "Узел завершился аварийно";
-pub const STEP_TIMED_OUT: &str = "Превышено время выполнения шага";
 pub const NO_TOOL_NODE: &str =
     "Инструмент нельзя вызвать: источник не предоставил для него исполняемый узел";
 
@@ -58,16 +58,6 @@ pub type QuestionHook = Arc<
         + Sync,
 >;
 
-pub type AdmitHook = Arc<
-    dyn Fn(
-            PermissionRequirement,
-            StepContext,
-            AdmissionOrigin,
-        ) -> BoxFuture<'static, Result<(), AppError>>
-        + Send
-        + Sync,
->;
-
 pub struct SchedulerOptions {
     pub database: Arc<Database>,
     pub registry: Arc<NodeRegistry>,
@@ -77,7 +67,7 @@ pub struct SchedulerOptions {
     pub logger: SharedLogger,
     pub approval: Option<ApprovalHook>,
     pub questions: Option<QuestionHook>,
-    pub admit: Option<AdmitHook>,
+    pub admit: Option<SharedGate>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -597,47 +587,19 @@ impl Scheduler {
         };
         self.commit_step(&step, true)?;
         let live = Arc::new(AtomicBool::new(true));
-        let context = StepContext::new(
-            self.run_id,
-            self.cancel.clone(),
-            self.options.services.clone(),
-            Arc::new(NodeLink {
-                scheduler: Arc::clone(&self),
-                live: Arc::clone(&live),
-                node_id: node.id.clone(),
-            }),
-        );
+        let context = self.context(Arc::new(NodeLink {
+            scheduler: Arc::clone(&self),
+            live: Arc::clone(&live),
+            node_id: node.id.clone(),
+        }));
         let registry = Arc::clone(&self.options.registry);
-        let admit = self.options.admit.clone();
         let node_type = node.node_type.clone();
         let timeout = node.timeout_ms.map(Duration::from_millis);
         let mut work = tokio::spawn(async move {
             context.check_cancelled()?;
             let definition = registry.get(&node_type)?;
-            let context = if definition.defers_approval() {
-                context.deferring()
-            } else {
-                context
-            }
-            .recording();
-            let requirement = definition.permission_for(&input);
-            if let Some(admit) = admit {
-                admit(requirement, context.clone(), AdmissionOrigin::Graph).await?;
-            } else if requirement.tool_key().is_some() {
-                return Err(AppError::new(
-                    AppErrorCode::PermissionDenied,
-                    NO_PERMISSION_SERVICE,
-                ));
-            }
-            context.check_cancelled()?;
-            match timeout {
-                Some(limit) => tokio::time::timeout(limit, definition.execute(&context, input))
-                    .await
-                    .unwrap_or_else(|_| {
-                        Err(AppError::new(AppErrorCode::RunFailed, STEP_TIMED_OUT))
-                    }),
-                None => definition.execute(&context, input).await,
-            }
+            let context = context.recording();
+            definition.execute_within(&context, input, timeout).await
         });
         let joined = |result: Result<Result<Value, AppError>, tokio::task::JoinError>| {
             result.unwrap_or_else(|_| Err(AppError::new(AppErrorCode::Unknown, NODE_PANICKED)))
@@ -721,6 +683,19 @@ impl Scheduler {
         self.commit_step(&step, false)
     }
 
+    fn context(&self, link: Arc<dyn StepLink>) -> StepContext {
+        let context = StepContext::new(
+            self.run_id,
+            self.cancel.clone(),
+            self.options.services.clone(),
+            link,
+        );
+        match &self.options.admit {
+            Some(gate) => context.with_gate(Arc::clone(gate)),
+            None => context,
+        }
+    }
+
     fn commit_tool_step(&self, step: &StepRow, inserting: bool) -> Result<(), AppError> {
         self.stream.commit(
             self.live_drafts(vec![HostEventDraft::Step {
@@ -767,48 +742,22 @@ impl Scheduler {
             attempt: 1,
         };
         self.commit_tool_step(&step, true)?;
-        let requirement = match definition.permission_for(&request.input) {
-            PermissionRequirement::Tool { tool, tier }
-                if request.minimum_tier == Some(ToolTier::Ask) && tier != Some(ToolTier::Off) =>
-            {
-                PermissionRequirement::Tool {
-                    tool,
-                    tier: Some(ToolTier::Ask),
-                }
-            }
-            PermissionRequirement::AppFolder { tool }
-                if request.minimum_tier == Some(ToolTier::Ask) =>
-            {
-                PermissionRequirement::Tool {
-                    tool,
-                    tier: Some(ToolTier::Ask),
-                }
-            }
-            other => other,
-        };
-        let context = context.with_link(Arc::new(ObservedLink {
-            inner: context.link(),
-            observer: request.on_approval.clone(),
-        }));
-        let context = if definition.defers_approval() {
-            context.deferring()
-        } else {
-            context
-        }
-        .recording();
+        let raised = request.minimum_tier == Some(ToolTier::Ask);
+        let context = context
+            .with_link(Arc::new(ObservedLink {
+                inner: context.link(),
+                observer: request.on_approval.clone(),
+            }))
+            .recording();
         let outcome = async {
-            match self.options.admit.clone() {
-                Some(admit) => admit(requirement, context.clone(), AdmissionOrigin::Model).await?,
-                None => {
-                    return Err(AppError::new(
-                        AppErrorCode::PermissionDenied,
-                        NO_PERMISSION_SERVICE,
-                    ));
-                }
+            if self.options.admit.is_none() {
+                return Err(AppError::new(
+                    AppErrorCode::PermissionDenied,
+                    NO_PERMISSION_SERVICE,
+                ));
             }
-            context.check_cancelled()?;
             let executed = definition
-                .execute_tool(&context, request.input.clone())
+                .execute_tool(&context, request.input.clone(), raised)
                 .await?;
             context.check_cancelled()?;
             Ok(executed)
@@ -1042,12 +991,7 @@ impl StepLink for NodeLink {
                 if !link.live.load(Ordering::SeqCst) || link.scheduler.cancel.is_cancelled() {
                     return Err(cancelled());
                 }
-                let context = StepContext::new(
-                    link.scheduler.run_id,
-                    link.scheduler.cancel.clone(),
-                    link.scheduler.options.services.clone(),
-                    Arc::new(link.clone()),
-                );
+                let context = link.scheduler.context(Arc::new(link.clone()));
                 Arc::clone(&link.scheduler)
                     .invoke_tool(context, link.node_id.clone(), request)
                     .await

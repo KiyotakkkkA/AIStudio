@@ -6,7 +6,8 @@ use zvs_contract::validate::check;
 use zvs_contract::{AppError, AppErrorCode, BackgroundShellDto, BackgroundShellId, Validate};
 
 use super::service::BackgroundShells;
-use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext};
+use crate::access::Admitted;
+use crate::kernel::{NodeRegistry, PermissionRequirement, PlainNode, StepContext};
 use crate::toolchain::process::fenced;
 
 pub const SHELL_OUTPUT: &str = "shell.output";
@@ -120,7 +121,7 @@ fn clipped(text: &str) -> (&str, bool) {
 pub struct ShellOutputNode(BackgroundShells);
 
 #[async_trait]
-impl NodeDef for ShellOutputNode {
+impl PlainNode for ShellOutputNode {
     type Input = ShellOutputInput;
     type Output = ShellToolOutput;
 
@@ -136,11 +137,12 @@ impl NodeDef for ShellOutputNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         _context: &StepContext,
-        input: ShellOutputInput,
+        admitted: Admitted<ShellOutputInput>,
     ) -> Result<ShellToolOutput, AppError> {
+        let input = admitted.into_inner();
         let owner = owner(&input.conversation_id)?;
         let (shell, body, notes) = match input.since_seq {
             Some(since) => {
@@ -184,7 +186,7 @@ impl NodeDef for ShellOutputNode {
 pub struct ShellKillNode(BackgroundShells);
 
 #[async_trait]
-impl NodeDef for ShellKillNode {
+impl PlainNode for ShellKillNode {
     type Input = ShellKillInput;
     type Output = ShellToolOutput;
 
@@ -200,11 +202,12 @@ impl NodeDef for ShellKillNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         _context: &StepContext,
-        input: ShellKillInput,
+        admitted: Admitted<ShellKillInput>,
     ) -> Result<ShellToolOutput, AppError> {
+        let input = admitted.into_inner();
         let owner = owner(&input.conversation_id)?;
         let shell = self.0.kill(Some(owner), &input.id).await?;
         Ok(ShellToolOutput {

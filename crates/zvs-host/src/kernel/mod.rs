@@ -16,14 +16,15 @@ pub use mcp_nodes::{
     McpCallTarget, McpNodeInput, McpNodeTarget, McpToolCaller, register_mcp_tool_node,
 };
 pub use nodes::{register_core_nodes, register_job_nodes};
-pub use registry::{NodeRegistry, RegisteredNode, input_schema, json_schema};
-pub use scheduler::{
-    AdmitHook, ApprovalHook, Finish, QuestionHook, Scheduler, SchedulerOptions, project,
+pub use registry::{
+    Call, NodeRegistry, RegisteredNode, STEP_TIMED_OUT, UNDECLARED_ACCESS, input_schema,
+    json_schema,
 };
+pub use scheduler::{ApprovalHook, Finish, QuestionHook, Scheduler, SchedulerOptions, project};
 pub use stream::{Observers, RunObserver, RunStream, RunWatcher, Subscription};
 pub use types::{
-    AdmissionOrigin, ApprovalDecision, ApprovalObserver, DeferredApproval, ExecReview, FnNode,
-    GraphNeighbors, KernelServices, NodeDef, PermissionRequirement, QuestionOutcome, StepContext,
-    StepLink, TOOL_AUTHORISED, TextDrivers, ToolStepFuture, ToolStepRequest, ToolStepResult,
-    VectorIndexer, VectorSearch, review_action,
+    AdmissionOrigin, ApprovalDecision, ApprovalObserver, ExecReview, FnNode, GraphNeighbors,
+    KernelServices, NO_PERMISSION_SERVICE, NodeDef, PermissionRequirement, PlainNode,
+    QuestionOutcome, StepContext, StepLink, TOOL_AUTHORISED, TextDrivers, ToolStepFuture,
+    ToolStepRequest, ToolStepResult, VectorIndexer, VectorSearch,
 };

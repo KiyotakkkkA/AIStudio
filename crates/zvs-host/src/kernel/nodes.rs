@@ -14,7 +14,8 @@ use zvs_contract::{
 };
 
 use super::registry::NodeRegistry;
-use super::types::{NodeDef, PermissionRequirement, StepContext};
+use super::types::{PermissionRequirement, PlainNode, StepContext};
+use crate::access::Admitted;
 use crate::drivers::ai::{ChatMessage, ChatRole, GenerateRequest, TextDelta, ToolCall};
 use crate::drivers::sidecar::{JobProgress, JobRunOptions};
 use crate::indexing::{IndexContext, IndexProgress};
@@ -296,7 +297,7 @@ impl Validate for GenerateOutput {
 pub struct GenerateNode;
 
 #[async_trait]
-impl NodeDef for GenerateNode {
+impl PlainNode for GenerateNode {
     type Input = GenerateInput;
     type Output = GenerateOutput;
 
@@ -312,11 +313,12 @@ impl NodeDef for GenerateNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: GenerateInput,
+        admitted: Admitted<GenerateInput>,
     ) -> Result<GenerateOutput, AppError> {
+        let input = admitted.into_inner();
         let input = input.into_request();
         let Some(providers) = &context.services.providers else {
             return Err(AppError::new(AppErrorCode::Conflict, PROVIDERS_UNAVAILABLE));
@@ -352,7 +354,7 @@ impl NodeDef for GenerateNode {
 pub struct VectorSearchNode;
 
 #[async_trait]
-impl NodeDef for VectorSearchNode {
+impl PlainNode for VectorSearchNode {
     type Input = VectorSearchInput;
     type Output = Vec<VectorSearchHitDto>;
 
@@ -368,11 +370,12 @@ impl NodeDef for VectorSearchNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: VectorSearchInput,
+        admitted: Admitted<VectorSearchInput>,
     ) -> Result<Vec<VectorSearchHitDto>, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let Some(vectors) = &context.services.vector_stores else {
             return Err(AppError::new(AppErrorCode::Conflict, VECTORS_UNAVAILABLE));
@@ -441,7 +444,7 @@ impl Validate for VectorStoreListEntry {
 pub struct VectorListNode;
 
 #[async_trait]
-impl NodeDef for VectorListNode {
+impl PlainNode for VectorListNode {
     type Input = VectorListInput;
     type Output = Vec<VectorStoreListEntry>;
 
@@ -457,11 +460,12 @@ impl NodeDef for VectorListNode {
         false
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        _input: VectorListInput,
+        admitted: Admitted<VectorListInput>,
     ) -> Result<Vec<VectorStoreListEntry>, AppError> {
+        let _input = admitted.into_inner();
         context.check_cancelled()?;
         let Some(vectors) = &context.services.vector_stores else {
             return Err(AppError::new(AppErrorCode::Conflict, VECTORS_UNAVAILABLE));
@@ -494,7 +498,7 @@ fn step_event(domain: &str, value: &impl Serialize) -> HostEventDraft {
 pub struct VectorIndexNode;
 
 #[async_trait]
-impl NodeDef for VectorIndexNode {
+impl PlainNode for VectorIndexNode {
     type Input = VectorIndexInput;
     type Output = VectorIndexReportDto;
 
@@ -510,11 +514,12 @@ impl NodeDef for VectorIndexNode {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: VectorIndexInput,
+        admitted: Admitted<VectorIndexInput>,
     ) -> Result<VectorIndexReportDto, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let Some(indexing) = &context.services.indexing else {
             return Err(AppError::new(AppErrorCode::Conflict, INDEXING_UNAVAILABLE));
@@ -572,7 +577,7 @@ impl Validate for BranchInput {
 pub struct BranchNode;
 
 #[async_trait]
-impl NodeDef for BranchNode {
+impl PlainNode for BranchNode {
     type Input = BranchInput;
     type Output = Value;
 
@@ -588,7 +593,12 @@ impl NodeDef for BranchNode {
         false
     }
 
-    async fn run(&self, context: &StepContext, input: BranchInput) -> Result<Value, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<BranchInput>,
+    ) -> Result<Value, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         Ok(if input.condition {
             input.then
@@ -633,7 +643,7 @@ fn own_property<'a>(value: &'a Value, key: &str) -> Option<std::borrow::Cow<'a, 
 pub struct MapNode;
 
 #[async_trait]
-impl NodeDef for MapNode {
+impl PlainNode for MapNode {
     type Input = MapInput;
     type Output = Vec<Value>;
 
@@ -649,7 +659,12 @@ impl NodeDef for MapNode {
         false
     }
 
-    async fn run(&self, context: &StepContext, input: MapInput) -> Result<Vec<Value>, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<MapInput>,
+    ) -> Result<Vec<Value>, AppError> {
+        let input = admitted.into_inner();
         let path = input.path.unwrap_or_default();
         input
             .items
@@ -695,7 +710,7 @@ impl Validate for JobRunInput {
 pub struct JobRunNode;
 
 #[async_trait]
-impl NodeDef for JobRunNode {
+impl PlainNode for JobRunNode {
     type Input = JobRunInput;
     type Output = Value;
 
@@ -711,7 +726,12 @@ impl NodeDef for JobRunNode {
         true
     }
 
-    async fn run(&self, context: &StepContext, input: JobRunInput) -> Result<Value, AppError> {
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<JobRunInput>,
+    ) -> Result<Value, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let Some(jobs) = &context.services.jobs else {
             return Err(AppError::new(AppErrorCode::Conflict, JOBS_UNAVAILABLE));

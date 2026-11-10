@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zvs_contract::validate::{check, invalid};
 use zvs_contract::{
-    AppError, AppErrorCode, ArtifactDto, BackgroundShellDto, BackgroundShellId,
-    PROCESS_APPROVAL_KIND, PROCESS_ARG_MAX, PROCESS_ARGV_MAX, PROCESS_REASON_MAX, ProcessPlanDto,
-    ProcessResultDto, ToolAuthorisationDto, ToolAuthorisationKind, ToolTier, Validate,
+    AppError, AppErrorCode, ArtifactDto, BackgroundShellDto, BackgroundShellId, PROCESS_ARG_MAX,
+    PROCESS_ARGV_MAX, PROCESS_REASON_MAX, ProcessPlanDto, ProcessResultDto, ToolTier, Validate,
 };
 
+use crate::access::{AccessRequest, Admitted, Effect};
 use crate::artifacts::{ArtifactStore, Snapshot, library_env, mentioned_paths, produced, snapshot};
 use crate::background::{BackgroundShells, NO_OWNER, ShellStart, status_line};
 use crate::chat_files::{CHAT_DIR_ENV, is_working};
@@ -19,12 +19,7 @@ use crate::conversations::is_owner;
 use crate::files::roots::{
     PathRoot, ROOTS_UNAVAILABLE, RootKind, SKILL_READ_ONLY, VirtualRoots, path_root,
 };
-use crate::kernel::{
-    ApprovalDecision, DeferredApproval, NodeDef, NodeRegistry, PermissionRequirement, StepContext,
-    review_action,
-};
-use crate::policy::{ReviewVerdict, ReviewedAction, rule_denied};
-use crate::services::approvals::ApprovalService;
+use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, StepContext};
 use crate::skills::script::{
     SCRIPT_NO_TOOLCHAIN, SCRIPT_NOT_STARTED, SCRIPT_UNSUPPORTED, SKILL_DIR_ENV, ScriptRuntime,
 };
@@ -35,7 +30,7 @@ use crate::toolchain::process::{
     process_text, run_process,
 };
 use crate::toolchain::service::SETTINGS_HINT;
-use crate::workspace::{FolderAccessService, FolderTarget};
+use crate::workspace::{FolderAccess, FolderAccessService, FolderTarget};
 
 pub const SHELL_RUN: &str = "shell.run";
 pub const PROCESS_TOOLS: [&str; 1] = [SHELL_RUN];
@@ -237,63 +232,14 @@ impl ProcessToolOutput {
 #[derive(Clone)]
 struct Tools {
     folders: FolderAccessService,
-    approvals: Arc<ApprovalService>,
     options: CommandToolOptions,
 }
 
 impl Tools {
-    fn new(
-        folders: &FolderAccessService,
-        approvals: Arc<ApprovalService>,
-        options: CommandToolOptions,
-    ) -> Self {
+    fn new(folders: &FolderAccessService, options: CommandToolOptions) -> Self {
         Self {
             folders: folders.clone(),
-            approvals,
             options,
-        }
-    }
-
-    async fn approve(
-        &self,
-        context: &StepContext,
-        conversation: &str,
-        tool: &str,
-        action: &str,
-        approval: Option<DeferredApproval>,
-        process: &ProcessPlanDto,
-    ) -> Result<(), AppError> {
-        let Some(approval) = approval else {
-            return Ok(());
-        };
-        let reviewed = ReviewedAction::Process {
-            tool: tool.to_owned(),
-            process: process.clone(),
-        };
-        let reason = match review_action(context, reviewed).await? {
-            ReviewVerdict::Run(authorisation) => return context.authorise(authorisation),
-            ReviewVerdict::Deny { rule } => return Err(rule_denied(&rule)),
-            ReviewVerdict::Ask { reason } => reason,
-        };
-        let mut request = self.approvals.create(
-            &context.run_id.to_string(),
-            &approval.subject,
-            &approval.scope,
-        )?;
-        request.insert("kind".to_owned(), json!(PROCESS_APPROVAL_KIND));
-        if !conversation.is_empty() {
-            request.insert("conversationId".to_owned(), json!(conversation));
-        }
-        request.insert("tool".to_owned(), json!(tool));
-        request.insert("action".to_owned(), json!(action));
-        request.insert("process".to_owned(), json!(process));
-        match context.request_approval(request).await? {
-            ApprovalDecision::Approved => context.authorise(
-                ToolAuthorisationDto::of(ToolAuthorisationKind::Approved).because(reason),
-            ),
-            ApprovalDecision::Denied => {
-                Err(AppError::new(AppErrorCode::ApprovalDenied, PROCESS_DENIED))
-            }
         }
     }
 
@@ -521,12 +467,8 @@ impl ScriptOutputs {
 pub struct ShellRunNode(Tools);
 
 impl ShellRunNode {
-    pub fn new(
-        folders: &FolderAccessService,
-        approvals: Arc<ApprovalService>,
-        options: CommandToolOptions,
-    ) -> Self {
-        Self(Tools::new(folders, approvals, options))
+    pub fn new(folders: &FolderAccessService, options: CommandToolOptions) -> Self {
+        Self(Tools::new(folders, options))
     }
 
     fn chat_folder(&self, conversation: &str) -> Option<PathBuf> {
@@ -535,12 +477,12 @@ impl ShellRunNode {
         roots.chat_folder(conversation).ok()
     }
 
-    async fn cwd(
+    fn cwd(
         &self,
         context: &StepContext,
         input: &ShellRunInput,
         script: bool,
-    ) -> Result<PathBuf, AppError> {
+    ) -> Result<(PathBuf, Option<FolderAccess>), AppError> {
         let tools = &self.0;
         let located = input
             .cwd
@@ -556,36 +498,39 @@ impl ShellRunNode {
                 ));
             }
             return if located.path.is_dir() {
-                Ok(located.path)
+                Ok((located.path, None))
             } else {
                 Err(AppError::new(AppErrorCode::NotFound, FOLDER_MISSING)
                     .with_detail("path", path_text(&located.path)))
             };
         }
         if script && input.cwd.is_none() {
-            return match self.chat_folder(&input.conversation_id) {
-                Some(folder) => Ok(folder),
-                None => prepare_scratch(&tools.options.scratch, &context.run_id.to_string()),
+            let folder = match self.chat_folder(&input.conversation_id) {
+                Some(folder) => folder,
+                None => prepare_scratch(&tools.options.scratch, &context.run_id.to_string())?,
             };
+            return Ok((folder, None));
         }
-        let folder = match &input.cwd {
+        let (folder, access) = match &input.cwd {
             Some(cwd) => {
                 let call = tools.folders.call(&input.conversation_id, SHELL_RUN);
-                tools
-                    .folders
-                    .ensure_access(context, &call, SHELL_ACTION, &[FolderTarget::folder(cwd)])
-                    .await?
-                    .into_iter()
-                    .next()
-                    .map(|target| target.path)
-                    .ok_or_else(|| AppError::new(AppErrorCode::NotFound, FOLDER_MISSING))?
+                let access = tools.folders.plan(&call, &[FolderTarget::folder(cwd)])?;
+                let folder = access
+                    .resolved
+                    .first()
+                    .map(|target| target.path.clone())
+                    .ok_or_else(|| AppError::new(AppErrorCode::NotFound, FOLDER_MISSING))?;
+                (folder, Some(access))
             }
-            None => tools
-                .working_folder(&input.conversation_id)?
-                .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, NO_FOLDER))?,
+            None => (
+                tools
+                    .working_folder(&input.conversation_id)?
+                    .ok_or_else(|| AppError::new(AppErrorCode::ValidationFailed, NO_FOLDER))?,
+                None,
+            ),
         };
         if folder.is_dir() {
-            Ok(folder)
+            Ok((folder, access))
         } else {
             Err(AppError::new(AppErrorCode::NotFound, FOLDER_MISSING)
                 .with_detail("path", path_text(&folder)))
@@ -593,10 +538,21 @@ impl ShellRunNode {
     }
 }
 
+pub struct ShellRun {
+    input: ShellRunInput,
+    skill: Option<SkillScript>,
+    shells: Option<BackgroundShells>,
+    cwd: PathBuf,
+    spec: LaunchSpec,
+    process: ProcessPlanDto,
+    folder: Option<FolderAccess>,
+}
+
 #[async_trait]
 impl NodeDef for ShellRunNode {
     type Input = ShellRunInput;
     type Output = ProcessToolOutput;
+    type Prepared = ShellRun;
 
     fn node_type(&self) -> &str {
         SHELL_RUN
@@ -610,20 +566,15 @@ impl NodeDef for ShellRunNode {
         PermissionRequirement::tool_at(SHELL_RUN, ToolTier::Ask)
     }
 
-    fn defers_approval(&self) -> bool {
-        true
-    }
-
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(
+    async fn prepare(
         &self,
         context: &StepContext,
         input: ShellRunInput,
-    ) -> Result<ProcessToolOutput, AppError> {
-        let approval = context.take_deferred_approval();
+    ) -> Result<ShellRun, AppError> {
         context.check_cancelled()?;
         let tools = &self.0;
         let program = input.argv.first().map(String::as_str).unwrap_or_default();
@@ -634,7 +585,7 @@ impl NodeDef for ShellRunNode {
             _ => None,
         };
         let shells = tools.shells(input.background, &input.conversation_id)?;
-        let cwd = self.cwd(context, &input, skill.is_some()).await?;
+        let (cwd, folder) = self.cwd(context, &input, skill.is_some())?;
         let chat = skill
             .as_ref()
             .and_then(|_| self.chat_folder(&input.conversation_id));
@@ -671,17 +622,50 @@ impl NodeDef for ShellRunNode {
             background: input.background,
             reason: Some(input.reason.trim().to_owned()),
         };
-        tools
-            .approve(
-                context,
-                &input.conversation_id,
-                SHELL_RUN,
-                SHELL_ACTION,
-                approval,
-                &process,
-            )
-            .await?;
-        context.check_cancelled()?;
+        Ok(ShellRun {
+            input,
+            skill,
+            shells,
+            cwd,
+            spec,
+            process,
+            folder,
+        })
+    }
+
+    fn access(&self, prepared: &ShellRun, request: AccessRequest) -> AccessRequest {
+        let mut request = request.with_effect(Effect::Process {
+            tool: SHELL_RUN.to_owned(),
+            process: prepared.process.clone(),
+        });
+        if let Some(folder) = &prepared.folder {
+            request = folder.describe(request, SHELL_ACTION);
+        }
+        let conversation = &prepared.input.conversation_id;
+        request.prompt.conversation = (!conversation.is_empty()).then(|| conversation.clone());
+        request.prompt.action = Some(SHELL_ACTION.to_owned());
+        request.prompt.denied = Some(PROCESS_DENIED.to_owned());
+        request
+    }
+
+    async fn execute(
+        &self,
+        context: &StepContext,
+        admitted: Admitted<ShellRun>,
+    ) -> Result<ProcessToolOutput, AppError> {
+        let ShellRun {
+            input,
+            skill,
+            shells,
+            cwd,
+            spec,
+            process,
+            folder,
+        } = admitted.into_inner();
+        if let Some(folder) = &folder {
+            folder.touch()?;
+        }
+        let tools = &self.0;
         let limits = tools.options.limits;
         if let Some(shells) = shells {
             let mut spec = spec;
@@ -767,12 +751,32 @@ impl NodeDef for ShellRunNode {
     }
 }
 
+#[cfg(test)]
+impl ShellRunNode {
+    pub async fn run(
+        &self,
+        context: &StepContext,
+        input: ShellRunInput,
+    ) -> Result<ProcessToolOutput, AppError> {
+        let prepared = self.prepare(context, input).await?;
+        if let Some(folder) = prepared
+            .folder
+            .as_ref()
+            .filter(|folder| folder.needs_grant())
+        {
+            let request = folder.request(SHELL_ACTION);
+            crate::access::grant(self.0.folders.approvals(), context, request).await?;
+        }
+        self.execute(context, crate::access::admitted(prepared))
+            .await
+    }
+}
+
 pub fn register_command_nodes(
     nodes: &NodeRegistry,
     folders: &FolderAccessService,
-    approvals: Arc<ApprovalService>,
     options: CommandToolOptions,
 ) -> Result<(), AppError> {
-    let tools = Tools::new(folders, approvals, options);
+    let tools = Tools::new(folders, options);
     nodes.register(ShellRunNode(tools))
 }

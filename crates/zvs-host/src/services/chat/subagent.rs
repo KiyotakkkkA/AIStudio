@@ -19,11 +19,12 @@ use super::{
     CallOptions, ChatLoopHost, GenerateChatNode, Inner, KNOWLEDGE_INSTRUCTION,
     PROVIDERS_UNAVAILABLE, file_tools_section, process_tools_section, working_folder_section,
 };
+use crate::access::Admitted;
 use crate::drivers::ai::{ChatMessage, GenerateRequest, TurnUsage};
 use crate::files::{FS_LIST, FS_READ, FS_SEARCH};
 use crate::kernel::knowledge_nodes::KNOWLEDGE_TOOLS;
 use crate::kernel::types::cancelled;
-use crate::kernel::{NodeDef, PermissionRequirement, RunObserver, StepContext};
+use crate::kernel::{PermissionRequirement, PlainNode, RunObserver, StepContext};
 use crate::platform::clock::SharedClock;
 use crate::services::chat_ask::ASK_TOOL;
 use crate::services::chat_goal::GOAL_TOOLS;
@@ -703,7 +704,7 @@ impl RoundHook for SubagentHook {
 pub(crate) struct SubagentNode(pub(super) Arc<Inner>);
 
 #[async_trait]
-impl NodeDef for SubagentNode {
+impl PlainNode for SubagentNode {
     type Input = SubagentInput;
     type Output = SubagentOutput;
 
@@ -712,18 +713,19 @@ impl NodeDef for SubagentNode {
     }
 
     fn permission(&self) -> PermissionRequirement {
-        PermissionRequirement::None
+        PermissionRequirement::Kernel
     }
 
     fn side_effect(&self) -> bool {
         true
     }
 
-    async fn run(
+    async fn execute(
         &self,
         context: &StepContext,
-        input: SubagentInput,
+        admitted: Admitted<SubagentInput>,
     ) -> Result<SubagentOutput, AppError> {
+        let input = admitted.into_inner();
         context.check_cancelled()?;
         let inner = &self.0;
         let Some(providers) = &context.services.providers else {

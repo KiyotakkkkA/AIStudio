@@ -52,7 +52,6 @@ impl Host {
     ) -> ShellRunNode {
         ShellRunNode::new(
             &self.services.folders,
-            self.services.runs.approvals(),
             CommandToolOptions {
                 limits,
                 roots: VirtualRoots::new(store, Some(self.services.skills.library().clone())),

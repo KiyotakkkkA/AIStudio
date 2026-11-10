@@ -177,7 +177,6 @@ async fn rig(provider: GitHostingProvider) -> Rig {
     let service = IntegrationService::new(IntegrationServiceOptions {
         providers: vec![provider],
         clock: host.clock.clone(),
-        approvals: Some(services.runs.approvals()),
         opener: Some(Arc::new(move |url: &str| {
             recorder
                 .lock()

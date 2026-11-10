@@ -119,7 +119,7 @@ impl PermissionService {
         context: &PermissionContext,
     ) -> Result<Admission, AppError> {
         match self.registry.resolve(node_type)?.permission() {
-            PermissionRequirement::None => Ok(Admission::Allow),
+            PermissionRequirement::None | PermissionRequirement::Kernel => Ok(Admission::Allow),
             PermissionRequirement::Tool { tool, tier } => {
                 self.admit_subject(tool, context, tier.unwrap_or(ToolTier::Auto))
             }
