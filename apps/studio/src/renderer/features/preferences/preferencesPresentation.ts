@@ -43,7 +43,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   device: DEVICE_TITLE,
   components: "Компоненты",
   voice: VOICE_INPUT,
-  cli: "CLI",
+  cli: "Терминал",
 };
 
 const EXTENSIONS_GROUP = "Расширения";

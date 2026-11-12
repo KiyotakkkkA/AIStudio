@@ -5,7 +5,9 @@ import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
 import type { ToggleRowCopy } from "./preferencesPresentation";
 
 export const CLI_SETTING_ID = "cli.install";
-export const CLI_TITLE = "Консольная версия";
+export const CLI_TITLE = "Терминал";
+export const CLI_APPEARANCE_TITLE = "Внешний вид";
+export const CLI_ACCESS_TITLE = "Управление доступом";
 export const CLI_COMMAND = "aistudio";
 export const CLI_INSTALL = "Установить";
 export const CLI_UNINSTALL = "Удалить";
@@ -39,11 +41,11 @@ export function cliFailureCopy(error: unknown, installing: boolean): string {
 
 export const CLI_CONFIRM_ROW: ToggleRowCopy = {
   key: "cli.confirmLoosening",
-  label: "Понижение режима проверки доступа",
-  hint: `Без подтверждения из консоли доступен только режим «${EXEC_MODE_COPY["auto-bypass"].label}».`,
+  label: "Дополнительное подтверждение при снятии ограничений",
+  hint: `Подтверждение снятия ограничений при выставлении режима доступа «Без ограничений»`,
 };
 export const CLI_CONNECTIONS_SETTING_ID = "cli.connections";
-export const CLI_CONNECTIONS_LABEL = "Подключения консоли";
+export const CLI_CONNECTIONS_LABEL = "Активные сессии";
 export const CLI_CONNECTIONS_EMPTY = "Активных подключений нет.";
 export const CLI_CONNECTIONS_HINT = "Процессы, подключённые к приложению через консоль.";
 export const CLI_CONNECTIONS_FAILED = "Не удалось загрузить сессии консоли.";

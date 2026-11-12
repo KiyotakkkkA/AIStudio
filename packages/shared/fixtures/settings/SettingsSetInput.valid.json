@@ -41,5 +41,12 @@
         }
       ]
     }
+  },
+  {
+    "name": "CLI policy confirmation",
+    "value": {
+      "key": "cli.confirmLoosening",
+      "value": false
+    }
   }
 ]

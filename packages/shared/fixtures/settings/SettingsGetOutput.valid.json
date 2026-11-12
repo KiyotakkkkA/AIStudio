@@ -36,5 +36,13 @@
       "value": "dark",
       "updatedAt": 1700000000000
     }
+  },
+  {
+    "name": "CLI policy confirmation",
+    "value": {
+      "key": "cli.confirmLoosening",
+      "value": false,
+      "updatedAt": 1700000000000
+    }
   }
 ]

@@ -64,7 +64,7 @@ fn model_line(app: &App) -> String {
     )
 }
 
-fn welcome(frame: &mut Frame<'_>, area: Rect, app: &App) {
+fn welcome(frame: &mut Frame<'_>, area: Rect) {
     let width = usize::from(area.width);
     let mut lines = banner::lines(width.saturating_sub(4));
     lines.push(Line::default());
@@ -74,22 +74,7 @@ fn welcome(frame: &mut Frame<'_>, area: Rect, app: &App) {
         Span::styled(format!("  ·  {}", crate::version::label()), theme::faint()),
     ]));
     lines.push(Line::default());
-    let card = [
-        (copy::WORKSPACE, app.folder.clone()),
-        (copy::MODEL, model_line(app)),
-        (copy::MODE, mode_label(app.mode).to_owned()),
-    ];
-    for (label, value) in card {
-        lines.push(Line::from(vec![
-            Span::styled(format!("{label}: "), theme::muted()),
-            Span::styled(
-                text::truncate(&value, width.saturating_sub(24)),
-                theme::text(),
-            ),
-        ]));
-    }
     lines.push(Line::default());
-    lines.push(Line::from(Span::styled(copy::WELCOME_HINT, theme::faint())));
     let height = rows(lines.len());
     let top = area.y + area.height.saturating_sub(height) / 3;
     let target = Rect {
@@ -105,7 +90,7 @@ fn welcome(frame: &mut Frame<'_>, area: Rect, app: &App) {
 
 fn transcript_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     if app.show_welcome() {
-        welcome(frame, area, app);
+        welcome(frame, area);
         return;
     }
     let lines = transcript::lines(app, usize::from(area.width));

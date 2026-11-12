@@ -155,7 +155,7 @@ PR what was not run.
   `aistudio.exe`. The confirmation names an unrecognised image.
 - **Studio.** `CliAccessStore` with `CliConsentModal` in `AppFrame`.
   «Параметры → Командная строка» gains the switch «Подтверждение ослабления доступа из
-  консоли» (`cli.confirmLoosening`, on by default) and «Подключения консоли» with
+  консоли» (`cli.confirmLoosening`, on by default) and «Активные сессии» with
   «Отключить» (`cli.connections.disconnect` cancels the connection).
 - **Console.** The status line shows «Ожидает подтверждения в приложении» while a change is
   held.

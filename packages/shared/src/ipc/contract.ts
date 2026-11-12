@@ -1,3 +1,4 @@
+import { CLI_CONFIRM_SETTING_KEY } from "../cli.js";
 import { z } from "zod";
 import { CliImageImportInput, ImageAttachments, ImageDataDto, ImageReadInput } from "../images.js";
 import { ProviderUsageDto } from "../providers/ProviderDto.js";
@@ -317,7 +318,7 @@ export const SettingKey = z
   .string()
   .min(1)
   .max(128)
-  .regex(/^[a-z][a-z0-9]*(\.[a-z0-9]+)*$/);
+  .refine((key) => key === CLI_CONFIRM_SETTING_KEY || /^[a-z][a-z0-9]*(\.[a-z0-9]+)*$/.test(key));
 export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({

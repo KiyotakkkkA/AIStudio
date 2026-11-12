@@ -342,7 +342,7 @@ function DevicePreferences() {
       />
     );
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <div
         data-setting={DEVICE_ENABLED_ID}
         className="flex items-center gap-3.5 rounded-card border border-line bg-main-850 px-4 py-3.5"

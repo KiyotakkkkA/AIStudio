@@ -177,3 +177,17 @@ test("a refused change rolls the toggle back and says why", async () => {
   expect(store.errors["app.tray"]).toBe(SETTING_SAVE_FAILED);
   expect(store.pending).toEqual({});
 });
+
+test("CLI policy confirmation persists and restores through validated IPC", async () => {
+  const { stored, store } = appSettings();
+  await store.load();
+  await store.set("cli.confirmLoosening", false);
+  expect(stored.get("cli.confirmLoosening")).toBe(false);
+  expect(store.errors["cli.confirmLoosening"]).toBeUndefined();
+  const restored = appSettings(Object.fromEntries(stored)).store;
+  await restored.load();
+  expect(restored.values["cli.confirmLoosening"]).toBe(false);
+  await restored.set("cli.confirmLoosening", true);
+  expect(restored.errors["cli.confirmLoosening"]).toBeUndefined();
+  expect(restored.values["cli.confirmLoosening"]).toBe(true);
+});

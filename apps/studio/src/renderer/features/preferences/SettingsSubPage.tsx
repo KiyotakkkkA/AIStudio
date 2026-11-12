@@ -14,7 +14,7 @@ export default function SettingsSubPage({
   readonly children: ReactNode;
 }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-4 pt-2">
+    <section aria-label={title} className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <IconButton path={mdiArrowLeft} label="Назад" size="sm" onClick={onBack} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

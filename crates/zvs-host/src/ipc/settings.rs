@@ -94,6 +94,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cli_confirmation_setting_round_trips_and_rejects_non_boolean_values() {
+        let (host, server) = server();
+        for enabled in [false, true] {
+            let saved = server
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({"key": zvs_contract::CLI_CONFIRM_SETTING_KEY, "value": enabled}),
+                )
+                .await;
+            assert_eq!(saved["ok"], json!(true), "{saved}");
+            let loaded = server
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.get",
+                    json!({"key": zvs_contract::CLI_CONFIRM_SETTING_KEY}),
+                )
+                .await;
+            assert_eq!(loaded["data"]["value"], json!(enabled));
+        }
+        let rejected = server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "settings.set",
+                json!({"key": zvs_contract::CLI_CONFIRM_SETTING_KEY, "value": "false"}),
+            )
+            .await;
+        assert_eq!(rejected["error"]["code"], json!("VALIDATION_FAILED"));
+        assert_eq!(
+            host.settings
+                .get(zvs_contract::CLI_CONFIRM_SETTING_KEY)
+                .expect("reads")
+                .expect("saved")
+                .value,
+            json!(true)
+        );
+    }
+
+    #[tokio::test]
     async fn device_switch_blocks_and_restores_the_command_skill_and_tools() {
         use crate::skills::SkillCatalogue;
         let (host, server) = server();

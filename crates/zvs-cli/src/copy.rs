@@ -36,7 +36,6 @@ pub const ACCESS_ALWAYS: &str = "Разрешить всегда";
 pub const ACCESS_DENY: &str = "Отказать и выйти";
 pub const ACCESS_DENIED: &str = "Доступ к папке не предоставлен. Сессия завершена.";
 
-pub const WELCOME_HINT: &str = "/ — команды · ? — сочетания клавиш";
 pub const INPUT_PLACEHOLDER: &str = "Сообщение…";
 pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";

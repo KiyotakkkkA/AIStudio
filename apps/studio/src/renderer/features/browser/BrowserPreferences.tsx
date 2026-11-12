@@ -155,7 +155,7 @@ export default observer(function BrowserPreferences() {
   if (page === "import") return <ImportPage onBack={back} />;
   if (page === "extensions") return <BrowserExtensionsPage onBack={back} />;
   return (
-    <div className="flex flex-col gap-6 pt-2">
+    <div className="flex flex-col gap-6">
       {browserSettings.error === null ? null : (
         <Alert onDismiss={browserSettings.dismissError}>{browserSettings.error}</Alert>
       )}

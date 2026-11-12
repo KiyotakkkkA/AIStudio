@@ -10,8 +10,6 @@ import {
   mdiClose,
   mdiCogOutline,
   mdiConsole,
-  mdiDeleteOutline,
-  mdiDownload,
   mdiDevices,
   mdiHarddisk,
   mdiInformationOutline,
@@ -40,14 +38,16 @@ import FadeIn from "../../ui/motion/FadeIn";
 import { useStore } from "../../stores/useStore";
 import {
   CLI_CHECKING,
+  CLI_TITLE,
   CLI_COMMAND,
+  CLI_APPEARANCE_TITLE,
+  CLI_ACCESS_TITLE,
   CLI_CONFIRM_ROW,
   CLI_CONNECTIONS_EMPTY,
   CLI_CONNECTIONS_HINT,
   CLI_CONNECTIONS_LABEL,
   CLI_CONNECTIONS_SETTING_ID,
   CLI_DISCONNECT,
-  CLI_INSTALL,
   CLI_INSTALLED,
   CLI_NOT_BUNDLED,
   CLI_NOT_INSTALLED,
@@ -55,7 +55,6 @@ import {
   CLI_THEME_HINT,
   CLI_THEME_LABEL,
   CLI_THEME_SETTING_ID,
-  CLI_UNINSTALL,
   cliClientLine,
 } from "./cliCopy";
 import CliThemes from "./CliThemes";
@@ -267,7 +266,7 @@ const InfoTableRows = observer(function InfoTableRows({
 const AppearanceSection = observer(function AppearanceSection() {
   const { ui } = useStore();
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <PreferenceContainer title="Цветовая схема">
         <SettingRow
           id={SETTING_IDS.theme}
@@ -661,7 +660,7 @@ const GeneralSection = observer(function GeneralSection() {
       </SettingsSubPage>
     );
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <PreferenceContainer title="Работа приложения">
         {GENERAL_ROWS.map((row) => (
           <ToggleSettingRow key={row.key} row={row} />
@@ -689,7 +688,7 @@ const ProfileSection = observer(function ProfileSection() {
     void profile.load();
   }, [profile]);
   return (
-    <div className="pt-2">
+    <div>
       <PreferenceContainer title="Персонализация">
         <SettingRow
           id={STYLE_ROW.key}
@@ -767,7 +766,7 @@ const NotificationsSection = observer(function NotificationsSection() {
     void appSettings.load();
   }, [appSettings]);
   return (
-    <div className="pt-2">
+    <div>
       <PreferenceContainer title="События приложения">
         <ToggleSettingRow row={NOTIFICATIONS_ROW} />
         {appSettings.values[NOTIFICATIONS_ROW.key] ? (
@@ -800,7 +799,7 @@ const MemorySection = observer(function MemorySection() {
       </SettingsSubPage>
     );
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <PreferenceContainer title="Управление памятью">
         <ToggleSettingRow row={ENABLED_ROW} />
         {enabled && (
@@ -826,7 +825,7 @@ const MemorySection = observer(function MemorySection() {
 });
 
 const CliSection = observer(function CliSection() {
-  const { cli } = useStore();
+  const { cli, ui } = useStore();
   useEffect(() => {
     void cli.load();
   }, [cli]);
@@ -840,40 +839,41 @@ const CliSection = observer(function CliSection() {
           ? CLI_INSTALLED
           : CLI_NOT_INSTALLED;
   return (
-    <div className="pt-2">
-      <PreferenceContainer title="Командная строка">
-        <SettingRow
-          id={CLI_SETTING_ID}
-          label={status?.command ?? CLI_COMMAND}
-          hint={state}
-          error={cli.error ?? undefined}
-          footer={
-            cli.notice === null ? undefined : (
-              <p role="status" className="m-0 text-[12px] text-main-500">
-                {cli.notice}
-              </p>
-            )
-          }
-        >
-          <div className="flex items-center gap-3">
-            {status?.installed ? (
-              <IconButton
-                path={mdiDeleteOutline}
-                label={CLI_UNINSTALL}
-                tone="danger"
-                disabled={cli.busy}
-                onClick={() => void cli.uninstall()}
-              />
-            ) : (
-              <IconButton
-                path={mdiDownload}
-                label={CLI_INSTALL}
-                disabled={cli.busy || !cli.available}
-                onClick={() => void cli.install()}
-              />
-            )}
+    <div className="flex flex-col gap-6">
+      <div
+        data-setting={CLI_SETTING_ID}
+        data-setting-highlighted={ui.preferenceTarget === CLI_SETTING_ID || undefined}
+        className="flex flex-col gap-2 rounded-card border border-line bg-main-850 px-4 py-3.5"
+      >
+        <div className="flex items-center gap-3.5">
+          <span className="flex size-10 flex-none items-center justify-center rounded-control bg-main-800 text-main-200">
+            <Icon path={mdiConsole} size={20} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-[13px] font-medium text-main-100">{CLI_TITLE}</span>
+            <span className="text-[12px] text-main-500">
+              {status?.command ?? CLI_COMMAND} · {state}
+            </span>
           </div>
-        </SettingRow>
+          <Toggle
+            label={cli.installed ? TOGGLE_ON : TOGGLE_OFF}
+            checked={cli.installed}
+            disabled={cli.busy || status === null || (!cli.installed && !cli.available)}
+            onChange={(enabled) => void (enabled ? cli.install() : cli.uninstall())}
+          />
+        </div>
+        {cli.error === null ? null : (
+          <p role="alert" className="m-0 text-[12px] text-err">
+            {cli.error}
+          </p>
+        )}
+        {cli.notice === null ? null : (
+          <p role="status" className="m-0 text-[12px] text-main-500">
+            {cli.notice}
+          </p>
+        )}
+      </div>
+      <PreferenceContainer title={CLI_APPEARANCE_TITLE}>
         <SettingRow
           id={CLI_THEME_SETTING_ID}
           label={CLI_THEME_LABEL}
@@ -883,6 +883,8 @@ const CliSection = observer(function CliSection() {
         >
           <CliThemes />
         </SettingRow>
+      </PreferenceContainer>
+      <PreferenceContainer title={CLI_ACCESS_TITLE}>
         <ToggleSettingRow row={CLI_CONFIRM_ROW} />
         <CliConnectionsRow />
       </PreferenceContainer>
@@ -1025,7 +1027,7 @@ const VoiceSection = observer(function VoiceSection() {
       : []),
   ];
   return (
-    <div className="pt-2">
+    <div>
       <PreferenceContainer title="Распознавание речи">
         <SettingRow
           id={VOICE_DEVICE_ROW.key}
@@ -1073,7 +1075,7 @@ const DataSection = observer(function DataSection() {
     fill: STORAGE_CATEGORY_FILLS[item.category],
   }));
   return (
-    <div className="flex flex-col gap-4 pt-2">
+    <div className="flex flex-col gap-4">
       <section className="space-y-3.5 rounded-card bg-main-850 p-3.5 text-[12px] text-main-300">
         <div className="space-y-2">
           <div className="flex items-baseline gap-2">
@@ -1210,7 +1212,7 @@ const DataSection = observer(function DataSection() {
 
 const AboutSection = observer(function AboutSection() {
   return (
-    <div className="flex flex-col gap-6 pt-2">
+    <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3.5 rounded-card bg-main-850 px-4 py-3.5">
         <AppLogo size={40} />
         <div className="flex min-w-0 flex-col leading-tight">
@@ -1321,7 +1323,7 @@ function PreferencesWorkspace() {
         </div>
       </nav>
       <div ref={content} className="flex min-w-0 flex-1 flex-col">
-        <ScrollArea className="min-h-0 flex-1 px-7 pt-7 pb-8">
+        <ScrollArea className="min-h-0 flex-1 p-7">
           <div className="mx-auto w-full max-w-240">
             <header className="mb-8 flex flex-col gap-2">
               <h2 className="m-0 text-[28px] leading-tight font-semibold tracking-[-0.02em] text-main-50">
@@ -1330,22 +1332,24 @@ function PreferencesWorkspace() {
               <p className="m-0 text-[13px] text-main-400">{SECTION_HINTS[section]}</p>
             </header>
             <FadeIn key={section}>
-              {section === "general" ? <GeneralSection /> : null}
-              {section === "profile" ? <ProfileSection /> : null}
-              {section === "appearance" ? <AppearanceSection /> : null}
-              {section === "notifications" ? <NotificationsSection /> : null}
-              {section === "memory" ? <MemorySection /> : null}
-              {section === "data" ? <DataSection /> : null}
-              {section === "about" ? <AboutSection /> : null}
-              {section === "cli" ? <CliSection /> : null}
-              {section === "voice" ? <VoiceSection /> : null}
-              {section === "browser" ? <BrowserPreferences /> : null}
-              {section === "device" ? <DevicePreferences /> : null}
-              {section === "components" ? (
-                <div data-setting={SETTING_IDS.components} className="pt-2">
-                  <ComponentsTab />
-                </div>
-              ) : null}
+              <div className="pt-2">
+                {section === "general" ? <GeneralSection /> : null}
+                {section === "profile" ? <ProfileSection /> : null}
+                {section === "appearance" ? <AppearanceSection /> : null}
+                {section === "notifications" ? <NotificationsSection /> : null}
+                {section === "memory" ? <MemorySection /> : null}
+                {section === "data" ? <DataSection /> : null}
+                {section === "about" ? <AboutSection /> : null}
+                {section === "cli" ? <CliSection /> : null}
+                {section === "voice" ? <VoiceSection /> : null}
+                {section === "browser" ? <BrowserPreferences /> : null}
+                {section === "device" ? <DevicePreferences /> : null}
+                {section === "components" ? (
+                  <div data-setting={SETTING_IDS.components}>
+                    <ComponentsTab />
+                  </div>
+                ) : null}
+              </div>
             </FadeIn>
           </div>
         </ScrollArea>

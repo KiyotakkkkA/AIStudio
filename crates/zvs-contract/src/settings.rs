@@ -9,6 +9,9 @@ pub const SETTING_KEY_MAX: usize = 128;
 pub fn check_setting_key(field: &str, key: &str) -> Result<(), AppError> {
     check::non_empty(field, key)?;
     check::max_len(field, key, SETTING_KEY_MAX)?;
+    if key == crate::cli::CLI_CONFIRM_SETTING_KEY {
+        return Ok(());
+    }
     let segment = |part: &str, first: bool| {
         !part.is_empty()
             && part.bytes().enumerate().all(|(index, byte)| {
