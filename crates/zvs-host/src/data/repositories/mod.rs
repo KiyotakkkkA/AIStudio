@@ -1,3 +1,4 @@
+pub mod access_grant;
 pub mod account;
 pub mod agentic;
 pub mod app_grant;
@@ -29,6 +30,7 @@ pub mod vector_store;
 
 use rusqlite::Connection;
 
+pub use access_grant::AccessGrantRepository;
 pub use account::{
     AccountDraft, AccountPatch, AccountRemoval, AccountRepository, NO_ACCOUNT_LINKED,
 };
@@ -66,6 +68,7 @@ pub use vector_source::{VectorSourceDraft, VectorSourceRepository};
 pub use vector_store::{VectorStoreDraft, VectorStorePatch, VectorStoreRepository};
 
 pub struct Repositories<'c> {
+    pub access_grants: AccessGrantRepository<'c>,
     pub settings: SettingRepository<'c>,
     pub secrets: SecretRepository<'c>,
     pub providers: ProviderRepository<'c>,
@@ -100,6 +103,7 @@ pub struct Repositories<'c> {
 impl<'c> Repositories<'c> {
     pub const fn new(connection: &'c Connection) -> Self {
         Self {
+            access_grants: AccessGrantRepository::new(connection),
             settings: SettingRepository::new(connection),
             secrets: SecretRepository::new(connection),
             providers: ProviderRepository::new(connection),

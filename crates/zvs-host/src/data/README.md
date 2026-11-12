@@ -47,6 +47,16 @@ The baseline snapshot holds only `sqlite_master`, so the rows live in their own 
 `VectorStoreRepository::update` writes only the columns a `VectorStorePatch` sets,
 `updated_at` included.
 
+`access_grant` (migration 0043) is the one table of stored grants. `AccessGrantRepository`
+reads and writes it directly; `FolderGrantRepository`, `AppGrantRepository`,
+`BrowserSiteRuleRepository` and the tier methods of `PermissionRepository` are views over it
+that keep their row structs, filtered by `resource_kind` and with columns aliased in each
+row's `COLUMNS`. Two partial unique indexes allow one row per kind, resource and action for
+shared grants and one per owner for dialog grants, so a site rule or a tier row upserts with
+`ON CONFLICT (resource_kind, resource, action) WHERE owner IS NULL`. App paths and icons are
+JSON in `detail`. Migration 0043 copies with `INSERT OR IGNORE`, so a duplicate in an old table
+keeps its first row instead of stopping the upgrade.
+
 ## Errors
 
 Closures passed to `with_connection` and `transaction` return `Result<T, DataError>`, so both

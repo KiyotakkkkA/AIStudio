@@ -76,6 +76,7 @@ const fn console(channel: &'static str, effect: Effect, scope: Scope) -> Channel
 }
 
 pub const POLICY: &[ChannelPolicy] = &[
+    studio("access.list", Effect::Read),
     studio("accounts.cancelLink", Effect::Act),
     studio("accounts.link", Effect::Act),
     studio("accounts.list", Effect::Read),

@@ -15,8 +15,10 @@ pub struct AppGrantRow {
 }
 
 impl AppGrantRow {
-    pub const COLUMNS: &str = "g.id, g.app, g.path, g.icon, g.scope, g.conversation_id, \
-         c.title AS conversation_title, g.granted_at, g.last_used_at";
+    pub const COLUMNS: &str = "g.id, g.resource AS app, \
+         ifnull(json_extract(g.detail, '$.path'), '') AS path, \
+         json_extract(g.detail, '$.icon') AS icon, g.scope, g.owner AS conversation_id, \
+         c.title AS conversation_title, g.granted_at, g.used_at AS last_used_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {

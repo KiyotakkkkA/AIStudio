@@ -1,12 +1,22 @@
 use rusqlite::{Connection, OptionalExtension, params};
+use serde_json::json;
 
-use crate::data::schema::AppGrantRow;
+use crate::data::schema::{AppGrantRow, GRANTED_BY_USER};
 
 pub struct AppGrantRepository<'c> {
     connection: &'c Connection,
 }
 
-const FROM: &str = "FROM app_grant g LEFT JOIN conversation c ON c.id = g.conversation_id";
+const FROM: &str = "FROM access_grant g LEFT JOIN conversation c ON c.id = g.owner \
+     WHERE g.resource_kind = 'app'";
+
+const SHARED: &str = "NOT EXISTS (SELECT 1 FROM access_grant shared \
+     WHERE shared.resource_kind = 'app' AND shared.resource = g.resource \
+     AND shared.owner IS NULL)";
+
+fn detail(row: &AppGrantRow) -> String {
+    json!({ "path": row.path, "icon": row.icon }).to_string()
+}
 
 impl<'c> AppGrantRepository<'c> {
     pub const fn new(connection: &'c Connection) -> Self {
@@ -16,7 +26,7 @@ impl<'c> AppGrantRepository<'c> {
     pub fn list(&self) -> rusqlite::Result<Vec<AppGrantRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} {FROM} ORDER BY g.scope, g.app, g.granted_at DESC",
+                "SELECT {} {FROM} ORDER BY g.scope, g.resource, g.granted_at DESC",
                 AppGrantRow::COLUMNS
             ))?
             .query_map([], AppGrantRow::from_row)?
@@ -26,7 +36,7 @@ impl<'c> AppGrantRepository<'c> {
     pub fn usable(&self, conversation_id: &str) -> rusqlite::Result<Vec<AppGrantRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} {FROM} WHERE g.conversation_id IS NULL OR (g.conversation_id = ?1 AND NOT EXISTS (SELECT 1 FROM app_grant global WHERE global.app = g.app AND global.conversation_id IS NULL))",
+                "SELECT {} {FROM} AND (g.owner IS NULL OR (g.owner = ?1 AND {SHARED}))",
                 AppGrantRow::COLUMNS
             ))?
             .query_map([conversation_id], AppGrantRow::from_row)?
@@ -40,7 +50,7 @@ impl<'c> AppGrantRepository<'c> {
     ) -> rusqlite::Result<Option<AppGrantRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} {FROM} WHERE g.app = ?1 AND g.conversation_id IS ?2",
+                "SELECT {} {FROM} AND g.resource = ?1 AND g.owner IS ?2",
                 AppGrantRow::COLUMNS
             ))?
             .query_row(params![app, conversation_id], AppGrantRow::from_row)
@@ -50,7 +60,7 @@ impl<'c> AppGrantRepository<'c> {
     pub fn find_by_id(&self, id: &str) -> rusqlite::Result<Option<AppGrantRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} {FROM} WHERE g.id = ?1",
+                "SELECT {} {FROM} AND g.id = ?1",
                 AppGrantRow::COLUMNS
             ))?
             .query_row([id], AppGrantRow::from_row)
@@ -59,28 +69,36 @@ impl<'c> AppGrantRepository<'c> {
 
     pub fn save(&self, row: &AppGrantRow) -> rusqlite::Result<()> {
         if let Some(existing) = self.find(&row.app, row.conversation_id.as_deref())? {
+            let icon = row.icon.clone().or(existing.icon);
             self.connection
                 .prepare_cached(
-                    "UPDATE app_grant SET path = ?2, icon = coalesce(?3, icon), granted_at = ?4 \
-                     WHERE id = ?1",
+                    "UPDATE access_grant SET detail = ?2, granted_at = ?3 WHERE id = ?1",
                 )?
-                .execute(params![existing.id, row.path, row.icon, row.granted_at])?;
+                .execute(params![
+                    existing.id,
+                    detail(&AppGrantRow {
+                        icon,
+                        ..row.clone()
+                    }),
+                    row.granted_at
+                ])?;
             return Ok(());
         }
         self.connection
             .prepare_cached(
-                "INSERT INTO app_grant (id, app, path, icon, scope, conversation_id, granted_at, \
-                 last_used_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                "INSERT INTO access_grant (id, resource_kind, resource, action, decision, scope, \
+                 owner, granted_by, granted_at, used_at, detail) \
+                 VALUES (?1, 'app', ?2, '', 'allow', ?3, ?4, ?5, ?6, ?7, ?8)",
             )?
             .execute(params![
                 row.id,
                 row.app,
-                row.path,
-                row.icon,
                 row.scope,
                 row.conversation_id,
+                GRANTED_BY_USER,
                 row.granted_at,
-                row.last_used_at
+                row.last_used_at,
+                detail(row),
             ])?;
         Ok(())
     }
@@ -88,8 +106,10 @@ impl<'c> AppGrantRepository<'c> {
     pub fn touch(&self, app: &str, conversation_id: &str, now: i64) -> rusqlite::Result<usize> {
         self.connection
             .prepare_cached(
-                "UPDATE app_grant SET last_used_at = ?3 WHERE app = ?1 \
-                 AND (conversation_id IS NULL OR (conversation_id = ?2 AND NOT EXISTS (SELECT 1 FROM app_grant global WHERE global.app = ?1 AND global.conversation_id IS NULL)))",
+                "UPDATE access_grant SET used_at = ?3 WHERE resource_kind = 'app' \
+                 AND resource = ?1 AND (owner IS NULL OR (owner = ?2 AND NOT EXISTS \
+                 (SELECT 1 FROM access_grant shared WHERE shared.resource_kind = 'app' \
+                 AND shared.resource = ?1 AND shared.owner IS NULL)))",
             )?
             .execute(params![app, conversation_id, now])
     }
@@ -97,7 +117,7 @@ impl<'c> AppGrantRepository<'c> {
     pub fn remove(&self, id: &str) -> rusqlite::Result<bool> {
         Ok(self
             .connection
-            .prepare_cached("DELETE FROM app_grant WHERE id = ?1")?
+            .prepare_cached("DELETE FROM access_grant WHERE id = ?1 AND resource_kind = 'app'")?
             .execute([id])?
             > 0)
     }

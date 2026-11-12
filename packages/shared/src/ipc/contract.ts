@@ -68,6 +68,7 @@ import {
   BrowserSitesDto,
 } from "../browserSites.js";
 import { AddAppGrantInput, AnswerAppRequestInput, AppGrantDto, AppGrantRef } from "../computer.js";
+import { AccessListDto } from "../access.js";
 import { ChatAnswerInput, ChatSkipInput } from "../questions.js";
 import {
   ClearMemoryInput,
@@ -379,6 +380,7 @@ export const contract = defineContract({
   "computer.grants": { input: z.void(), output: z.array(AppGrantDto) },
   "computer.revoke": { input: AppGrantRef, output: z.void() },
   "computer.answer": { input: AnswerAppRequestInput, output: z.void() },
+  "access.list": { input: z.void(), output: AccessListDto },
   "browserSites.get": { input: z.void(), output: BrowserSitesDto },
   "browserSites.setDefault": { input: BrowserSiteDefaultInput, output: BrowserSitesDto },
   "browserSites.put": { input: BrowserSitePutInput, output: BrowserSitesDto },

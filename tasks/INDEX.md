@@ -287,7 +287,7 @@ patches on the current code; each says how.
 - [x] **TASK_079** — Rules in every mode, `auto` without a judge, the vendor pack without a catch-all
 - [x] **TASK_080** — Allow rules bound to approvals, listed and removable
 - [x] **TASK_081** — Caller identity and the console pipe
-- [ ] **TASK_082** — One grant store and the «Доступ» page
+- [x] **TASK_082** — One grant store and the «Доступ» page
 - [ ] **TASK_083** — Approval lifetime, the audit trail and the agentic mode on one table
 
 ```

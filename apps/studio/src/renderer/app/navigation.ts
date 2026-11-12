@@ -72,16 +72,22 @@ const NAV_GROUPS: readonly NavGroupModel[] = [
     id: "system",
     label: "Система",
     items: [
-      { id: "tasks", label: "Задачи", icon: mdiClockOutline, path: ROUTES.tasks },
       { id: "downloads", label: "Загрузки", icon: mdiTrayArrowDown, path: ROUTES.downloads },
-      { id: "runs", label: "Запуски и логи", icon: mdiHistory, path: ROUTES.runs },
       {
         id: "permissions",
-        label: "Разрешения",
+        label: "Доступ",
         icon: mdiShieldCheckOutline,
         path: ROUTES.permissions,
       },
       { id: "settings", label: "Параметры", icon: mdiCogOutline, path: ROUTES.settings },
+    ],
+  },
+  {
+    id: "logging",
+    label: "Журналирование",
+    items: [
+      { id: "tasks", label: "Задачи", icon: mdiClockOutline, path: ROUTES.tasks },
+      { id: "runs", label: "Запуски и логи", icon: mdiHistory, path: ROUTES.runs },
     ],
   },
 ];

@@ -1,7 +1,6 @@
 import { isIpcError } from "@zvs/ipc";
 import { AppErrorCode, type CliConnectionDto, type CliTheme } from "@zvs/shared";
 import { plural } from "../connections/connectionPresentation";
-import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
 import type { ToggleRowCopy } from "./preferencesPresentation";
 
 export const CLI_SETTING_ID = "cli.install";

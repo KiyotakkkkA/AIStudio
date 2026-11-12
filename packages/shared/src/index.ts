@@ -18,6 +18,7 @@ export * from "./browserLibrary.js";
 export * from "./browserSettings.js";
 export * from "./browserSites.js";
 export * from "./computer.js";
+export * from "./access.js";
 export * from "./ai.js";
 export * from "./system.js";
 export * from "./storage.js";

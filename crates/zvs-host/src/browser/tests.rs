@@ -384,11 +384,11 @@ impl Host {
         self.services
             .database
             .with_connection(|connection| {
-                Ok(
-                    connection.query_row("SELECT count(*) FROM tool_permission", [], |row| {
-                        row.get::<_, i64>(0)
-                    })?,
-                )
+                Ok(connection.query_row(
+                    "SELECT count(*) FROM access_grant WHERE resource_kind = 'tool'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )?)
             })
             .expect("counts")
             .try_into()

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use zvs_contract::{AnswerFolderRequestInput, AppError, FolderGrantRef};
 
 use super::IpcServer;
+use super::caller::{Caller, granted_by};
 use crate::services::Services;
 
 pub fn register(server: &mut IpcServer) {
@@ -18,12 +19,15 @@ pub fn register(server: &mut IpcServer) {
                 Ok::<(), AppError>(())
             },
         )
-        .handle(
+        .handle_as(
             "folders.answer",
-            |services: Arc<Services>, input: AnswerFolderRequestInput| async move {
-                services
-                    .folders
-                    .answer(&input.id, &input.approval_id, input.answer)?;
+            |services: Arc<Services>, caller: Caller, input: AnswerFolderRequestInput| async move {
+                services.folders.answer_as(
+                    &input.id,
+                    &input.approval_id,
+                    input.answer,
+                    granted_by(caller),
+                )?;
                 Ok::<(), AppError>(())
             },
         );

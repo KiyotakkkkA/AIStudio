@@ -318,6 +318,7 @@ impl Host {
             services.database.shared(),
             clock.clone(),
             Arc::new(SilentLogger),
+            services.runs.grants(),
         );
         agent.attach(ComputerControls {
             runs: Arc::new(services.runs.clone()),

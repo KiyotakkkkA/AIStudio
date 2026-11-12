@@ -1,3 +1,5 @@
+use crate::data::schema::{GRANTED_BY_CLI, GRANTED_BY_USER};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Caller {
     Studio,
@@ -21,5 +23,12 @@ impl Caller {
             Self::Cli { connection } => Some(connection),
             _ => None,
         }
+    }
+}
+
+pub const fn granted_by(caller: Caller) -> &'static str {
+    match caller {
+        Caller::Cli { .. } => GRANTED_BY_CLI,
+        _ => GRANTED_BY_USER,
     }
 }

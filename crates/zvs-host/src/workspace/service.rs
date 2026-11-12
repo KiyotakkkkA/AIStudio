@@ -13,8 +13,8 @@ use super::paths::{
     ForbiddenFolders, GrantTarget, TargetKind, canonical, covers, grant_target, relative_to,
     resolve, same_folder,
 };
-use crate::access::{AccessRequest, Asking, Attendant, Resource};
-use crate::data::schema::{ConversationRow, FolderGrantRow};
+use crate::access::{AccessGrants, AccessRequest, Asking, Attendant, GrantQuery, Resource};
+use crate::data::schema::{ConversationRow, FolderGrantRow, GRANTED_BY_USER, GrantKind};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::{ApprovalDecision, StepContext};
 use crate::platform::clock::SharedClock;
@@ -228,6 +228,7 @@ struct Inner {
     approvals: Arc<ApprovalService>,
     forbidden: ForbiddenFolders,
     clock: SharedClock,
+    grants: AccessGrants,
     pending: Mutex<HashMap<String, Pending>>,
 }
 
@@ -293,6 +294,7 @@ impl FolderAccessService {
     ) -> Self {
         Self {
             inner: Arc::new(Inner {
+                grants: AccessGrants::new(Arc::clone(&database), clock.clone()),
                 database,
                 approvals,
                 forbidden,
@@ -346,15 +348,13 @@ impl FolderAccessService {
         Ok(folder)
     }
 
-    fn covering(
-        &self,
-        conversation_id: &str,
-        folder: &Path,
-    ) -> Result<Option<FolderGrantRow>, AppError> {
+    fn covering(&self, conversation_id: &str, folder: &Path) -> Result<bool, AppError> {
+        let path = path_text(folder);
         Ok(self
-            .read(|repositories| Ok(repositories.folder_grants.applicable(conversation_id)?))?
-            .into_iter()
-            .find(|grant| covers(Path::new(&grant.path), folder)))
+            .inner
+            .grants
+            .covers(&GrantQuery::new(GrantKind::Folder, &path).owner(Some(conversation_id)))?
+            .is_some())
     }
 
     fn owner(&self, id: &str) -> Result<Owner, AppError> {
@@ -389,7 +389,6 @@ impl FolderAccessService {
             return Ok(covers(&workspace, folder));
         }
         self.covering(conversation_id, folder)
-            .map(|grant| grant.is_some())
     }
 
     pub fn grant(
@@ -398,7 +397,7 @@ impl FolderAccessService {
         scope: FolderGrantScope,
         conversation_id: Option<&str>,
     ) -> Result<FolderGrantRow, AppError> {
-        self.stored_grant(folder, scope, conversation_id)
+        self.stored_grant(folder, scope, conversation_id, GRANTED_BY_USER)
             .map(|(grant, _)| grant)
     }
 
@@ -407,6 +406,7 @@ impl FolderAccessService {
         folder: &Path,
         scope: FolderGrantScope,
         conversation_id: Option<&str>,
+        granted_by: &str,
     ) -> Result<(FolderGrantRow, bool), AppError> {
         if self.refuses(folder) {
             return Err(denied(FOLDER_FORBIDDEN, folder));
@@ -436,14 +436,17 @@ impl FolderAccessService {
             {
                 return Ok((existing, false));
             }
-            let created = repositories.folder_grants.create(&FolderGrantRow {
-                id: new_id().hyphenated().to_string(),
-                path: path_text(folder),
-                scope,
-                conversation_id: conversation_id.clone(),
-                granted_at: now,
-                last_used_at: None,
-            })?;
+            let created = repositories.folder_grants.create_by(
+                &FolderGrantRow {
+                    id: new_id().hyphenated().to_string(),
+                    path: path_text(folder),
+                    scope,
+                    conversation_id: conversation_id.clone(),
+                    granted_at: now,
+                    last_used_at: None,
+                },
+                granted_by,
+            )?;
             Ok((created, true))
         })
     }
@@ -670,6 +673,16 @@ impl FolderAccessService {
         approval_id: &str,
         answer: FolderAccessAnswer,
     ) -> Result<(), AppError> {
+        self.answer_as(run_id, approval_id, answer, GRANTED_BY_USER)
+    }
+
+    pub fn answer_as(
+        &self,
+        run_id: &RunId,
+        approval_id: &str,
+        answer: FolderAccessAnswer,
+        granted_by: &str,
+    ) -> Result<(), AppError> {
         let run = run_id.to_string();
         let (conversation_id, folders) = {
             let pending = self.pending();
@@ -687,7 +700,8 @@ impl FolderAccessService {
         let mut created: Vec<String> = Vec::new();
         if let Some(scope) = scope {
             for folder in &folders {
-                let (grant, fresh) = self.stored_grant(folder, scope, Some(&conversation_id))?;
+                let (grant, fresh) =
+                    self.stored_grant(folder, scope, Some(&conversation_id), granted_by)?;
                 if fresh {
                     created.push(grant.id);
                 }

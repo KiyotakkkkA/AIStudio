@@ -21,6 +21,7 @@ import * as documents from "../src/documents.js";
 import * as artifacts from "../src/artifacts.js";
 import * as sites from "../src/sites.js";
 import * as execPolicy from "../src/execPolicy.js";
+import * as access from "../src/access.js";
 import * as browserSettings from "../src/browserSettings.js";
 import * as browserData from "../src/browserData.js";
 import * as browserExtensions from "../src/browserExtensions.js";
@@ -523,6 +524,8 @@ const schemas: Record<string, z.ZodType> = {
   "computer/AppGrantDto": AppGrantDto,
   "computer/AppGrantRef": AppGrantRef,
   "computer/AnswerAppRequestInput": AnswerAppRequestInput,
+  "access/ToolGrantDto": access.ToolGrantDto,
+  "access/AccessListDto": access.AccessListDto,
   "accounts/AccountDto": AccountDto,
   "accounts/AccountLinkInput": contract["accounts.link"].input,
   "accounts/AccountRef": contract["accounts.refresh"].input,

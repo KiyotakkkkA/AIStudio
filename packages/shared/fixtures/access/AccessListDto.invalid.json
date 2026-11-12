@@ -1,0 +1,122 @@
+[
+  {
+    "name": "a tool grant without its author",
+    "value": {
+      "policy": {
+        "mode": "always-ask",
+        "judge": null
+      },
+      "folders": [
+        {
+          "id": "0199aa11-6666-7111-8111-111111111111",
+          "path": "D:\\work",
+          "scope": "always",
+          "conversation": null,
+          "boundConversations": [
+            {
+              "id": "0199aa11-2222-7111-8111-111111111111",
+              "title": "Plans"
+            }
+          ],
+          "grantedAt": 1,
+          "lastUsedAt": 2
+        }
+      ],
+      "sites": {
+        "defaults": {
+          "browse": "allow",
+          "click": "ask",
+          "type": "ask",
+          "submit": "ask",
+          "download": "ask"
+        },
+        "sites": []
+      },
+      "apps": [
+        {
+          "id": "0199aa11-1111-7111-8111-111111111111",
+          "app": "chrome.exe",
+          "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "icon": "iVBORw0KGgo=",
+          "scope": "always",
+          "conversation": null,
+          "grantedAt": 1800000000000,
+          "lastUsedAt": null
+        }
+      ],
+      "tools": [
+        {
+          "id": "0199aa11-7777-7111-8111-111111111111",
+          "tool": "mail.send",
+          "displayName": "Отправка письма",
+          "scope": "skill:notes",
+          "tier": "auto",
+          "grantedBy": "",
+          "grantedAt": 1800000000000
+        }
+      ],
+      "rules": {
+        "rules": [],
+        "unconfirmed": []
+      }
+    }
+  },
+  {
+    "name": "rules missing",
+    "value": {
+      "policy": {
+        "mode": "always-ask",
+        "judge": null
+      },
+      "folders": [
+        {
+          "id": "0199aa11-6666-7111-8111-111111111111",
+          "path": "D:\\work",
+          "scope": "always",
+          "conversation": null,
+          "boundConversations": [
+            {
+              "id": "0199aa11-2222-7111-8111-111111111111",
+              "title": "Plans"
+            }
+          ],
+          "grantedAt": 1,
+          "lastUsedAt": 2
+        }
+      ],
+      "sites": {
+        "defaults": {
+          "browse": "allow",
+          "click": "ask",
+          "type": "ask",
+          "submit": "ask",
+          "download": "ask"
+        },
+        "sites": []
+      },
+      "apps": [
+        {
+          "id": "0199aa11-1111-7111-8111-111111111111",
+          "app": "chrome.exe",
+          "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          "icon": "iVBORw0KGgo=",
+          "scope": "always",
+          "conversation": null,
+          "grantedAt": 1800000000000,
+          "lastUsedAt": null
+        }
+      ],
+      "tools": [
+        {
+          "id": "0199aa11-7777-7111-8111-111111111111",
+          "tool": "mail.send",
+          "displayName": "Отправка письма",
+          "scope": "skill:notes",
+          "tier": "auto",
+          "grantedBy": "user",
+          "grantedAt": 1800000000000
+        }
+      ]
+    }
+  }
+]

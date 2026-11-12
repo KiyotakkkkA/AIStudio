@@ -5,6 +5,7 @@ use zvs_contract::{AppError, AppErrorCode, ToolAuthorisationDto, ToolAuthorisati
 
 use super::admitted::Clearance;
 use super::decision::{Decision, Outcome, StageName};
+use super::grants::AccessGrants;
 use super::person::{ask_grant, ask_tool};
 use super::pipeline::{AccessPipeline, Pass};
 use super::request::{AccessRequest, Cleared, Effect, Gating, Resource};
@@ -52,6 +53,7 @@ pub struct Gatekeeper {
     folder: AccessPipeline,
     screening: AccessPipeline,
     approvals: Arc<ApprovalService>,
+    grants: Option<AccessGrants>,
 }
 
 impl Gatekeeper {
@@ -69,7 +71,18 @@ impl Gatekeeper {
             folder: AccessPipeline::new(vec![Box::new(floor().without_shortcuts())]),
             screening: AccessPipeline::new(vec![Box::new(floor())]),
             approvals,
+            grants: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_grants(mut self, grants: AccessGrants) -> Self {
+        self.grants = Some(grants);
+        self
+    }
+
+    pub const fn grants(&self) -> Option<&AccessGrants> {
+        self.grants.as_ref()
     }
 
     pub const fn approvals(&self) -> &Arc<ApprovalService> {
@@ -109,6 +122,11 @@ impl Gatekeeper {
         context.check_cancelled()?;
         if request.actor.run_id.is_empty() {
             request.actor.run_id = context.run_id.to_string();
+        }
+        if let Some(grants) = &self.grants
+            && !request.resources.is_empty()
+        {
+            request.resources = grants.uncovered(&request)?;
         }
         match request.gating {
             Gating::Open => {

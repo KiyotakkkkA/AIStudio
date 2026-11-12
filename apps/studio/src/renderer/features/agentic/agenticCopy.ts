@@ -3,6 +3,7 @@ import { AppErrorCode, type AgenticPermissionMode, type AgenticStopReason } from
 import { plural } from "../connections/connectionPresentation";
 import type { StatusTone } from "../../ui/atoms/statusTone";
 import type { BudgetKey, SessionPhase } from "./sessionModel";
+import { SCOPE_ALWAYS, SCOPE_ONCE } from "../access/accessCopy";
 
 export const PAGE_TITLE = "Агенты";
 export const NEW_SESSION = "Новая сессия";
@@ -49,8 +50,8 @@ export const INSTRUCTION_SEND = "Отправить";
 export const INSTRUCTIONS_QUEUED = "Ожидают завершения шага";
 
 export const APPROVAL_TITLE = "Требуется подтверждение";
-export const APPROVE_ONCE = "Разрешить один раз";
-export const APPROVE_ALWAYS = "Разрешать всегда";
+export const APPROVE_ONCE = SCOPE_ONCE;
+export const APPROVE_ALWAYS = SCOPE_ALWAYS;
 export const DENY = "Отклонить";
 
 export const SESSION_TITLE = "Сессия";

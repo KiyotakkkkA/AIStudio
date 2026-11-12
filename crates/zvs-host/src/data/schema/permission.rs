@@ -14,7 +14,9 @@ pub struct ToolPermissionRow {
 }
 
 impl ToolPermissionRow {
-    pub const COLUMNS: &str = "id, subject, scope, tier, granted_at, granted_by";
+    pub const COLUMNS: &str = "id, resource AS subject, action AS scope, \
+         CASE decision WHEN 'allow' THEN 'auto' WHEN 'block' THEN 'off' ELSE 'ask' END AS tier, \
+         granted_at, granted_by";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {

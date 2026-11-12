@@ -13,6 +13,7 @@ import {
 import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
 import { PLUGIN_KINDS } from "../plugins/pluginPresentation";
 import { TOOL_PRESENTATION, toolPresentation } from "./toolPresentation";
+import { SCOPE_ONCE } from "../access/accessCopy";
 export { TOOL_PRESENTATION, toolPresentation } from "./toolPresentation";
 
 export function pluginToolKind(key: string): IntegrationKind | null {
@@ -58,7 +59,7 @@ export const SKILL_FIELD = "Навык";
 export const STDIN_FIELD = "Стандартный ввод";
 export const APPROVAL_PROMPT = "Запрос на вызов инструмента";
 export const APPROVAL_QUESTION = "Разрешить?";
-export const ALLOW_ONCE = "Разрешить один раз";
+export const ALLOW_ONCE = SCOPE_ONCE;
 export const FORBID = "Запретить";
 
 export function approvalQuestion(subject: string): string {

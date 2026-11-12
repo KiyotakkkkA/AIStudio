@@ -332,6 +332,7 @@ fn agent(runs: Arc<Runs>) -> (ComputerAgent, TemporaryDatabase) {
         database.shared(),
         Arc::new(FakeClock::default()),
         Arc::new(SilentLogger),
+        crate::access::AccessGrants::new(database.shared(), Arc::new(FakeClock::default())),
     );
     agent.attach(ComputerControls {
         runs,

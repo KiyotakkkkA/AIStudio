@@ -3,16 +3,20 @@ use std::sync::Arc;
 use zvs_contract::{RunIdInput, RunListFilter, RunsApproveInput, RunsDenyInput, StartRunInput};
 
 use super::IpcServer;
+use super::caller::{Caller, granted_by};
 use crate::services::Services;
 
 pub fn register(server: &mut IpcServer) {
     server
-        .handle(
+        .handle_as(
             "runs.approve",
-            |services: Arc<Services>, input: RunsApproveInput| async move {
-                services
-                    .runs
-                    .approve(&input.id, &input.approval_id, input.always())
+            |services: Arc<Services>, caller: Caller, input: RunsApproveInput| async move {
+                services.runs.approve_as(
+                    &input.id,
+                    &input.approval_id,
+                    input.always(),
+                    granted_by(caller),
+                )
             },
         )
         .handle(

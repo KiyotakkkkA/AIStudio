@@ -9,8 +9,9 @@ use zvs_contract::{
 
 use super::progress::{Absorbed, absorb, approval_id, approval_kind, approval_run, derived_status};
 use super::sidecar::SharedDesktop;
+use crate::access::AccessGrants;
 use crate::browser::AgentRuns;
-use crate::data::schema::AppGrantRow;
+use crate::data::schema::{AppGrantRow, GrantKind};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::Subscription;
 use crate::platform::clock::SharedClock;
@@ -103,7 +104,7 @@ struct Inner {
     desktop: SharedDesktop,
     database: Arc<Database>,
     session: Mutex<Session>,
-    grants: Mutex<HashMap<String, BTreeSet<String>>>,
+    grants: AccessGrants,
     pending: Mutex<HashMap<String, PendingAccess>>,
     listeners: Mutex<Vec<Listener>>,
     controls: OnceLock<ComputerControls>,
@@ -127,6 +128,7 @@ impl ComputerAgent {
         database: Arc<Database>,
         clock: SharedClock,
         logger: SharedLogger,
+        grants: AccessGrants,
     ) -> Self {
         Self(Arc::new(Inner {
             clock,
@@ -134,7 +136,7 @@ impl ComputerAgent {
             desktop,
             database,
             session: Mutex::new(Session::default()),
-            grants: Mutex::new(HashMap::new()),
+            grants,
             pending: Mutex::new(HashMap::new()),
             listeners: Mutex::new(Vec::new()),
             controls: OnceLock::new(),
@@ -306,7 +308,7 @@ impl ComputerAgent {
     }
 
     pub fn run_ended(&self, run: &str) {
-        lock(&self.0.grants).remove(run);
+        self.0.grants.release(run);
         lock(&self.0.pending).retain(|_, pending| pending.run != run);
         let ended = {
             let session = lock(&self.0.session);
@@ -504,17 +506,14 @@ impl ComputerAgent {
             .into_iter()
             .map(|row| row.app)
             .collect();
-        if let Some(granted) = lock(&self.0.grants).get(run) {
-            apps.extend(granted.iter().cloned());
-        }
+        apps.extend(self.0.grants.held(run, GrantKind::App));
         apps
     }
 
     pub fn grant_run(&self, run: &str, apps: &[ComputerAppDto]) {
-        lock(&self.0.grants)
-            .entry(run.to_owned())
-            .or_default()
-            .extend(apps.iter().map(|app| app.app.clone()));
+        self.0
+            .grants
+            .hold(run, GrantKind::App, apps.iter().map(|app| app.app.clone()));
         self.granted("generation", apps);
     }
 

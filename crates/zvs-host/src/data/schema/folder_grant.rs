@@ -14,7 +14,8 @@ pub struct FolderGrantRow {
 }
 
 impl FolderGrantRow {
-    pub const COLUMNS: &str = "id, path, scope, conversation_id, granted_at, last_used_at";
+    pub const COLUMNS: &str = "id, resource AS path, scope, owner AS conversation_id, \
+         granted_at, used_at AS last_used_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {

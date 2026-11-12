@@ -3,6 +3,8 @@ import { createIpcClient } from "@zvs/ipc";
 import {
   AppErrorCode,
   contract,
+  type AccessListDto,
+  type AppGrantDto,
   type Contract,
   type ConversationId,
   type FolderGrantDto,
@@ -38,14 +40,54 @@ function grant(n: number, overrides: Partial<FolderGrantDto> = {}): FolderGrantD
   };
 }
 
-function setup(grants: FolderGrantDto[]) {
+const APP: AppGrantDto = {
+  id: "0199dd11-7777-7111-8111-000000000001",
+  app: "notepad.exe",
+  path: "C:/Windows/notepad.exe",
+  icon: null,
+  scope: "always",
+  conversation: null,
+  grantedAt: 1_000,
+  lastUsedAt: null,
+};
+
+function listed(folders: FolderGrantDto[], apps: AppGrantDto[] = []): AccessListDto {
+  return {
+    policy: { mode: "always-ask", judge: null },
+    folders,
+    sites: {
+      defaults: { browse: "allow", click: "ask", type: "ask", submit: "ask", download: "ask" },
+      sites: [{ origin: "https://shop.example", rules: { click: "allow" }, updatedAt: 1 }],
+    },
+    apps,
+    tools: [
+      {
+        id: "t1",
+        tool: "mail.send",
+        displayName: "mail.send",
+        scope: "skill:notes",
+        tier: "auto",
+        grantedBy: "user",
+        grantedAt: 1,
+      },
+    ],
+    rules: { rules: [], unconfirmed: [] },
+  };
+}
+
+function setup(grants: FolderGrantDto[], apps: AppGrantDto[] = []) {
   const bridge = createFakeBridge<Contract>();
   let stored = [...grants];
+  let storedApps = [...apps];
   bridge
-    .handle("folders.list", () => stored)
+    .handle("access.list", () => listed(stored, storedApps))
     .handle("folders.revoke", ({ id: revoked }) => {
       stored = stored.filter((item) => item.id !== revoked);
-    });
+    })
+    .handle("computer.revoke", ({ id: revoked }) => {
+      storedApps = storedApps.filter((item) => item.id !== revoked);
+    })
+    .handle("browserSites.remove", () => listed(stored).sites);
   const clock = createFakeClock();
   const store = new PermissionsStore(createIpcClient(contract, bridge), { clock });
   return { bridge, clock, store };
@@ -89,7 +131,7 @@ describe("PermissionsStore", () => {
     await store.load();
     bridge
       .fail("folders.revoke", AppErrorCode.NOT_FOUND, "Разрешение не найдено")
-      .handle("folders.list", () => []);
+      .handle("access.list", () => listed([]));
     await store.revoke(id(1));
     expect(store.error).toBe(ALREADY_REVOKED);
     expect(store.isEmpty).toBe(true);
@@ -99,10 +141,33 @@ describe("PermissionsStore", () => {
   test("a failed load keeps the previous list and reports it", async () => {
     const { bridge, store } = setup([grant(1)]);
     await store.load();
-    bridge.fail("folders.list", AppErrorCode.DB_ERROR, "db");
+    bridge.fail("access.list", AppErrorCode.DB_ERROR, "db");
     await store.load();
     expect(store.error).toBe(LOAD_ERROR);
     expect(store.grants).toHaveLength(1);
+  });
+
+  test("one list feeds every tab and counts each kind", async () => {
+    const { store } = setup([grant(1)], [APP]);
+    expect(store.counts.folders).toBeNull();
+    await store.load();
+    expect(store.counts).toEqual({ folders: 1, sites: 1, apps: 1, tools: 1, rules: 0 });
+    store.setTab("apps");
+    expect(store.tab).toBe("apps");
+    expect(store.access?.policy.mode).toBe("always-ask");
+  });
+
+  test("revoking an app or a site goes to its own channel and reloads", async () => {
+    const { bridge, store } = setup([grant(1)], [APP]);
+    await store.load();
+    await store.revokeApp(APP.id);
+    expect(store.apps).toEqual([]);
+    await store.removeSite("https://shop.example");
+    expect(bridge.calls.filter((call) => call.channel === "browserSites.remove")).toEqual([
+      { channel: "browserSites.remove", payload: { origin: "https://shop.example" } },
+    ]);
+    expect(bridge.calls.filter((call) => call.channel === "access.list")).toHaveLength(3);
+    expect(store.error).toBeNull();
   });
 
   test("labels read the clock the store was given", async () => {

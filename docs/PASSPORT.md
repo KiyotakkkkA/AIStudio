@@ -539,7 +539,7 @@ repositories.
 
 Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 `vector_document`, `conversation`, `message`, `scenario`, `scenario_version`, `run`, `step`,
-`skill`, `mcp_server`, `tool`, `tool_permission`, `integration`, `download`, `task`,
+`skill`, `mcp_server`, `tool`, `access_grant`, `integration`, `download`, `task`,
 `setting`.
 
 **Secrets at rest**: the secret *value* is encrypted with **Windows DPAPI** (current-user
@@ -1031,11 +1031,31 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   stripped) case-insensitively on component boundaries. The grant unit is the nearest parent:
   a file asks for its folder, a listing for the folder itself, a missing path for its deepest
   existing ancestor plus the folders that will be created. `ensure_access` raises **one**
-  `kind: "folder"` approval per call for all uncovered folders, answered «Разрешить
-  однократно», «Разрешить для этого диалога», «Разрешить всегда» or «Запретить»; a timeout
-  or a closed modal denies and the call fails with `PermissionDenied`. Binding an uncovered
-  folder asks with the two stored scopes only. Revoking a grant on the «Разрешения» page keeps
-  bindings; the chat then reports `workingFolderAccess: "missing"`.
+  `kind: "folder"` approval per call for all uncovered folders, answered «Один раз», «В этом
+  диалоге», «Всегда» or «Запретить»; a timeout or a closed modal denies and the call fails
+  with `PermissionDenied`. Binding an uncovered folder asks with the two stored scopes only.
+  Revoking a grant on the «Доступ» page keeps bindings; the chat then reports
+  `workingFolderAccess: "missing"`.
+- **One grant store** (TASK_082). Stored grants of every kind live in `access_grant`
+  (`resource_kind` `folder | site | app | tool`, `resource`, `action`, `decision`
+  `allow | ask | block`, `scope` `conversation | always`, `owner`, `granted_by`
+  `user | cli-confirmed` or the registry's own value for tool tiers, `granted_at`, `used_at`,
+  `detail`). Migration 0043 copied `folder_grant`, `app_grant`, `browser_site_rule` and
+  `tool_permission` into it and dropped them. A `conversation` grant references its dialog with
+  `ON DELETE CASCADE`, so deleting a dialog removes its grants in the same transaction.
+  `access::AccessGrants` answers `covers`, `grant`, `revoke` and `list`, and holds the in-memory
+  grants of a run (`hold`, `held`, `release`); the gatekeeper drops a folder or app resource
+  that it covers before asking (`uncovered`). The folder, app, site and tier repositories are
+  views over the table, so `folders.*`, `browserSites.*`, `computer.grants` and
+  `computer.revoke` keep their DTOs. A `cli-confirmed` grant is one answered `always` or
+  `conversation` from the console (`folders.answer`, `runs.approve`) after the studio confirmed
+  it. Every approval uses one scope vocabulary, «Один раз», «В этом диалоге», «Всегда»
+  (`features/access/accessCopy.ts`).
+- **«Доступ» page** (System group, replaces «Разрешения»). `access.list` returns the mode and
+  the judge, folder, site and app grants, tool tier rows and user rules in one `AccessListDto`.
+  Tabs «Папки», «Сайты», «Приложения», «Инструменты», «Правила»; folders, sites, apps and rules
+  are revoked there through their own channels. Tool tiers are shown read-only with a link to
+  «Инструменты», which stays the place that edits them.
 - **Forbidden folders** are refused outright, with no request, both as targets and as
   working folders: drive roots, `%WINDIR%`, `Program Files`, `Program Files (x86)`,
   `%ProgramData%`, the bare user profile root (its subfolders are allowed), every app folder
@@ -1849,8 +1869,9 @@ Rules are stored per origin, not per session. A chat reaches the `browser.*` too
 exceed what Tools allows, only narrow it.
 
 > Implementation (TASK_046, 2026-10-26; site rules 2026-11-06). `zvs-host/src/browser/`:
-> `grants.rs` stores `browser_site_rule` rows (origin × action × decision, both enforced by a
-> `CHECK`; the default row's origin is `*`) and is the one place a decision is made. Migration
+> `grants.rs` stores site rules (origin × action × decision; the default row's origin is `*`)
+> and is the one place a decision is made. Since TASK_082 they are `site` rows of
+> `access_grant` (§14, *One grant store*) and are also listed on the «Доступ» page. Migration
 > 0040 turned every `browser_grant` row into an `allow` rule and dropped that table. The agent
 > panel can grant only click and type. A node's requirement takes the origin of the element, of
 > the address being opened, or of the current page. A node's `permission_for` passes the resolved tier as the minimum to
@@ -2040,9 +2061,10 @@ resolution.
   not `ApplicationFrameHost.exe`). Acting in an app without access raises a `kind: "apps"`
   approval with each app's path and icon; `computer.request_access` raises the same one up
   front. It is answered through `computer.answer` with `once` (this generation: kept in memory
-  for the run), `conversation` or `always` (rows in `app_grant`, migration 0039), or `deny`.
-  «Параметры → Устройство → Разрешения приложений» lists and revokes stored grants
-  (`computer.grants`, `computer.revoke`). The Permissions page manages folder grants only.
+  for the run, held by `AccessGrants`), `conversation` or `always` (`app` rows of
+  `access_grant`, §14 *One grant store*; the path and icon are in `detail`), or `deny`.
+  «Параметры → Устройство → Разрешения приложений» and the «Доступ» page list and revoke stored
+  grants (`computer.grants`, `computer.revoke`).
 - **Floor, refused in every mode:** windows of the app itself (by process id), credential
   prompts and password managers (`policy::FORBIDDEN_APPS`), typing into a password field
   (checked by the sidecar against the focused element just before input).

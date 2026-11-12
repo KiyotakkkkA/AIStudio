@@ -5,6 +5,7 @@ import type {
   BrowserAuthorisation,
   BrowserSiteGrant,
 } from "@zvs/shared";
+import { SCOPE_ALWAYS, SCOPE_ONCE } from "../renderer/features/access/accessCopy";
 
 export const AGENT_TITLE = "Агент";
 export const AGENT_OPEN = "Показать панель агента";
@@ -18,8 +19,8 @@ export const RESUME = "Продолжить";
 export const STOP = "Остановить";
 export const REVOKE = "Отозвать разрешение";
 export const DENY = "Отклонить";
-export const ALWAYS = "Всегда на этом сайте";
-export const APPROVE_ONCE = "Разрешить один раз";
+export const ALWAYS = SCOPE_ALWAYS;
+export const APPROVE_ONCE = SCOPE_ONCE;
 export const IRREVERSIBLE = "действие необратимо";
 export const TARGET_LABEL = "Цель";
 export const AGENT_ACTION_FAILED = "Состояние сеанса изменилось. Повторите действие.";

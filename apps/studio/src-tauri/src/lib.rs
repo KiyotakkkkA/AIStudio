@@ -1048,6 +1048,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::clone(&database),
             clock.clone(),
             logger.clone(),
+            runs.grants(),
         )
     };
     register_computer_nodes(

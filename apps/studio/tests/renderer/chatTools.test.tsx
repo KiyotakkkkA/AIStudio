@@ -44,6 +44,7 @@ import { PLUGIN_MARKS } from "../../src/renderer/features/plugins/pluginPresenta
 import ChatCommandMenu from "../../src/renderer/features/chat/ChatCommandMenu";
 import { mdiFlagOutline, mdiWeb } from "@mdi/js";
 import { provider } from "./providerFixtures.ts";
+import { SCOPE_ONCE } from "../../src/renderer/features/access/accessCopy";
 
 const saved = provider();
 const handle = RunHandleDto.parse({
@@ -527,7 +528,7 @@ test("a card shows the call, its result and an inline approval prompt", () => {
     />,
   );
   expect(screen.getByText("ждёт подтверждения")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Разрешить один раз" }));
+  fireEvent.click(screen.getByRole("button", { name: SCOPE_ONCE }));
   expect(onDecide).toHaveBeenCalledWith(approvalId, true);
   fireEvent.click(screen.getByRole("button", { name: "Запретить" }));
   expect(onDecide).toHaveBeenCalledWith(approvalId, false);
@@ -546,7 +547,7 @@ test("a card shows the call, its result and an inline approval prompt", () => {
       ]}
     />,
   );
-  expect(screen.queryByRole("button", { name: "Разрешить один раз" })).toBeNull();
+  expect(screen.queryByRole("button", { name: SCOPE_ONCE })).toBeNull();
   expect(screen.getByText("готово")).toBeTruthy();
   expect(screen.getByText("Use the CLI.")).toBeTruthy();
   expect(screen.getByText("Результат · сокращён")).toBeTruthy();

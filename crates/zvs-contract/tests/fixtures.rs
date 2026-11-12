@@ -406,6 +406,14 @@ const TABLE: &[(&str, Check)] = &[
         "computer/AnswerAppRequestInput",
         round_trip::<zvs_contract::AnswerAppRequestInput>,
     ),
+    (
+        "access/ToolGrantDto",
+        round_trip::<zvs_contract::ToolGrantDto>,
+    ),
+    (
+        "access/AccessListDto",
+        round_trip::<zvs_contract::AccessListDto>,
+    ),
     ("accounts/AccountDto", round_trip::<AccountDto>),
     ("accounts/AccountLinkInput", round_trip::<AccountLinkInput>),
     ("accounts/AccountRef", round_trip::<AccountRef>),

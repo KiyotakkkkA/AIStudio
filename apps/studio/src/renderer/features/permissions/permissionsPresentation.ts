@@ -2,16 +2,16 @@ import { AppErrorCode, type FolderGrantDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 import { plural } from "../connections/connectionPresentation";
 import { formatLastUsed } from "../tools/toolPresentation";
+import { SCOPE_ALWAYS, SCOPE_CONVERSATION } from "../access/accessCopy";
 
-export const PAGE_TITLE = "Разрешения";
+export const PAGE_TITLE = "Доступ";
 export const FOLDERS_TAB = "Папки";
 export const ALWAYS_SECTION = "Постоянные";
 export const DIALOG_SECTION = "В диалогах";
 export const REVOKE = "Отозвать";
 export const REVOKE_TITLE = "Отозвать разрешение";
 export const EMPTY_TITLE = "Разрешений нет";
-export const EMPTY_DESCRIPTION =
-  "Разрешение на папку появляется после ответа «Разрешить всегда» или «Разрешить для этого диалога».";
+export const EMPTY_DESCRIPTION = `Разрешение на папку появляется после ответа «${SCOPE_ALWAYS}» или «${SCOPE_CONVERSATION}».`;
 export const NOTHING_SELECTED_TITLE = "Разрешение не выбрано";
 export const NOTHING_SELECTED_DESCRIPTION = "Выберите папку в списке.";
 export const NOTHING_FOUND = "Ничего не найдено.";
@@ -27,7 +27,7 @@ export function scopeLabel(grant: FolderGrantDto): string {
   return grant.conversation === null ? "Постоянное" : `Диалог «${grant.conversation.title}»`;
 }
 
-export function lastUsedLabel(grant: FolderGrantDto, now: number): string {
+export function lastUsedLabel(grant: Pick<FolderGrantDto, "lastUsedAt">, now: number): string {
   return grant.lastUsedAt === null
     ? "Не использовалось"
     : `Использовано ${formatLastUsed(grant.lastUsedAt, now)}`;

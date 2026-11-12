@@ -472,6 +472,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         ..RunServiceOptions::new(database.shared(), run_bus.clone(), Arc::clone(&nodes))
     })
     .expect("a run service");
+    let access_grants = runs.grants();
     downloads.attach(Arc::new(runs.clone()));
     let mcp = crate::services::McpService::new(crate::services::McpServiceOptions {
         clock: clock.clone(),
@@ -692,6 +693,7 @@ pub fn test_services(system: SystemService) -> TestServices {
                 database.shared(),
                 clock.clone(),
                 Arc::new(crate::platform::logger::SilentLogger),
+                access_grants,
             ),
             documents: crate::documents::DocumentService::new(
                 crate::documents::DocumentServiceOptions {

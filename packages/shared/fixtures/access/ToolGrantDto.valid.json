@@ -1,0 +1,26 @@
+[
+  {
+    "name": "scoped",
+    "value": {
+      "id": "0199aa11-7777-7111-8111-111111111111",
+      "tool": "mail.send",
+      "displayName": "Отправка письма",
+      "scope": "skill:notes",
+      "tier": "auto",
+      "grantedBy": "user",
+      "grantedAt": 1800000000000
+    }
+  },
+  {
+    "name": "global tier",
+    "value": {
+      "id": "0199aa11-8888-7111-8111-111111111111",
+      "tool": "shell.run",
+      "displayName": "shell.run",
+      "scope": "global",
+      "tier": "off",
+      "grantedBy": "registry",
+      "grantedAt": 1
+    }
+  }
+]

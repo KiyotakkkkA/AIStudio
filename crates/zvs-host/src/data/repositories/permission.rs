@@ -17,7 +17,7 @@ impl<'c> PermissionRepository<'c> {
     pub fn list(&self, subject: &str) -> rusqlite::Result<Vec<ToolPermissionRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} FROM tool_permission WHERE subject = ?1",
+                "SELECT {} FROM access_grant WHERE resource_kind = 'tool' AND resource = ?1",
                 ToolPermissionRow::COLUMNS
             ))?
             .query_map([subject], ToolPermissionRow::from_row)?
@@ -27,11 +27,7 @@ impl<'c> PermissionRepository<'c> {
     pub fn grant(&self, row: &ToolPermissionRow) -> rusqlite::Result<()> {
         self.connection
             .prepare_cached(
-                "INSERT INTO tool_permission (id, subject, scope, tier, granted_at, granted_by) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-                 ON CONFLICT (subject, scope) DO UPDATE SET id = excluded.id, \
-                 subject = excluded.subject, scope = excluded.scope, tier = excluded.tier, \
-                 granted_at = excluded.granted_at, granted_by = excluded.granted_by",
+                "INSERT INTO access_grant (id, resource_kind, resource, action, decision, scope,                  owner, granted_by, granted_at) VALUES (?1, 'tool', ?2, ?3,                  CASE ?4 WHEN 'auto' THEN 'allow' WHEN 'off' THEN 'block' ELSE 'ask' END,                  'always', NULL, ?6, ?5)                  ON CONFLICT (resource_kind, resource, action) WHERE owner IS NULL                  DO UPDATE SET id = excluded.id, decision = excluded.decision,                  granted_at = excluded.granted_at, granted_by = excluded.granted_by",
             )?
             .execute(params![
                 row.id,
@@ -46,7 +42,7 @@ impl<'c> PermissionRepository<'c> {
 
     pub fn revoke(&self, id: &str) -> rusqlite::Result<usize> {
         self.connection
-            .prepare_cached("DELETE FROM tool_permission WHERE id = ?1")?
+            .prepare_cached("DELETE FROM access_grant WHERE id = ?1 AND resource_kind = 'tool'")?
             .execute([id])
     }
 

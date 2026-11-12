@@ -18,6 +18,7 @@ the host creates or requests an approval.
 | `stages.rs`   | `FloorStage`, `TierStage`, `HardRulesStage`, `ModeStage`, `RulesStage`, `JudgeStage`                                |
 | `gate.rs`     | `AccessGate` (the kernel's port), `Gatekeeper` (every stage and the person in order), `review`                      |
 | `person.rs`   | The one approval builder: tool approvals, folder and app grants, `grant` for a grant needed during `execute`        |
+| `grants.rs`   | `AccessGrants`: stored grants (`covers`, `grant`, `revoke`, `list`, `tool_grants`) and a run's held grants          |
 | `admitted.rs` | `Clearance` (made only here) and `Admitted<P>` (made only from a `Clearance`)                                       |
 | `tests.rs`    | The pipeline contract, the PASSPORT decision table end to end, terminal input, `always_ask`                         |
 
@@ -60,7 +61,10 @@ drivers produced before: plain (gate), `process`, `files`, `folder`, `apps`, the
 (`mail` and the rest, from the provider's plan). The scope is the prompt's scope (`site:<origin>`,
 `app:<exe>`), else the run's first permission scope, else `global`.
 
-Folder and app answers stay in their stores (TASK_082 merges them). The `Attendant` attached by
+Stored folder, app, site and tool grants share one table, `access_grant` (TASK_082). Before a
+request asks for resources, `Gatekeeper::admit` drops the folders and apps that
+`AccessGrants::uncovered` finds covered, by a stored grant or by one held for the run. The
+`Attendant` attached by
 the folder service (`workspace/service.rs`) or the computer agent (`computer/nodes.rs`) records
 the pending request when it is raised and reads the answer when it is settled; the browser's
 attendant reports the approval and the authorisation to the agent panel.

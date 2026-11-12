@@ -1,14 +1,28 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
-import type { Contract, FolderGrantDto, FolderGrantId } from "@zvs/shared";
+import type {
+  AccessListDto,
+  AppGrantDto,
+  BrowserSiteDto,
+  Contract,
+  FolderGrantDto,
+  FolderGrantId,
+  ToolGrantDto,
+  UserRuleDto,
+} from "@zvs/shared";
+import { CHANGE_FAILED } from "../access/accessCopy";
 import { LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
+
+export type AccessTab = "folders" | "sites" | "apps" | "tools" | "rules";
 
 export interface PermissionsStoreOptions {
   readonly clock?: () => number;
 }
 
 export default class PermissionsStore {
+  access: AccessListDto | null = null;
   grants: FolderGrantDto[] = [];
+  tab: AccessTab = "folders";
   loading = false;
   loaded = false;
   error: string | null = null;
@@ -60,6 +74,38 @@ export default class PermissionsStore {
     return this.loaded && this.grants.length === 0;
   }
 
+  get sites(): readonly BrowserSiteDto[] {
+    return this.access?.sites.sites ?? [];
+  }
+
+  get apps(): readonly AppGrantDto[] {
+    return this.access?.apps ?? [];
+  }
+
+  get tools(): readonly ToolGrantDto[] {
+    return this.access?.tools ?? [];
+  }
+
+  get rules(): readonly UserRuleDto[] {
+    return this.access?.rules.rules ?? [];
+  }
+
+  get counts(): Record<AccessTab, number | null> {
+    if (this.access === null)
+      return { folders: null, sites: null, apps: null, tools: null, rules: null };
+    return {
+      folders: this.grants.length,
+      sites: this.sites.length,
+      apps: this.apps.length,
+      tools: this.tools.length,
+      rules: this.rules.length,
+    };
+  }
+
+  setTab(tab: AccessTab) {
+    this.tab = tab;
+  }
+
   setQuery(query: string) {
     this.query = query;
   }
@@ -76,16 +122,20 @@ export default class PermissionsStore {
     const revision = ++this.revision;
     this.loading = true;
     try {
-      const grants = await this.ipc.call("folders.list", undefined);
+      const access = await this.ipc.call("access.list", undefined);
       runInAction(() => {
         if (revision !== this.revision) return;
-        this.grants = grants;
+        this.access = access;
+        this.grants = access.folders;
         this.now = this.clock();
         this.loaded = true;
         if (this.error === LOAD_ERROR) this.error = null;
-        if (this.selectedId !== null && !grants.some((grant) => grant.id === this.selectedId))
+        if (
+          this.selectedId !== null &&
+          !access.folders.some((grant) => grant.id === this.selectedId)
+        )
           this.selectedId = null;
-        this.selectedId ??= grants[0]?.id ?? null;
+        this.selectedId ??= access.folders[0]?.id ?? null;
       });
     } catch {
       runInAction(() => {
@@ -98,15 +148,15 @@ export default class PermissionsStore {
     }
   }
 
-  async revoke(id: FolderGrantId) {
+  private async change(work: () => Promise<unknown>, failure: (error: unknown) => string) {
     if (this.revoking) return;
     this.revoking = true;
     this.error = null;
     try {
-      await this.ipc.call("folders.revoke", { id });
+      await work();
     } catch (error) {
       runInAction(() => {
-        this.error = revokeErrorCopy(error);
+        this.error = failure(error);
       });
     } finally {
       runInAction(() => {
@@ -114,6 +164,21 @@ export default class PermissionsStore {
       });
     }
     await this.load();
+  }
+
+  async revoke(id: FolderGrantId) {
+    await this.change(() => this.ipc.call("folders.revoke", { id }), revokeErrorCopy);
+  }
+
+  async revokeApp(id: string) {
+    await this.change(() => this.ipc.call("computer.revoke", { id }), revokeErrorCopy);
+  }
+
+  async removeSite(origin: string) {
+    await this.change(
+      () => this.ipc.call("browserSites.remove", { origin }),
+      () => CHANGE_FAILED,
+    );
   }
 
   dispose() {

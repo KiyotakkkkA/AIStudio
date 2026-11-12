@@ -1,5 +1,6 @@
 import { AppErrorCode, type FolderApprovalDto } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
+import { SCOPE_ALWAYS, SCOPE_CONVERSATION, SCOPE_ONCE } from "../access/accessCopy";
 
 export const WORKING_FOLDER_LABEL = "Рабочая папка";
 export const CHOOSE_FOLDER = "Выбрать папку";
@@ -9,9 +10,9 @@ export const FOLDER_ACCESS_MISSING = "Нет доступа";
 export const RESTORE_FOLDER_ACCESS = "Предоставить доступ";
 export const FOLDER_LOCKED = "Изменение рабочей папки недоступно во время обработки запроса";
 
-export const ALLOW_ONCE = "Разрешить однократно";
-export const ALLOW_CONVERSATION = "Разрешить для этого диалога";
-export const ALLOW_ALWAYS = "Разрешить всегда";
+export const ALLOW_ONCE = SCOPE_ONCE;
+export const ALLOW_CONVERSATION = SCOPE_CONVERSATION;
+export const ALLOW_ALWAYS = SCOPE_ALWAYS;
 export const DENY = "Запретить";
 export const CANCEL = "Отмена";
 

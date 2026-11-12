@@ -6,6 +6,7 @@ import type ScenarioEditor from "./ScenarioEditor";
 import { APPROVAL_PROMPT } from "./runCopy";
 import MailDraftView from "../mail/MailDraftView";
 import { MAIL_LEAD, SEND_MAIL } from "../mail/mailCopy";
+import { SCOPE_ALWAYS } from "../access/accessCopy";
 
 function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
   const run = editor.execution;
@@ -40,7 +41,7 @@ function ApprovalBar({ editor }: { readonly editor: ScenarioEditor }) {
           disabled={run.deciding}
           onClick={() => void run.decide(true, true)}
         >
-          Разрешать всегда
+          {SCOPE_ALWAYS}
         </Button>
       ) : null}
       <Button size="sm" tone="ghost" disabled={run.deciding} onClick={() => void run.decide(false)}>

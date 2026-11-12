@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::{AppError, AppErrorCode, ApprovalRequestDto, ToolTier};
 
 use super::permissions::{Admission, GLOBAL_SCOPE, PermissionContext, PermissionService};
-use crate::data::schema::PendingApprovalRow;
+use crate::data::schema::{GRANTED_BY_USER, PendingApprovalRow};
 use crate::data::{Database, Repositories};
 use crate::kernel::ApprovalDecision;
 use crate::platform::clock::SharedClock;
@@ -193,6 +193,17 @@ impl ApprovalService {
         decision: ApprovalDecision,
         always: bool,
     ) -> Result<(), AppError> {
+        self.decide_as(run_id, id, decision, always, GRANTED_BY_USER)
+    }
+
+    pub fn decide_as(
+        &self,
+        run_id: &str,
+        id: &str,
+        decision: ApprovalDecision,
+        always: bool,
+        granted_by: &str,
+    ) -> Result<(), AppError> {
         let row = self
             .row(id)?
             .filter(|row| {
@@ -233,7 +244,7 @@ impl ApprovalService {
                     &row.subject,
                     &row.scope,
                     ToolTier::Auto,
-                    "user",
+                    granted_by,
                 )?;
             }
             repositories.permissions.decide(id, decision)?;

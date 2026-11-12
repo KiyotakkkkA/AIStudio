@@ -1,6 +1,6 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::data::schema::BrowserSiteRuleRow;
+use crate::data::schema::{BrowserSiteRuleRow, GRANTED_BY_USER};
 
 pub struct BrowserSiteRuleRepository<'c> {
     connection: &'c Connection,
@@ -14,7 +14,7 @@ impl<'c> BrowserSiteRuleRepository<'c> {
     pub fn list(&self) -> rusqlite::Result<Vec<BrowserSiteRuleRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} FROM browser_site_rule ORDER BY origin, action",
+                "SELECT {} FROM access_grant WHERE resource_kind = 'site' ORDER BY resource, action",
                 BrowserSiteRuleRow::COLUMNS
             ))?
             .query_map([], BrowserSiteRuleRow::from_row)?
@@ -24,7 +24,8 @@ impl<'c> BrowserSiteRuleRepository<'c> {
     pub fn find(&self, origin: &str, action: &str) -> rusqlite::Result<Option<BrowserSiteRuleRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} FROM browser_site_rule WHERE origin = ?1 AND action = ?2",
+                "SELECT {} FROM access_grant WHERE resource_kind = 'site' AND resource = ?1 \
+                 AND action = ?2 AND owner IS NULL",
                 BrowserSiteRuleRow::COLUMNS
             ))?
             .query_row([origin, action], BrowserSiteRuleRow::from_row)
@@ -34,14 +35,23 @@ impl<'c> BrowserSiteRuleRepository<'c> {
     pub fn save(&self, row: &BrowserSiteRuleRow) -> rusqlite::Result<BrowserSiteRuleRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO browser_site_rule ({columns}) VALUES (?1, ?2, ?3, ?4, ?5) \
-                 ON CONFLICT (origin, action) DO UPDATE SET decision = excluded.decision, \
-                 updated_at = excluded.updated_at \
-                 RETURNING {columns}",
-                columns = BrowserSiteRuleRow::COLUMNS
+                "INSERT INTO access_grant (id, resource_kind, resource, action, decision, scope, \
+                 owner, granted_by, granted_at) \
+                 VALUES (?1, 'site', ?2, ?3, ?4, 'always', NULL, ?6, ?5) \
+                 ON CONFLICT (resource_kind, resource, action) WHERE owner IS NULL \
+                 DO UPDATE SET decision = excluded.decision, granted_at = excluded.granted_at \
+                 RETURNING {}",
+                BrowserSiteRuleRow::COLUMNS
             ))?
             .query_row(
-                params![row.id, row.origin, row.action, row.decision, row.updated_at],
+                params![
+                    row.id,
+                    row.origin,
+                    row.action,
+                    row.decision,
+                    row.updated_at,
+                    GRANTED_BY_USER
+                ],
                 BrowserSiteRuleRow::from_row,
             )
     }
@@ -49,7 +59,7 @@ impl<'c> BrowserSiteRuleRepository<'c> {
     pub fn remove(&self, id: &str) -> rusqlite::Result<bool> {
         Ok(self
             .connection
-            .prepare_cached("DELETE FROM browser_site_rule WHERE id = ?1")?
+            .prepare_cached("DELETE FROM access_grant WHERE id = ?1 AND resource_kind = 'site'")?
             .execute([id])?
             > 0)
     }
@@ -57,14 +67,19 @@ impl<'c> BrowserSiteRuleRepository<'c> {
     pub fn remove_rule(&self, origin: &str, action: &str) -> rusqlite::Result<bool> {
         Ok(self
             .connection
-            .prepare_cached("DELETE FROM browser_site_rule WHERE origin = ?1 AND action = ?2")?
+            .prepare_cached(
+                "DELETE FROM access_grant WHERE resource_kind = 'site' AND resource = ?1 \
+                 AND action = ?2",
+            )?
             .execute([origin, action])?
             > 0)
     }
 
     pub fn remove_origin(&self, origin: &str) -> rusqlite::Result<usize> {
         self.connection
-            .prepare_cached("DELETE FROM browser_site_rule WHERE origin = ?1")?
+            .prepare_cached(
+                "DELETE FROM access_grant WHERE resource_kind = 'site' AND resource = ?1",
+            )?
             .execute([origin])
     }
 }

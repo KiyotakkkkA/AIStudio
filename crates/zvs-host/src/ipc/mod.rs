@@ -1,3 +1,4 @@
+pub mod access;
 pub mod accounts;
 pub mod agentic;
 pub mod artifacts;
@@ -42,6 +43,7 @@ pub use policy::{Callers, ChannelPolicy, Effect, POLICY, Scope, console_channels
 pub use server::{CALLER_REFUSED, CLI_CHANNEL_REFUSED, Coverage, INTERNAL_MESSAGE, IpcServer};
 
 pub fn register(server: &mut IpcServer) {
+    access::register(server);
     system::register(server);
     settings::register(server);
     secrets::register(server);
@@ -108,6 +110,7 @@ mod tests {
         assert_eq!(
             server.channels(),
             [
+                "access.list",
                 "accounts.cancelLink",
                 "accounts.link",
                 "accounts.list",

@@ -260,6 +260,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0042_browser_library",
         sql: include_str!("../../migrations/0042_browser_library.sql"),
     },
+    Migration {
+        id: 43,
+        name: "0043_access_grant",
+        sql: include_str!("../../migrations/0043_access_grant.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -777,7 +782,7 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(&database, &MIGRATIONS[..42], &options(&backups, &clock)).expect("applies");
         assert_eq!(
             query(
                 &database,
@@ -1220,6 +1225,114 @@ mod tests {
         .err()
         .expect("fails");
         assert_eq!(failure.backups_dir, backups);
+    }
+
+    fn seeded_before_access_grants(seed: &str) -> TemporaryDatabase {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..42], &options(&backups, &clock)).expect("applies");
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', 1, 1);"#,
+                )?;
+                connection.execute_batch(seed)?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        database
+    }
+
+    const GRANT_ROW: &str = "SELECT id || ' ' || resource_kind || ' ' || resource || ' ' || action || ' ' || decision || ' ' || scope || ' ' || ifnull(owner, '-') || ' ' || granted_by || ' ' || granted_at || ' ' || ifnull(used_at, '-') FROM access_grant";
+
+    fn gone(database: &Database, table: &str) -> bool {
+        query(
+            database,
+            &format!("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '{table}'"),
+        )
+        .is_empty()
+    }
+
+    #[test]
+    fn tool_permission_rows_become_tool_grants() {
+        let database = seeded_before_access_grants(
+            "INSERT INTO tool_permission (id, subject, scope, tier, granted_at, granted_by) VALUES ('t1', 'mail.send', 'global', 'ask', 1, 'registry'), ('t2', 'mail.send', 'skill:notes', 'auto', 2, 'user'), ('t3', 'shell.run', 'scenario:daily', 'off', 3, 'user');",
+        );
+        assert_eq!(
+            query(&database, &format!("{GRANT_ROW} ORDER BY id")),
+            [
+                "t1 tool mail.send global ask always - registry 1 -",
+                "t2 tool mail.send skill:notes allow always - user 2 -",
+                "t3 tool shell.run scenario:daily block always - user 3 -",
+            ]
+        );
+        assert!(gone(&database, "tool_permission"));
+    }
+
+    #[test]
+    fn folder_grants_keep_their_scope_owner_and_last_use() {
+        let database = seeded_before_access_grants(
+            "INSERT INTO folder_grant (id, path, scope, conversation_id, granted_at, last_used_at) VALUES ('f1', 'C:/work', 'always', NULL, 1, 9), ('f2', 'C:/notes', 'conversation', 'c1', 2, NULL);",
+        );
+        assert_eq!(
+            query(&database, &format!("{GRANT_ROW} ORDER BY id")),
+            [
+                "f1 folder C:/work  allow always - user 1 9",
+                "f2 folder C:/notes  allow conversation c1 user 2 -",
+            ]
+        );
+        assert!(gone(&database, "folder_grant"));
+        database
+            .with_connection(|connection| {
+                connection.execute("DELETE FROM conversation WHERE id = 'c1'", [])?;
+                Ok(())
+            })
+            .expect("deletes");
+        assert_eq!(query(&database, "SELECT id FROM access_grant"), ["f1"]);
+    }
+
+    #[test]
+    fn app_grants_keep_the_executable_path_and_icon() {
+        let database = seeded_before_access_grants(
+            "INSERT INTO app_grant (id, app, path, icon, scope, conversation_id, granted_at, last_used_at) VALUES ('a1', 'notepad.exe', 'C:/Windows/notepad.exe', 'data:image/png;base64,AA', 'always', NULL, 1, 4), ('a2', 'calc.exe', 'C:/Windows/calc.exe', NULL, 'conversation', 'c1', 2, NULL);",
+        );
+        assert_eq!(
+            query(&database, &format!("{GRANT_ROW} ORDER BY id")),
+            [
+                "a1 app notepad.exe  allow always - user 1 4",
+                "a2 app calc.exe  allow conversation c1 user 2 -",
+            ]
+        );
+        assert_eq!(
+            query(
+                &database,
+                "SELECT json_extract(detail, '$.path') || ' ' || ifnull(json_extract(detail, '$.icon'), '-') FROM access_grant ORDER BY id"
+            ),
+            [
+                "C:/Windows/notepad.exe data:image/png;base64,AA",
+                "C:/Windows/calc.exe -",
+            ]
+        );
+        assert!(gone(&database, "app_grant"));
+    }
+
+    #[test]
+    fn site_rules_become_site_grants_with_their_decision() {
+        let database = seeded_before_access_grants(
+            "INSERT INTO browser_site_rule (id, origin, action, decision, updated_at) VALUES ('s1', 'https://shop.example', 'click', 'allow', 5), ('s2', 'https://shop.example', 'submit', 'block', 6);",
+        );
+        assert_eq!(
+            query(
+                &database,
+                &format!("{GRANT_ROW} WHERE resource = 'https://shop.example' ORDER BY id")
+            ),
+            [
+                "s1 site https://shop.example click allow always - user 5 -",
+                "s2 site https://shop.example submit block always - user 6 -",
+            ]
+        );
+        assert!(gone(&database, "browser_site_rule"));
     }
 
     #[test]

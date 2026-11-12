@@ -11,7 +11,7 @@ pub struct BrowserSiteRuleRow {
 }
 
 impl BrowserSiteRuleRow {
-    pub const COLUMNS: &str = "id, origin, action, decision, updated_at";
+    pub const COLUMNS: &str = "id, resource AS origin, action, decision, granted_at AS updated_at";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {

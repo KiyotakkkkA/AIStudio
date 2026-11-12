@@ -20,9 +20,11 @@ use super::approvals::{ApprovalService, DEFAULT_APPROVAL_TIMEOUT};
 use super::permissions::{PermissionContext, PermissionService};
 use super::questions::QuestionService;
 pub use crate::access::OUTSIDE_ALLOWED_TOOLS;
-use crate::access::{AccessGate, AccessRequest, Actor, Clearance, Gatekeeper, Gating, SharedGate};
+use crate::access::{
+    AccessGate, AccessGrants, AccessRequest, Actor, Clearance, Gatekeeper, Gating, SharedGate,
+};
 use crate::data::repositories::{RunCursor, RunDraft, RunPageQuery, encode_run_cursor};
-use crate::data::schema::{RunRow, StepRow};
+use crate::data::schema::{GRANTED_BY_USER, RunRow, StepRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::kernel::scheduler::step_event;
 use crate::kernel::{
@@ -62,6 +64,7 @@ pub struct RunServiceOptions {
     pub admit: Option<SharedGate>,
     pub runtime: Option<Handle>,
     pub tools: Option<ToolRegistry>,
+    pub grants: Option<AccessGrants>,
 }
 
 impl RunServiceOptions {
@@ -80,6 +83,7 @@ impl RunServiceOptions {
             admit: None,
             runtime: None,
             tools: None,
+            grants: None,
         }
     }
 }
@@ -105,10 +109,11 @@ impl Gate {
         approvals: Arc<ApprovalService>,
         tools: Option<ToolRegistry>,
         clock: SharedClock,
+        grants: AccessGrants,
     ) -> Self {
         Self {
             database,
-            keeper: Gatekeeper::new(permissions, approvals, tools.as_ref()),
+            keeper: Gatekeeper::new(permissions, approvals, tools.as_ref()).with_grants(grants),
             tools,
             clock,
         }
@@ -234,6 +239,7 @@ struct Inner {
     options: Arc<SchedulerOptions>,
     permissions: Arc<PermissionService>,
     approvals: Arc<ApprovalService>,
+    grants: AccessGrants,
     questions: Arc<QuestionService>,
     observers: Arc<Observers>,
     active: Mutex<HashMap<String, ActiveRun>>,
@@ -290,6 +296,9 @@ impl RunService {
                 async move { asked.wait(request, &cancel).await }.boxed()
             })
         };
+        let grants = options.grants.clone().unwrap_or_else(|| {
+            AccessGrants::new(Arc::clone(&options.database), options.clock.clone())
+        });
         let admit: SharedGate = options.admit.unwrap_or_else(|| {
             Arc::new(Gate::new(
                 Arc::clone(&options.database),
@@ -297,6 +306,7 @@ impl RunService {
                 Arc::clone(&approvals),
                 options.tools.clone(),
                 options.clock.clone(),
+                grants.clone(),
             ))
         });
         let scheduler = Arc::new(SchedulerOptions {
@@ -322,6 +332,7 @@ impl RunService {
                 options: scheduler,
                 permissions,
                 approvals,
+                grants,
                 questions: asked,
                 observers: Arc::new(Observers::default()),
                 active: Mutex::new(HashMap::new()),
@@ -342,6 +353,10 @@ impl RunService {
 
     pub fn events(&self) -> &EventBus {
         &self.inner.events
+    }
+
+    pub fn grants(&self) -> AccessGrants {
+        self.inner.grants.clone()
     }
 
     pub fn permissions(&self) -> Arc<PermissionService> {
@@ -368,11 +383,22 @@ impl RunService {
     }
 
     pub fn approve(&self, id: &RunId, approval_id: &str, always: bool) -> Result<(), AppError> {
-        self.inner.approvals.decide(
+        self.approve_as(id, approval_id, always, GRANTED_BY_USER)
+    }
+
+    pub fn approve_as(
+        &self,
+        id: &RunId,
+        approval_id: &str,
+        always: bool,
+        granted_by: &str,
+    ) -> Result<(), AppError> {
+        self.inner.approvals.decide_as(
             &id.to_string(),
             approval_id,
             ApprovalDecision::Approved,
             always,
+            granted_by,
         )
     }
 

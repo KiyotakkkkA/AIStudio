@@ -1,3 +1,4 @@
+pub mod access;
 pub mod accounts;
 pub mod agentic;
 pub mod ai;
@@ -56,6 +57,10 @@ pub mod vector_stores;
 pub mod voice;
 pub mod wire;
 
+pub use access::{
+    ACCESS_GRANT_ID_MAX, ACCESS_GRANTED_BY_MAX, ACCESS_LIST_MAX, ACCESS_SCOPE_MAX, AccessListDto,
+    TOOL_DISPLAY_NAME_MAX, ToolGrantDto,
+};
 pub use accounts::{
     AccountDto, AccountLinkInput, AccountLinkResult, AccountRef, AccountsCancelLinkOutput,
     AccountsListOutput, AccountsUnlinkOutput,
