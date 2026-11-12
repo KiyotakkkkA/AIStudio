@@ -9,7 +9,7 @@ export const ALWAYS_THESE_FILES = "Всегда разрешать для эти
 export const RULES_ROW = {
   key: "execPolicy.rules",
   label: "Правила",
-  hint: "Постоянные разрешения, созданные из подтверждений, и правила из файлов пользователя.",
+  hint: "Постоянные разрешения, данные в ходе работы в приложении",
 } as const;
 
 export const RULES_EMPTY =
@@ -19,9 +19,9 @@ export const RULES_FAILED = "Не удалось загрузить правил
 export const RULE_REMOVE_LABEL = "Удалить правило";
 export const RULE_INACTIVE = "не действует";
 export const PACK_CONFIRM = "Подтвердить";
-export const PACK_CONFIRM_TITLE = "Подтвердить файл правил?";
+export const PACK_CONFIRM_TITLE = "Подтвердить изменение правил?";
 export const PACK_CONFIRM_CONSEQUENCE =
-  "Разрешающие правила из файла начнут действовать без подтверждения действий.";
+  "Выбранные правила вступят в силу немедленно";
 
 export const RULE_EFFECT_LABEL: Record<PolicyRuleEffect, string> = {
   allow: "Разрешение",

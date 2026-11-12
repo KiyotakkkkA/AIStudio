@@ -56,7 +56,7 @@ function ExecPolicyMenu({ store: execPolicy, setup }: ExecPolicyBinding) {
   const [confirming, setConfirming] = useState(false);
   const current = EXEC_MODE_COPY[execPolicy.mode];
   const tone = TRIGGER_TONES[execPolicy.mode];
-  const label = `${EXEC_POLICY_LABEL}: ${current.label}`;
+  const label = `${EXEC_POLICY_LABEL}`;
 
   return (
     <>

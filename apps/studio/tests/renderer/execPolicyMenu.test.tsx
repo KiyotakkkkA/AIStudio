@@ -19,7 +19,7 @@ function openMenu() {
   render(<ExecPolicyMenu store={store} setup={setup} />);
   fireEvent.click(
     screen.getByRole("button", {
-      name: `${EXEC_POLICY_LABEL}: ${EXEC_MODE_COPY["always-ask"].label}`,
+      name: `${EXEC_POLICY_LABEL}`,
     }),
   );
   return { store, setup };
