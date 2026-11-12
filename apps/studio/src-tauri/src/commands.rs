@@ -7,6 +7,7 @@ use zvs_contract::{
     BrowserBounds, BrowserCommand, BrowserState, ComputerCommand, ComputerPointer, ComputerState,
     HostEvent, parse,
 };
+use zvs_host::ipc::Caller;
 use zvs_host::platform::events::{EventBus, EventSink};
 use zvs_host::{IpcServer, Services};
 
@@ -93,7 +94,10 @@ pub async fn ipc_call<R: Runtime>(
     if let Some(result) = browser_channel(&webview, &channel, payload.clone()).await {
         return result;
     }
-    Ok(host.server.dispatch(&channel, payload).await)
+    Ok(host
+        .server
+        .dispatch(Caller::Studio, &channel, payload)
+        .await)
 }
 
 #[tauri::command]

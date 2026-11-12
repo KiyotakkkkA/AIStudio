@@ -169,13 +169,21 @@ async fn a_device_is_chosen_persisted_and_reset_to_the_system_default() {
         device("b", "USB", false),
     ]);
 
-    let listed = data(server.dispatch("voice.devices", Value::Null).await);
+    let listed = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "voice.devices", Value::Null)
+            .await,
+    );
     assert_eq!(listed["devices"].as_array().map(Vec::len), Some(2));
     assert_eq!(listed["selectedId"], Value::Null);
 
     let chosen = data(
         server
-            .dispatch("voice.select", json!({ "deviceId": "b" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.select",
+                json!({ "deviceId": "b" }),
+            )
             .await,
     );
     assert_eq!(chosen["selectedId"], json!("b"));
@@ -187,12 +195,20 @@ async fn a_device_is_chosen_persisted_and_reset_to_the_system_default() {
     assert_eq!(stored.map(|setting| setting.value), Some(json!("b")));
 
     host.audio.set(vec![device("a", "Realtek", true)]);
-    let unplugged = data(server.dispatch("voice.devices", Value::Null).await);
+    let unplugged = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "voice.devices", Value::Null)
+            .await,
+    );
     assert_eq!(unplugged["selectedId"], json!("b"));
 
     let reset = data(
         server
-            .dispatch("voice.select", json!({ "deviceId": null }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.select",
+                json!({ "deviceId": null }),
+            )
             .await,
     );
     assert_eq!(reset["selectedId"], Value::Null);
@@ -203,19 +219,29 @@ async fn an_absent_device_cannot_be_chosen_and_a_probe_failure_is_native() {
     let (host, server) = registered();
     host.audio.set(vec![device("a", "Realtek", true)]);
     let missing = server
-        .dispatch("voice.select", json!({ "deviceId": "z" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.select",
+            json!({ "deviceId": "z" }),
+        )
         .await;
     assert_eq!(code(&missing), "NOT_FOUND");
 
     host.audio.failing.store(true, Ordering::SeqCst);
-    let failed = server.dispatch("voice.devices", Value::Null).await;
+    let failed = server
+        .dispatch(crate::ipc::Caller::Studio, "voice.devices", Value::Null)
+        .await;
     assert_eq!(code(&failed), "NATIVE_ERROR");
 }
 
 #[tokio::test]
 async fn the_model_list_recommends_one_model_and_nothing_is_installed_yet() {
     let (_host, server) = registered();
-    let models = data(server.dispatch("voice.models", Value::Null).await);
+    let models = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "voice.models", Value::Null)
+            .await,
+    );
     assert_eq!(
         models["models"].as_array().map(Vec::len),
         Some(SPEECH_MODELS.len())
@@ -231,7 +257,11 @@ async fn installing_a_model_queues_the_engine_and_the_model_once() {
     let (host, server) = registered();
     let models = data(
         server
-            .dispatch("voice.installModel", json!({ "modelRef": SMALL }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.installModel",
+                json!({ "modelRef": SMALL }),
+            )
             .await,
     );
     assert_ne!(model_state(&models, SMALL), &json!("available"));
@@ -239,7 +269,11 @@ async fn installing_a_model_queues_the_engine_and_the_model_once() {
 
     let again = data(
         server
-            .dispatch("voice.installModel", json!({ "modelRef": SMALL }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.installModel",
+                json!({ "modelRef": SMALL }),
+            )
             .await,
     );
     assert_ne!(model_state(&again, SMALL), &json!("available"));
@@ -252,6 +286,7 @@ async fn installing_a_model_queues_the_engine_and_the_model_once() {
 
     let unknown = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "voice.installModel",
             json!({ "modelRef": "curated:speech:nope" }),
         )
@@ -322,10 +357,32 @@ async fn a_dictation_is_recorded_recognised_and_its_clip_removed() {
     host.audio.speak(vec![100; SAMPLE_RATE as usize * 2]);
     host.recognizer.answer("Напиши письмо коллеге.");
 
-    data(server.dispatch("voice.startRecording", Value::Null).await);
-    let busy = server.dispatch("voice.startRecording", Value::Null).await;
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.startRecording",
+                Value::Null,
+            )
+            .await,
+    );
+    let busy = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.startRecording",
+            Value::Null,
+        )
+        .await;
     assert_eq!(code(&busy), "CONFLICT");
-    let transcript = data(server.dispatch("voice.stopRecording", Value::Null).await);
+    let transcript = data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.stopRecording",
+                Value::Null,
+            )
+            .await,
+    );
     assert_eq!(transcript["text"], json!("Напиши письмо коллеге."));
 
     let requests = host.recognizer.requests();
@@ -334,7 +391,13 @@ async fn a_dictation_is_recorded_recognised_and_its_clip_removed() {
     assert!(!requests[0].audio.exists());
     assert!(requests[0].threads >= 1);
 
-    let idle = server.dispatch("voice.stopRecording", Value::Null).await;
+    let idle = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.stopRecording",
+            Value::Null,
+        )
+        .await;
     assert_eq!(code(&idle), "CONFLICT");
 }
 
@@ -343,20 +406,58 @@ async fn a_short_clip_is_empty_and_a_cancelled_one_is_never_recognised() {
     let (host, server) = registered();
     install_engine_and_model(&host);
     host.audio.speak(vec![0; 100]);
-    data(server.dispatch("voice.startRecording", Value::Null).await);
-    let transcript = data(server.dispatch("voice.stopRecording", Value::Null).await);
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.startRecording",
+                Value::Null,
+            )
+            .await,
+    );
+    let transcript = data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.stopRecording",
+                Value::Null,
+            )
+            .await,
+    );
     assert_eq!(transcript["text"], json!(""));
 
     host.audio.speak(vec![0; SAMPLE_RATE as usize]);
-    data(server.dispatch("voice.startRecording", Value::Null).await);
-    data(server.dispatch("voice.cancelRecording", Value::Null).await);
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.startRecording",
+                Value::Null,
+            )
+            .await,
+    );
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.cancelRecording",
+                Value::Null,
+            )
+            .await,
+    );
     assert!(host.recognizer.requests().is_empty());
 }
 
 #[tokio::test]
 async fn recording_needs_an_installed_model_and_falls_back_to_the_default_device() {
     let (host, server) = registered();
-    let unready = server.dispatch("voice.startRecording", Value::Null).await;
+    let unready = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.startRecording",
+            Value::Null,
+        )
+        .await;
     assert_eq!(code(&unready), "CONFLICT");
 
     install_engine_and_model(&host);
@@ -365,12 +466,34 @@ async fn recording_needs_an_installed_model_and_falls_back_to_the_default_device
         .set(VOICE_DEVICE_SETTING_KEY, &json!("gone"))
         .expect("stores");
     host.audio.set(vec![device("a", "Realtek", true)]);
-    data(server.dispatch("voice.startRecording", Value::Null).await);
-    data(server.dispatch("voice.cancelRecording", Value::Null).await);
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.startRecording",
+                Value::Null,
+            )
+            .await,
+    );
+    data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.cancelRecording",
+                Value::Null,
+            )
+            .await,
+    );
     assert_eq!(host.audio.recorded(), [None]);
 
     host.audio.record_failing.store(true, Ordering::SeqCst);
-    let failed = server.dispatch("voice.startRecording", Value::Null).await;
+    let failed = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.startRecording",
+            Value::Null,
+        )
+        .await;
     assert_eq!(code(&failed), "NATIVE_ERROR");
 }
 
@@ -378,20 +501,32 @@ async fn recording_needs_an_installed_model_and_falls_back_to_the_default_device
 async fn only_an_installed_model_can_be_selected() {
     let (host, server) = registered();
     let missing = server
-        .dispatch("voice.selectModel", json!({ "modelRef": SMALL }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "voice.selectModel",
+            json!({ "modelRef": SMALL }),
+        )
         .await;
     assert_eq!(code(&missing), "CONFLICT");
 
     install_engine_and_model(&host);
     let cleared = data(
         server
-            .dispatch("voice.selectModel", json!({ "modelRef": null }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.selectModel",
+                json!({ "modelRef": null }),
+            )
             .await,
     );
     assert_eq!(cleared["selectedRef"], Value::Null);
     let chosen = data(
         server
-            .dispatch("voice.selectModel", json!({ "modelRef": SMALL }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "voice.selectModel",
+                json!({ "modelRef": SMALL }),
+            )
             .await,
     );
     assert_eq!(chosen["selectedRef"], json!(SMALL));

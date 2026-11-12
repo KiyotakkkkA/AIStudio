@@ -41,6 +41,12 @@ import { useStore } from "../../stores/useStore";
 import {
   CLI_CHECKING,
   CLI_COMMAND,
+  CLI_CONFIRM_ROW,
+  CLI_CONNECTIONS_EMPTY,
+  CLI_CONNECTIONS_HINT,
+  CLI_CONNECTIONS_LABEL,
+  CLI_CONNECTIONS_SETTING_ID,
+  CLI_DISCONNECT,
   CLI_INSTALL,
   CLI_INSTALLED,
   CLI_NOT_BUNDLED,
@@ -50,6 +56,7 @@ import {
   CLI_THEME_LABEL,
   CLI_THEME_SETTING_ID,
   CLI_UNINSTALL,
+  cliClientLine,
 } from "./cliCopy";
 import CliThemes from "./CliThemes";
 import {
@@ -876,8 +883,58 @@ const CliSection = observer(function CliSection() {
         >
           <CliThemes />
         </SettingRow>
+        <ToggleSettingRow row={CLI_CONFIRM_ROW} />
+        <CliConnectionsRow />
       </PreferenceContainer>
     </div>
+  );
+});
+
+const CliConnectionsRow = observer(function CliConnectionsRow() {
+  const { cliAccess } = useStore();
+  useEffect(() => {
+    cliAccess.start();
+    void cliAccess.refresh();
+  }, [cliAccess]);
+  return (
+    <SettingRow
+      id={CLI_CONNECTIONS_SETTING_ID}
+      label={CLI_CONNECTIONS_LABEL}
+      hint={cliAccess.connections.length === 0 ? CLI_CONNECTIONS_EMPTY : CLI_CONNECTIONS_HINT}
+      error={cliAccess.error ?? undefined}
+      stacked={cliAccess.connections.length > 0}
+    >
+      {cliAccess.connections.length === 0 ? null : (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {cliAccess.connections.map((connection) => (
+            <li
+              key={connection.id}
+              className="flex items-center justify-between gap-3 rounded-card bg-main-850 px-3.5 py-2.5"
+            >
+              <div className="min-w-0">
+                <p
+                  className={`m-0 text-[13px] ${connection.recognised ? "text-main-100" : "text-err"}`}
+                >
+                  {cliClientLine(connection)}
+                </p>
+                {connection.image === null ? null : (
+                  <p className="m-0 truncate text-[12px] text-main-500" title={connection.image}>
+                    {connection.image}
+                  </p>
+                )}
+              </div>
+              <Button
+                tone="secondary"
+                size="sm"
+                onClick={() => void cliAccess.disconnect(connection.id)}
+              >
+                {CLI_DISCONNECT}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </SettingRow>
   );
 });
 

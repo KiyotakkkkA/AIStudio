@@ -34,6 +34,7 @@ async fn every_run_channel_validates_outputs_lists_persisted_runs_and_handles_mi
     let (host, server) = serve();
     let started = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "runs.start",
             json!({ "kind": "chat", "graph": { "nodes": [] } }),
         )
@@ -43,18 +44,28 @@ async fn every_run_channel_validates_outputs_lists_persisted_runs_and_handles_mi
     let id = run_id(&started);
     host.runs.wait(&id).await;
 
-    let get = server.dispatch("runs.get", json!({ "id": id })).await;
+    let get = server
+        .dispatch(crate::ipc::Caller::Studio, "runs.get", json!({ "id": id }))
+        .await;
     assert_eq!(get["data"]["status"], json!("succeeded"));
     assert_eq!(get["data"]["graph"], json!({ "nodes": [] }));
     assert_eq!(get["data"]["input"], Value::Null);
 
-    let page = server.dispatch("runs.list", json!({})).await;
+    let page = server
+        .dispatch(crate::ipc::Caller::Studio, "runs.list", json!({}))
+        .await;
     assert_eq!(page["ok"], json!(true), "{page}");
     assert_eq!(page["data"]["items"].as_array().map(Vec::len), Some(1));
     assert_eq!(page["data"]["counts"]["byStatus"]["succeeded"], json!(1));
     assert_eq!(page["data"]["counts"]["byKind"]["browser"], json!(0));
 
-    let detail = server.dispatch("runs.detail", json!({ "id": id })).await;
+    let detail = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "runs.detail",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(
         detail["data"]["summary"]["progress"],
         json!({ "done": 0, "total": 0 })
@@ -65,27 +76,54 @@ async fn every_run_channel_validates_outputs_lists_persisted_runs_and_handles_mi
             .is_some_and(|events| !events.is_empty())
     );
     assert_eq!(
-        server.dispatch("runs.steps", json!({ "id": id })).await,
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.steps",
+                json!({ "id": id })
+            )
+            .await,
         json!({ "ok": true, "data": [] })
     );
     assert_eq!(
-        server.dispatch("runs.cancel", json!({ "id": id })).await,
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.cancel",
+                json!({ "id": id })
+            )
+            .await,
         json!({ "ok": true })
     );
     assert_eq!(
-        server.dispatch("runs.retry", json!({ "id": id })).await["error"]["code"],
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.retry",
+                json!({ "id": id })
+            )
+            .await["error"]["code"],
         json!("CONFLICT")
     );
     assert_eq!(
-        server.dispatch("runs.clearFinished", Value::Null).await,
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.clearFinished",
+                Value::Null
+            )
+            .await,
         json!({ "ok": true, "data": { "removed": 1 } })
     );
     assert_eq!(
-        server.dispatch("runs.list", json!({})).await["data"]["items"],
+        server
+            .dispatch(crate::ipc::Caller::Studio, "runs.list", json!({}))
+            .await["data"]["items"],
         json!([])
     );
     let missing = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "runs.get",
             json!({ "id": "0199aa11-1111-7111-8111-111111111111" }),
         )
@@ -103,7 +141,9 @@ async fn every_run_channel_validates_outputs_lists_persisted_runs_and_handles_mi
         ("runs.deny", json!({ "id": id })),
     ] {
         assert_eq!(
-            server.dispatch(channel, payload).await["error"]["code"],
+            server
+                .dispatch(crate::ipc::Caller::Studio, channel, payload)
+                .await["error"]["code"],
             json!("VALIDATION_FAILED"),
             "{channel}"
         );
@@ -123,13 +163,20 @@ async fn approvals_travel_over_ipc_and_stale_decisions_conflict() {
         .expect("registers");
     let started = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "runs.start",
             json!({ "kind": "job", "graph": { "nodes": [{ "id": "a", "type": "tool" }] } }),
         )
         .await;
     let id = run_id(&started);
     let approval = loop {
-        let page = server.dispatch("runs.list", json!({ "live": true })).await;
+        let page = server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.list",
+                json!({ "live": true }),
+            )
+            .await;
         if let Some(approval) = page["data"]["items"][0].get("approval") {
             break approval.clone();
         }
@@ -139,6 +186,7 @@ async fn approvals_travel_over_ipc_and_stale_decisions_conflict() {
     assert_eq!(
         server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "runs.approve",
                 json!({ "id": id, "approvalId": approval["id"] })
             )
@@ -147,12 +195,15 @@ async fn approvals_travel_over_ipc_and_stale_decisions_conflict() {
     );
     host.runs.wait(&id).await;
     assert_eq!(
-        server.dispatch("runs.get", json!({ "id": id })).await["data"]["status"],
+        server
+            .dispatch(crate::ipc::Caller::Studio, "runs.get", json!({ "id": id }))
+            .await["data"]["status"],
         json!("succeeded")
     );
     assert_eq!(
         server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "runs.deny",
                 json!({ "id": id, "approvalId": approval["id"] })
             )
@@ -170,12 +221,18 @@ async fn the_demo_job_runs_one_sidecar_job_through_the_kernel_with_progress() {
         .grant("job.run", "global", ToolTier::Auto, "user")
         .expect("grants");
     let started = server
-        .dispatch("system.demoJob", json!({ "steps": 3, "intervalMs": 10 }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "system.demoJob",
+            json!({ "steps": 3, "intervalMs": 10 }),
+        )
         .await;
     assert_eq!(started["ok"], json!(true), "{started}");
     let id = run_id(&started);
     host.runs.wait(&id).await;
-    let run = server.dispatch("runs.get", json!({ "id": id })).await;
+    let run = server
+        .dispatch(crate::ipc::Caller::Studio, "runs.get", json!({ "id": id }))
+        .await;
     assert_eq!(run["data"]["status"], json!("succeeded"));
     assert_eq!(run["data"]["kind"], json!("job"));
     assert_eq!(run["data"]["title"], json!("Демонстрационная задача"));
@@ -187,7 +244,13 @@ async fn the_demo_job_runs_one_sidecar_job_through_the_kernel_with_progress() {
             json!({ "steps": 3, "intervalMs": 10 })
         )]
     );
-    let steps = server.dispatch("runs.steps", json!({ "id": id })).await;
+    let steps = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "runs.steps",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(steps["data"][0]["output"], json!({ "slept": 3 }));
     let progress: Vec<(u64, u64)> = host
         .run_events
@@ -202,7 +265,11 @@ async fn the_demo_job_runs_one_sidecar_job_through_the_kernel_with_progress() {
         assert!(progress.contains(&expected), "{progress:?}");
     }
     let refused = server
-        .dispatch("system.demoJob", json!({ "steps": 0 }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "system.demoJob",
+            json!({ "steps": 0 }),
+        )
         .await;
     assert_eq!(refused["error"]["code"], json!("VALIDATION_FAILED"));
 }
@@ -213,11 +280,17 @@ async fn without_a_grant_the_demo_job_waits_for_approval() {
     register_job_nodes(&host.nodes).expect("registers");
     let id = run_id(
         &server
-            .dispatch("system.demoJob", json!({ "steps": 1 }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "system.demoJob",
+                json!({ "steps": 1 }),
+            )
             .await,
     );
     loop {
-        let run = server.dispatch("runs.get", json!({ "id": id })).await;
+        let run = server
+            .dispatch(crate::ipc::Caller::Studio, "runs.get", json!({ "id": id }))
+            .await;
         if run["data"]["status"] == json!("blocked") {
             break;
         }
@@ -225,11 +298,19 @@ async fn without_a_grant_the_demo_job_waits_for_approval() {
     }
     assert!(host.jobs.calls().is_empty());
     assert_eq!(
-        server.dispatch("runs.cancel", json!({ "id": id })).await,
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "runs.cancel",
+                json!({ "id": id })
+            )
+            .await,
         json!({ "ok": true })
     );
     assert_eq!(
-        server.dispatch("runs.get", json!({ "id": id })).await["data"]["status"],
+        server
+            .dispatch(crate::ipc::Caller::Studio, "runs.get", json!({ "id": id }))
+            .await["data"]["status"],
         json!("cancelled")
     );
 }

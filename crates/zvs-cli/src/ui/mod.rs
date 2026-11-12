@@ -594,6 +594,8 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
             copy::HINT_SHELL
         } else if app.shell.is_some() {
             copy::HINT_SHELL_RUNNING
+        } else if app.consent_pending {
+            copy::CONSENT_PENDING
         } else if app.verification.is_some() {
             copy::HINT_VERIFY
         } else if app.capturing() {

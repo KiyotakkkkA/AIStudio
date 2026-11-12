@@ -340,6 +340,7 @@ pub struct App {
     pub policy: Option<ExecPolicyDto>,
     pub overlay: Option<Overlay>,
     pub verification: Option<String>,
+    pub consent_pending: bool,
     pub shell: Option<ShellRun>,
     pub selection: Option<Selection>,
     pub transcript: Transcript,
@@ -421,6 +422,7 @@ impl App {
             policy: None,
             overlay: None,
             verification: None,
+            consent_pending: false,
             shell: None,
             selection: None,
             transcript: Transcript::default(),
@@ -927,6 +929,10 @@ impl App {
                 if self.verification.as_deref() == Some(origin.as_str()) {
                     self.verification = None;
                 }
+                Vec::new()
+            }
+            Msg::Notice(zvs_contract::CliNotice::Consent { pending }) => {
+                self.consent_pending = pending;
                 Vec::new()
             }
             Msg::Unreachable(message) => {

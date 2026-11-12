@@ -4,6 +4,7 @@ pub mod artifacts;
 pub mod browser_library;
 pub mod browser_settings;
 pub mod browser_sites;
+mod caller;
 pub mod chat;
 pub mod cli;
 pub mod computer;
@@ -16,6 +17,7 @@ pub mod integrations;
 pub mod mcp;
 pub mod memory;
 pub mod notifications;
+mod policy;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
@@ -35,7 +37,9 @@ pub mod vector_stores;
 pub mod voice;
 pub mod workspace;
 
-pub use server::{Coverage, INTERNAL_MESSAGE, IpcServer};
+pub use caller::Caller;
+pub use policy::{Callers, ChannelPolicy, Effect, POLICY, Scope, console_channels, policy};
+pub use server::{CALLER_REFUSED, CLI_CHANNEL_REFUSED, Coverage, INTERNAL_MESSAGE, IpcServer};
 
 pub fn register(server: &mut IpcServer) {
     system::register(server);
@@ -187,6 +191,10 @@ mod tests {
                 "chat.unbindFolder",
                 "cli.accounts.cancelLink",
                 "cli.accounts.link",
+                "cli.connections.disconnect",
+                "cli.connections.list",
+                "cli.consents.answer",
+                "cli.consents.list",
                 "cli.images.import",
                 "cli.install",
                 "cli.mcp.create",

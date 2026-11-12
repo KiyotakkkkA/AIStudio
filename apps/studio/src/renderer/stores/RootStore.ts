@@ -24,6 +24,7 @@ import DevicePermissionsStore from "../features/device/DevicePermissionsStore";
 import PermissionsStore from "../features/permissions/PermissionsStore";
 import StorageStore from "../features/preferences/StorageStore";
 import CliStore from "../features/preferences/CliStore";
+import CliAccessStore from "../features/preferences/CliAccessStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
@@ -65,6 +66,7 @@ export class RootStore {
   readonly devicePermissions: DevicePermissionsStore;
   readonly storage: StorageStore;
   readonly cli: CliStore;
+  readonly cliAccess: CliAccessStore;
   readonly appSettings: AppSettingsStore;
   readonly memory: MemoryStore;
   readonly profile: ProfileStore;
@@ -103,6 +105,7 @@ export class RootStore {
     this.storage = new StorageStore(environment.ipc);
     this.appSettings = new AppSettingsStore(environment.ipc);
     this.cli = new CliStore(environment.ipc, () => this.appSettings.load());
+    this.cliAccess = new CliAccessStore(environment.ipc, environment.events);
     this.chat.useMemorySwitch(
       () => this.appSettings.values["memory.enabled"] && this.appSettings.values["memory.model"],
     );
@@ -165,6 +168,7 @@ export class RootStore {
         devicePermissions: false,
         appSettings: false,
         cli: false,
+        cliAccess: false,
         memory: false,
         profile: false,
         execPolicy: false,
@@ -189,6 +193,7 @@ export class RootStore {
 
   dispose(): void {
     this.disposeFeatureSwitch();
+    this.cliAccess.dispose();
     this.viewer.dispose();
     this.accounts.dispose();
     this.vectorStores.dispose();

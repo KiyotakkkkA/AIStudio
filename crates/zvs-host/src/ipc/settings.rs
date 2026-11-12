@@ -35,7 +35,8 @@ pub fn register(server: &mut IpcServer) {
                 if input.key == EXEC_POLICY_KEY || input.key == SUBAGENTS_KEY {
                     return Err(invalid("key", "reserved"));
                 }
-                if input.key == crate::computer::settings::COMPUTER_ENABLED_KEY
+                if (input.key == crate::computer::settings::COMPUTER_ENABLED_KEY
+                    || input.key == zvs_contract::CLI_CONFIRM_SETTING_KEY)
                     && !input.value.is_boolean()
                 {
                     return Err(invalid("value", "type"));
@@ -115,6 +116,7 @@ mod tests {
         for enabled in [false, true] {
             let response = server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "settings.set",
                     json!({"key": "computer.enabled", "value": enabled}),
                 )
@@ -151,6 +153,7 @@ mod tests {
         assert_eq!(
             server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "settings.set",
                     json!({"key": "computer.enabled", "value": "false"})
                 )
@@ -166,13 +169,18 @@ mod tests {
 
         assert_eq!(
             server
-                .dispatch("settings.get", json!({ "key": "window.main" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.get",
+                    json!({ "key": "window.main" })
+                )
                 .await,
             json!({ "ok": true, "data": { "key": "window.main" } })
         );
 
         let written = server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "settings.set",
                 json!({ "key": "window.main", "value": geometry }),
             )
@@ -183,7 +191,11 @@ mod tests {
         );
         assert_eq!(
             server
-                .dispatch("settings.get", json!({ "key": "window.main" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.get",
+                    json!({ "key": "window.main" })
+                )
                 .await,
             written
         );
@@ -198,7 +210,11 @@ mod tests {
             ("ui.theme", json!("sepia")),
         ] {
             let response = server
-                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({ "key": key, "value": value }),
+                )
                 .await;
             assert_eq!(response["ok"], json!(true));
         }
@@ -214,7 +230,11 @@ mod tests {
             ("ui.palette.light", json!("basic-white")),
         ] {
             let response = server
-                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({ "key": key, "value": value }),
+                )
                 .await;
             assert_eq!(response["ok"], json!(true));
         }
@@ -239,7 +259,11 @@ mod tests {
             ("providers.healthcheck.enabled", json!(false), false),
         ] {
             let response = server
-                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({ "key": key, "value": value }),
+                )
                 .await;
             assert_eq!(response["ok"], json!(true));
             assert_eq!(host.health.running(), running, "{key}");
@@ -257,7 +281,11 @@ mod tests {
             ("ui.rail.collapsed", json!(true)),
         ] {
             let response = server
-                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({ "key": key, "value": value }),
+                )
                 .await;
             assert_eq!(response["ok"], json!(true), "{key}");
         }
@@ -274,6 +302,7 @@ mod tests {
         host.shell.fail_autostart(true);
         let response = server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "settings.set",
                 json!({ "key": "app.autostart", "value": true }),
             )
@@ -296,7 +325,11 @@ mod tests {
     async fn a_malformed_key_is_rejected_before_it_reaches_the_database() {
         let (host, server) = server();
         let response = server
-            .dispatch("settings.set", json!({ "key": "UI theme", "value": 1 }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "settings.set",
+                json!({ "key": "UI theme", "value": 1 }),
+            )
             .await;
         assert_eq!(response["error"]["code"], json!("VALIDATION_FAILED"));
         assert!(host.settings.list().expect("lists").is_empty());
@@ -310,7 +343,11 @@ mod tests {
             ("profile.style", json!("loud")),
         ] {
             let response = server
-                .dispatch("settings.set", json!({ "key": key, "value": value }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "settings.set",
+                    json!({ "key": key, "value": value }),
+                )
                 .await;
             assert_eq!(
                 response["error"]["code"],
@@ -321,6 +358,7 @@ mod tests {
         assert!(host.settings.list().expect("lists").is_empty());
         let response = server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "settings.set",
                 json!({ "key": "chat.toolcalls", "value": 20 }),
             )

@@ -84,8 +84,7 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
     let created: ConversationDto = data(
         &channels
             .server
-            .dispatch(
-                "chat.conversations.create",
+            .dispatch(crate::ipc::Caller::Studio, "chat.conversations.create",
                 json!({ "providerId": channels.provider_id, "modelId": "fake-model", "systemPrompt": "Be concise." }),
             )
             .await,
@@ -95,6 +94,7 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.send",
                 json!({ "conversationId": created.id, "text": "  First question  " }),
             )
@@ -110,7 +110,11 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
     let detail: ConversationDetailDto = data(
         &channels
             .server
-            .dispatch("chat.conversations.get", json!({ "id": created.id }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.get",
+                json!({ "id": created.id }),
+            )
             .await,
     );
     assert_eq!(detail.conversation.title, "First question");
@@ -125,19 +129,28 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
     let listed: Vec<ConversationDto> = data(
         &channels
             .server
-            .dispatch("chat.conversations.list", Value::Null)
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.list",
+                Value::Null,
+            )
             .await,
     );
     assert_eq!(listed.len(), 1);
     let cancelled = channels
         .server
-        .dispatch("chat.cancel", json!({ "id": handle.id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "chat.cancel",
+            json!({ "id": handle.id }),
+        )
         .await;
     assert_eq!(cancelled["ok"], json!(true), "{cancelled}");
     let truncated: ConversationDetailDto = data(
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.truncate",
                 json!({ "id": created.id, "messageId": detail.messages[1].id }),
             )
@@ -153,6 +166,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.create",
                 json!({ "providerId": channels.provider_id, "modelId": "fake-model" }),
             )
@@ -162,6 +176,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.rename",
                 json!({ "id": created.id, "title": " Plans " }),
             )
@@ -172,6 +187,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.updateRelations",
                 json!({ "id": created.id, "useRelations": true }),
             )
@@ -182,6 +198,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.pin",
                 json!({ "id": created.id, "pinned": true }),
             )
@@ -193,14 +210,19 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.updateStores",
                 json!({ "id": created.id, "attachedStoreIds": [] }),
             )
             .await,
     );
     assert!(stores.attached_store_ids.is_empty());
-    let commands: Vec<zvs_contract::ChatCommandDto> =
-        data(&channels.server.dispatch("chat.commands", json!(null)).await);
+    let commands: Vec<zvs_contract::ChatCommandDto> = data(
+        &channels
+            .server
+            .dispatch(crate::ipc::Caller::Studio, "chat.commands", json!(null))
+            .await,
+    );
     assert_eq!(
         commands
             .iter()
@@ -217,7 +239,11 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             failed(
                 &channels
                     .server
-                    .dispatch(channel, json!({ "conversationId": created.id }))
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        channel,
+                        json!({ "conversationId": created.id })
+                    )
                     .await
             ),
             &json!("CONFLICT"),
@@ -229,6 +255,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             &channels
                 .server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "chat.conversations.updateTools",
                     json!({ "id": created.id })
                 )
@@ -241,6 +268,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             &channels
                 .server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "chat.send",
                     json!({ "conversationId": created.id, "text": "   " })
                 )
@@ -253,6 +281,7 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
             &channels
                 .server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "chat.cancel",
                     json!({ "id": RunId::new(crate::platform::ids::new_id()) })
                 )
@@ -262,14 +291,22 @@ async fn the_conversation_channels_update_settings_and_refuse_bad_input() {
     );
     let removed = channels
         .server
-        .dispatch("chat.conversations.remove", json!({ "id": created.id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "chat.conversations.remove",
+            json!({ "id": created.id }),
+        )
         .await;
     assert_eq!(removed, json!({ "ok": true }));
     assert_eq!(
         failed(
             &channels
                 .server
-                .dispatch("chat.conversations.get", json!({ "id": created.id }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "chat.conversations.get",
+                    json!({ "id": created.id })
+                )
                 .await
         ),
         &json!("NOT_FOUND")
@@ -283,6 +320,7 @@ async fn removing_a_dialog_closes_its_terminals() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.create",
                 json!({ "providerId": channels.provider_id, "modelId": "fake-model" }),
             )
@@ -300,7 +338,11 @@ async fn removing_a_dialog_closes_its_terminals() {
         .expect("opens a terminal");
     let removed = channels
         .server
-        .dispatch("chat.conversations.remove", json!({ "id": created.id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "chat.conversations.remove",
+            json!({ "id": created.id }),
+        )
         .await;
     assert_eq!(removed, json!({ "ok": true }));
     assert_eq!(channels.host.terminals.open(), 0);
@@ -317,6 +359,7 @@ async fn answers_and_skips_for_a_question_that_is_not_pending_conflict() {
             &channels
                 .server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "chat.answer",
                     json!({
                         "id": run,
@@ -332,7 +375,11 @@ async fn answers_and_skips_for_a_question_that_is_not_pending_conflict() {
         failed(
             &channels
                 .server
-                .dispatch("chat.skip", json!({ "id": run, "requestId": request }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "chat.skip",
+                    json!({ "id": run, "requestId": request })
+                )
                 .await
         ),
         &json!("CONFLICT")
@@ -341,7 +388,11 @@ async fn answers_and_skips_for_a_question_that_is_not_pending_conflict() {
         failed(
             &channels
                 .server
-                .dispatch("chat.skip", json!({ "id": run, "requestId": "r1" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "chat.skip",
+                    json!({ "id": run, "requestId": "r1" })
+                )
                 .await
         ),
         &json!("VALIDATION_FAILED")
@@ -355,6 +406,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.create",
                 json!({ "providerId": channels.provider_id, "modelId": "fake-model" }),
             )
@@ -364,6 +416,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.send",
                 json!({ "conversationId": created.id, "text": "Plan: the release?" }),
             )
@@ -377,6 +430,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.export",
                 json!({ "id": created.id, "format": "markdown" }),
             )
@@ -394,6 +448,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
         &channels
             .server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "chat.conversations.export",
                 json!({ "id": created.id, "format": "markdown" }),
             )
@@ -422,6 +477,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
     channels
         .server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "chat.conversations.export",
             json!({ "id": created.id, "format": "json" }),
         )
@@ -439,6 +495,7 @@ async fn a_dialog_exports_to_the_picked_file_as_json_or_markdown() {
     let missing = channels
         .server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "chat.conversations.export",
             json!({ "id": "0199aa11-9999-7111-8111-111111111111", "format": "json" }),
         )

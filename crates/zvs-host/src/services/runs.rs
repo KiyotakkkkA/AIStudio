@@ -559,6 +559,19 @@ impl RunService {
         }
     }
 
+    pub fn subject_of_stream(&self, stream: &StreamId) -> Option<String> {
+        self.inner
+            .database
+            .with_connection(|connection| {
+                Ok(Repositories::new(connection)
+                    .runs
+                    .subject_of_stream(&stream.to_string())?)
+            })
+            .ok()
+            .flatten()
+            .flatten()
+    }
+
     pub fn get(&self, id: &RunId) -> Result<RunDto, AppError> {
         run_dto(&read_run(&self.inner.database, &id.to_string())?)
     }

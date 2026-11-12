@@ -123,9 +123,11 @@ pub use chat::{
     WebSourceDto,
 };
 pub use cli::{
-    CLI_COMMAND, CLI_LAUNCH_ARG, CLI_LINE_MAX, CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION,
-    CLI_THEME_FILE, CliClientMessage, CliInstallDto, CliNotice, CliOpenInput, CliServerMessage,
-    CliSessionDto, CliTheme, CliThemeDto, cli_pipe_name,
+    CLI_COMMAND, CLI_CONFIRM_SETTING_KEY, CLI_IMAGE_MAX, CLI_LAUNCH_ARG, CLI_LINE_MAX,
+    CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION, CLI_STEP_DOMAIN, CLI_THEME_FILE, CliChangeDto,
+    CliClientMessage, CliConnectionDto, CliConnectionRef, CliConsentAnswerInput, CliConsentDto,
+    CliInstallDto, CliNotice, CliOpenInput, CliServerMessage, CliSessionDto, CliTheme, CliThemeDto,
+    cli_pipe_name,
 };
 pub use computer::{
     APPS_APPROVAL_KIND, AddAppGrantInput, AnswerAppRequestInput, AppGrantDto, AppGrantRef,

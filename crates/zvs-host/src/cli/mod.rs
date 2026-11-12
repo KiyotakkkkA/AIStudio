@@ -1,4 +1,6 @@
 pub mod connection;
+pub mod connections;
+pub mod gate;
 pub mod installer;
 pub mod notices;
 pub mod path_list;
@@ -12,7 +14,13 @@ use zvs_contract::{
     ConversationId, CreateMcpServerInput, McpServerDto, RunId, RunKind, WorkingFolderAccess,
 };
 
-pub use connection::{CLI_CHANNELS, CliDispatch, serve};
+pub use connection::{CliDispatch, serve};
+pub use connections::{
+    CLI_CONNECTION_CLOSED, CLI_CONNECTION_MISSING, CLI_CONSENT_DECLINED, CLI_CONSENT_EXPIRED,
+    CLI_CONSENT_MISSING, CLI_CONSENT_TIMEOUT, CLI_STUDIO_REQUIRED, CliClient, CliConnections,
+    NoticeSender,
+};
+pub use gate::CLI_DIALOG_REFUSED;
 pub use installer::{CliInstallState, CliInstaller, NoCliInstaller, SharedCliInstaller};
 pub use notices::CliNotices;
 pub use path_list::{path_contains, path_with, path_without};

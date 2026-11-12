@@ -712,6 +712,11 @@ pub fn test_services(system: SystemService) -> TestServices {
             cli_theme: crate::cli::CliThemeFile::new(
                 &workspace.join(crate::platform::paths::CLI_FOLDER),
             ),
+            cli_connections: crate::cli::CliConnections::new(
+                clock.clone(),
+                run_bus.clone(),
+                shell.clone(),
+            ),
             voice,
         }),
         nodes,
@@ -1099,6 +1104,7 @@ impl ThemePort for RecordingTheme {
 
 #[derive(Debug, Default)]
 pub struct RecordingShell {
+    shown: AtomicUsize,
     notified: Mutex<Vec<NotificationDraft>>,
     cleared: Mutex<Vec<NotificationTargetDto>>,
     tray: Mutex<Vec<bool>>,
@@ -1109,6 +1115,10 @@ pub struct RecordingShell {
 impl RecordingShell {
     pub fn shared() -> Arc<Self> {
         Arc::new(Self::default())
+    }
+
+    pub fn studio_shown(&self) -> usize {
+        self.shown.load(Ordering::SeqCst)
     }
 
     pub fn notified(&self) -> Vec<NotificationDraft> {
@@ -1152,6 +1162,10 @@ impl RecordingShell {
 }
 
 impl ShellPort for RecordingShell {
+    fn show_studio(&self) {
+        self.shown.fetch_add(1, Ordering::SeqCst);
+    }
+
     fn set_autostart(&self, enabled: bool) -> Result<(), String> {
         if self.failing.load(Ordering::SeqCst) {
             return Err("registry write refused".to_owned());

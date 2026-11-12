@@ -10,74 +10,48 @@ use zvs_contract::{
     HostEvent, ResultEnvelope,
 };
 
+use super::connections::{CliClient, NoticeSender};
+use super::gate;
 use super::notices::CliNotices;
-use crate::ipc::IpcServer;
+use crate::ipc::{CLI_CHANNEL_REFUSED, Caller, IpcServer, policy};
 use crate::platform::events::{EventBus, EventSink};
 use crate::platform::logger::{LogLevel, SharedLogger};
 
-pub const CLI_CHANNELS: &[&str] = &[
-    "chat.answer",
-    "chat.attach",
-    "chat.bindFolder",
-    "chat.cancel",
-    "chat.context",
-    "chat.conversations.create",
-    "chat.conversations.get",
-    "chat.conversations.list",
-    "chat.conversations.updateStores",
-    "chat.goal.continue",
-    "chat.goal.stop",
-    "chat.queue.add",
-    "chat.queue.edit",
-    "chat.queue.flush",
-    "chat.queue.list",
-    "chat.queue.remove",
-    "chat.send",
-    "chat.skip",
-    "cli.accounts.cancelLink",
-    "cli.accounts.link",
-    "cli.images.import",
-    "cli.mcp.create",
-    "cli.open",
-    "cli.subagents.cancel",
-    "execPolicy.allowRule",
-    "execPolicy.get",
-    "execPolicy.rules",
-    "execPolicy.set",
-    "folders.answer",
-    "mcp.cancelSignIn",
-    "mcp.get",
-    "mcp.list",
-    "mcp.signIn",
-    "mcp.start",
-    "mcp.stop",
-    "providers.get",
-    "providers.list",
-    "providers.usage",
-    "runs.approve",
-    "runs.deny",
-    "shells.kill",
-    "shells.list",
-    "shells.output",
-    "skills.list",
-    "skills.setEnabled",
-    "system.ping",
-    "vectorStores.list",
-];
-pub const CLI_CHANNEL_REFUSED: &str = "Канал недоступен консольной версии";
 const OUTGOING: usize = 4096;
 const LOG_SOURCE: &str = "cli";
 
 #[async_trait]
 pub trait CliDispatch: Send + Sync {
-    async fn dispatch(&self, channel: &str, payload: Value) -> Value;
+    async fn dispatch(&self, caller: Caller, channel: &str, payload: Value) -> Value;
+
+    fn connect(&self, client: CliClient, notify: NoticeSender) -> (u64, CancellationToken);
+
+    fn disconnect(&self, connection: u64);
+
+    fn sees(&self, connection: u64, event: &HostEvent) -> bool;
 }
 
 #[async_trait]
 impl CliDispatch for IpcServer {
-    async fn dispatch(&self, channel: &str, payload: Value) -> Value {
-        Self::dispatch(self, channel, payload).await
+    async fn dispatch(&self, caller: Caller, channel: &str, payload: Value) -> Value {
+        Self::dispatch(self, caller, channel, payload).await
     }
+
+    fn connect(&self, client: CliClient, notify: NoticeSender) -> (u64, CancellationToken) {
+        self.services().cli_connections.open(client, notify)
+    }
+
+    fn disconnect(&self, connection: u64) {
+        self.services().cli_connections.close(connection);
+    }
+
+    fn sees(&self, connection: u64, event: &HostEvent) -> bool {
+        gate::sees(self.services(), connection, event.stream_id)
+    }
+}
+
+fn console_channel(channel: &str) -> bool {
+    policy(channel).is_some_and(|row| row.callers.cli)
 }
 
 struct QueueSink {
@@ -123,6 +97,7 @@ async fn write_messages<W: AsyncWrite + Unpin>(
     mut writer: W,
     mut outgoing: mpsc::Receiver<CliServerMessage>,
     closed: CancellationToken,
+    visible: impl Fn(&HostEvent) -> bool,
 ) {
     loop {
         let message = tokio::select! {
@@ -132,6 +107,11 @@ async fn write_messages<W: AsyncWrite + Unpin>(
         let Some(message) = message else {
             break;
         };
+        if let CliServerMessage::Event { event } = &message
+            && !visible(event)
+        {
+            continue;
+        }
         let Ok(mut line) = serde_json::to_vec(&message) else {
             continue;
         };
@@ -146,6 +126,7 @@ async fn write_messages<W: AsyncWrite + Unpin>(
 
 pub async fn serve<S>(
     stream: S,
+    client: CliClient,
     dispatch: Arc<dyn CliDispatch>,
     events: EventBus,
     notices: CliNotices,
@@ -157,7 +138,20 @@ pub async fn serve<S>(
     let mut reader = BufReader::new(reader);
     let (outgoing, queue) = mpsc::channel(OUTGOING);
     let closed = CancellationToken::new();
-    let writing = tokio::spawn(write_messages(writer, queue, closed.clone()));
+    let connection = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let writing = {
+        let dispatch = Arc::clone(&dispatch);
+        let connection = Arc::clone(&connection);
+        tokio::spawn(write_messages(
+            writer,
+            queue,
+            closed.clone(),
+            move |event| {
+                let connection = connection.load(std::sync::atomic::Ordering::SeqCst);
+                connection != 0 && dispatch.sees(connection, event)
+            },
+        ))
+    };
     let mut buffer = Vec::new();
 
     let hello = tokio::select! {
@@ -192,11 +186,38 @@ pub async fn serve<S>(
     {
         return;
     }
+    let notify: NoticeSender = {
+        let outgoing = outgoing.clone();
+        Arc::new(move |notice| {
+            let _ = outgoing.try_send(CliServerMessage::Notice { notice });
+        })
+    };
+    let (connection_id, dropped) = dispatch.connect(client.clone(), notify);
+    connection.store(connection_id, std::sync::atomic::Ordering::SeqCst);
+    {
+        let closed = closed.clone();
+        tokio::spawn(async move {
+            tokio::select! {
+                () = dropped.cancelled() => closed.cancel(),
+                () = closed.cancelled() => {}
+            }
+        });
+    }
     let subscription = events.subscribe(Arc::new(QueueSink {
         outgoing: outgoing.clone(),
         closed: closed.clone(),
     }));
-    logger.log(LogLevel::Info, LOG_SOURCE, "A CLI client connected", &[]);
+    logger.log(
+        LogLevel::Info,
+        LOG_SOURCE,
+        "A CLI client connected",
+        &[
+            ("connection", json!(connection_id)),
+            ("pid", json!(client.pid)),
+            ("image", json!(client.image)),
+            ("recognised", json!(client.recognised)),
+        ],
+    );
     for notice in notices.current() {
         let _ = outgoing.send(CliServerMessage::Notice { notice }).await;
     }
@@ -253,8 +274,16 @@ pub async fn serve<S>(
                 let outgoing = outgoing.clone();
                 let dispatch = Arc::clone(&dispatch);
                 tokio::spawn(async move {
-                    let envelope = if CLI_CHANNELS.contains(&channel.as_str()) {
-                        dispatch.dispatch(&channel, payload).await
+                    let envelope = if console_channel(&channel) {
+                        dispatch
+                            .dispatch(
+                                Caller::Cli {
+                                    connection: connection_id,
+                                },
+                                &channel,
+                                payload,
+                            )
+                            .await
                     } else {
                         refused(&channel)
                     };
@@ -267,10 +296,16 @@ pub async fn serve<S>(
     }
 
     events.unsubscribe(subscription);
+    dispatch.disconnect(connection_id);
     closed.cancel();
     drop(outgoing);
     let _ = writing.await;
-    logger.log(LogLevel::Info, LOG_SOURCE, "A CLI client disconnected", &[]);
+    logger.log(
+        LogLevel::Info,
+        LOG_SOURCE,
+        "A CLI client disconnected",
+        &[("connection", json!(connection_id))],
+    );
 }
 
 #[cfg(test)]

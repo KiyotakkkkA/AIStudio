@@ -1,0 +1,15 @@
+[
+  {
+    "name": "not a uuid",
+    "value": {
+      "id": "x",
+      "confirm": true
+    }
+  },
+  {
+    "name": "missing answer",
+    "value": {
+      "id": "9b2f7a3e-4c1d-4e8a-9f2b-6d5c4b3a2e10"
+    }
+  }
+]

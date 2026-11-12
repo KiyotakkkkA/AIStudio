@@ -45,7 +45,9 @@ async fn the_channels_expose_the_registry_and_match_the_contract() {
     let (host, server) = registered();
     let tool = mail(&host);
     let id = tool.id.to_string();
-    let listed = server.dispatch("tools.list", json!({})).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "tools.list", json!({}))
+        .await;
     assert_eq!(listed["ok"], json!(true), "{listed}");
     assert!(
         listed["data"]
@@ -53,14 +55,24 @@ async fn the_channels_expose_the_registry_and_match_the_contract() {
             .is_some_and(|tools| tools.iter().any(|tool| tool["key"] == "mail.send"))
     );
     let tiered = server
-        .dispatch("tools.setTier", json!({ "id": id, "tier": "off" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.setTier",
+            json!({ "id": id, "tier": "off" }),
+        )
         .await;
     assert_eq!(tiered["data"]["tier"], json!("off"), "{tiered}");
     let disabled = server
-        .dispatch("tools.setEnabled", json!({ "id": id, "enabled": false }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.setEnabled",
+            json!({ "id": id, "enabled": false }),
+        )
         .await;
     assert_eq!(disabled["data"]["enabled"], json!(false));
-    let detail = server.dispatch("tools.get", json!({ "id": id })).await;
+    let detail = server
+        .dispatch(crate::ipc::Caller::Studio, "tools.get", json!({ "id": id }))
+        .await;
     assert_eq!(
         (
             &detail["data"]["key"],
@@ -75,10 +87,17 @@ async fn the_channels_expose_the_registry_and_match_the_contract() {
             &json!([])
         )
     );
-    let usage = server.dispatch("tools.usage", json!({ "id": id })).await;
+    let usage = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.usage",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(usage["data"]["callCount"], json!(0));
     let missing = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.get",
             json!({ "id": "0199aa11-1111-7111-8111-111111111111" }),
         )
@@ -92,6 +111,7 @@ async fn setting_a_tool_to_off_through_the_channel_fails_the_run_at_admission() 
     let tool = mail(&host);
     server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.setTier",
             json!({ "id": tool.id.to_string(), "tier": "off" }),
         )
@@ -119,7 +139,11 @@ async fn setting_a_tool_to_off_through_the_channel_fails_the_run_at_admission() 
 async fn the_kernel_tools_are_registered_once_in_the_composed_host() {
     let (host, server) = registered();
     let listed = server
-        .dispatch("tools.list", json!({ "source": "builtin" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.list",
+            json!({ "source": "builtin" }),
+        )
         .await;
     let keys: Vec<&str> = listed["data"]
         .as_array()

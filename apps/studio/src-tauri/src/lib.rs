@@ -1294,6 +1294,8 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         Arc::clone(&database),
         Arc::clone(&clock),
     );
+    let cli_connections =
+        zvs_host::cli::CliConnections::new(Arc::clone(&clock), events.clone(), Arc::clone(&shell));
     let services = Arc::new(Services {
         system,
         storage,
@@ -1347,6 +1349,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         cli_theme: zvs_host::cli::CliThemeFile::new(
             &paths.data_dir.join(zvs_host::platform::paths::CLI_FOLDER),
         ),
+        cli_connections,
         voice,
     });
     {
@@ -1366,6 +1369,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             Arc::clone(&server),
             events.clone(),
             notices.clone(),
+            paths.cli_path.clone(),
             logger.clone(),
         );
     }

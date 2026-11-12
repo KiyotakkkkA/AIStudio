@@ -122,7 +122,16 @@ import {
   UserRulesDto,
 } from "../execPolicy.js";
 import { CliSubagentCancelInput, SubagentPreferencesDto } from "../subagents.js";
-import { CliInstallDto, CliOpenInput, CliSessionDto, CliThemeDto } from "../cli.js";
+import {
+  CliConnectionDto,
+  CliConnectionRef,
+  CliConsentAnswerInput,
+  CliConsentDto,
+  CliInstallDto,
+  CliOpenInput,
+  CliSessionDto,
+  CliThemeDto,
+} from "../cli.js";
 import {
   VoiceDevicesDto,
   VoiceModelInput,
@@ -678,6 +687,10 @@ export const contract = defineContract({
   "cli.uninstall": { input: z.void(), output: CliInstallDto },
   "cli.theme.get": { input: z.void(), output: CliThemeDto },
   "cli.theme.set": { input: CliThemeDto, output: CliThemeDto },
+  "cli.connections.list": { input: z.void(), output: z.array(CliConnectionDto) },
+  "cli.connections.disconnect": { input: CliConnectionRef, output: z.void() },
+  "cli.consents.list": { input: z.void(), output: z.array(CliConsentDto) },
+  "cli.consents.answer": { input: CliConsentAnswerInput, output: z.void() },
   "voice.devices": { input: z.void(), output: VoiceDevicesDto },
   "voice.select": { input: VoiceSelectInput, output: VoiceDevicesDto },
   "voice.models": { input: z.void(), output: VoiceModelsDto },

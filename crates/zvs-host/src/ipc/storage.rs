@@ -45,7 +45,11 @@ mod tests {
         register(&mut server);
 
         let usage = server
-            .dispatch("storage.usage", json!({ "refresh": true }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "storage.usage",
+                json!({ "refresh": true }),
+            )
             .await;
         assert_eq!(usage["ok"], json!(true), "{usage}");
         assert_eq!(
@@ -53,7 +57,13 @@ mod tests {
             Some(11)
         );
 
-        let cleared = server.dispatch("storage.clearCache", json!(null)).await;
+        let cleared = server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "storage.clearCache",
+                json!(null),
+            )
+            .await;
         assert_eq!(cleared["ok"], json!(true), "{cleared}");
         assert_eq!(cleared["data"]["removedBytes"], json!(0));
     }

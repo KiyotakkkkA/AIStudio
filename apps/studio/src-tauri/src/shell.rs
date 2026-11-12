@@ -144,6 +144,13 @@ impl<R: Runtime> ShellPort for TauriShell<R> {
     fn clear(&self, target: NotificationTargetDto) {
         self.toaster.clear(target);
     }
+
+    fn show_studio(&self) {
+        let app = self.app.clone();
+        let _ = self
+            .app
+            .run_on_main_thread(move || window::focus_studio(&app));
+    }
 }
 
 #[cfg(test)]

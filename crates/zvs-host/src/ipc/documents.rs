@@ -69,13 +69,17 @@ mod tests {
     }
 
     async fn call(server: &IpcServer, channel: &str, payload: Value) -> Value {
-        let response = server.dispatch(channel, payload).await;
+        let response = server
+            .dispatch(crate::ipc::Caller::Studio, channel, payload)
+            .await;
         assert_eq!(response["ok"], json!(true), "{channel}: {response}");
         response["data"].clone()
     }
 
     async fn failure(server: &IpcServer, channel: &str, payload: Value) -> Value {
-        let response = server.dispatch(channel, payload).await;
+        let response = server
+            .dispatch(crate::ipc::Caller::Studio, channel, payload)
+            .await;
         assert_eq!(response["ok"], json!(false), "{channel}: {response}");
         response["error"]["code"].clone()
     }

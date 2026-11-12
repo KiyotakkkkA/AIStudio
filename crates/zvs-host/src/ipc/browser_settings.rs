@@ -146,12 +146,17 @@ mod tests {
         };
         assert!(commands(&host).contains(&"browser-use".to_owned()));
         assert_eq!(
-            server.dispatch("browserSettings.get", json!(null)).await,
+            server
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "browserSettings.get",
+                    json!(null)
+                )
+                .await,
             json!({ "ok": true, "data": { "enabled": true, "webLinks": "studio", "localLinks": "studio", "fullUrl": false, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false } })
         );
         let saved = server
-            .dispatch(
-                "browserSettings.set",
+            .dispatch(crate::ipc::Caller::Studio, "browserSettings.set",
                 json!({ "enabled": false, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false }),
             )
             .await;
@@ -177,8 +182,7 @@ mod tests {
             .expect("registered");
         assert!(!click.available);
         server
-            .dispatch(
-                "browserSettings.set",
+            .dispatch(crate::ipc::Caller::Studio, "browserSettings.set",
                 json!({ "enabled": true, "webLinks": "system", "localLinks": "studio", "fullUrl": true, "passwordAutosave": false, "formAutofill": true, "downloadDir": null, "askDownload": false }),
             )
             .await;

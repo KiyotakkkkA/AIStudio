@@ -112,7 +112,9 @@ mod tests {
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
 
-        let catalogue = server.dispatch("downloads.catalogue", json!({})).await;
+        let catalogue = server
+            .dispatch(crate::ipc::Caller::Studio, "downloads.catalogue", json!({}))
+            .await;
         assert_eq!(catalogue["ok"], json!(true), "{catalogue}");
         let rows: Vec<CatalogueItemDto> =
             serde_json::from_value(catalogue["data"].clone()).expect("catalogue rows");
@@ -122,13 +124,19 @@ mod tests {
         );
 
         let started = server
-            .dispatch("downloads.start", json!({ "ref": "curated:model:alpha" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "downloads.start",
+                json!({ "ref": "curated:model:alpha" }),
+            )
             .await;
         assert_eq!(started["ok"], json!(true), "{started}");
         let id = started["data"]["id"].as_str().expect("an id").to_owned();
         let mut finished = Value::Null;
         for _ in 0..600 {
-            let listed = server.dispatch("downloads.list", json!({})).await;
+            let listed = server
+                .dispatch(crate::ipc::Caller::Studio, "downloads.list", json!({}))
+                .await;
             let rows: Vec<DownloadDto> =
                 serde_json::from_value(listed["data"].clone()).expect("rows");
             if rows
@@ -147,7 +155,11 @@ mod tests {
         );
 
         let disk = server
-            .dispatch("downloads.disk", json!({ "refresh": true }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "downloads.disk",
+                json!({ "refresh": true }),
+            )
             .await;
         assert_eq!(disk["ok"], json!(true), "{disk}");
         assert_eq!(
@@ -156,41 +168,67 @@ mod tests {
         );
         assert_eq!(
             server
-                .dispatch("downloads.pause", json!({ "id": id }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.pause",
+                    json!({ "id": id })
+                )
                 .await["error"]["code"],
             json!("CONFLICT")
         );
         assert_eq!(
             server
-                .dispatch("downloads.prioritise", json!({ "id": id, "priority": 9 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.prioritise",
+                    json!({ "id": id, "priority": 9 })
+                )
                 .await["error"]["code"],
             json!("CONFLICT")
         );
         assert_eq!(
             server
-                .dispatch("downloads.cancel", json!({ "id": id }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.cancel",
+                    json!({ "id": id })
+                )
                 .await["data"]["status"],
             json!("succeeded")
         );
         assert_eq!(
             server
-                .dispatch("downloads.resume", json!({ "id": id }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.resume",
+                    json!({ "id": id })
+                )
                 .await["error"]["code"],
             json!("CONFLICT")
         );
         assert_eq!(
             server
-                .dispatch("downloads.remove", json!({ "id": id }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.remove",
+                    json!({ "id": id })
+                )
                 .await,
             json!({ "ok": true, "data": { "id": id, "removed": true } })
         );
         assert_eq!(
-            server.dispatch("downloads.list", json!({})).await,
+            server
+                .dispatch(crate::ipc::Caller::Studio, "downloads.list", json!({}))
+                .await,
             json!({ "ok": true, "data": [] })
         );
         assert_eq!(
             server
-                .dispatch("downloads.start", json!({ "ref": "ab" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "downloads.start",
+                    json!({ "ref": "ab" })
+                )
                 .await["error"]["code"],
             json!("VALIDATION_FAILED")
         );

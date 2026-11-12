@@ -137,5 +137,6 @@ pub struct Services {
     pub picker: Option<SharedPicker>,
     pub cli: crate::cli::SharedCliInstaller,
     pub cli_theme: crate::cli::CliThemeFile,
+    pub cli_connections: crate::cli::CliConnections,
     pub voice: crate::voice::VoiceService,
 }

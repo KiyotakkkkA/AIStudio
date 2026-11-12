@@ -112,6 +112,7 @@ impl ComputerShell {
                             return;
                         }
                     }
+                    Ok(CliNotice::Consent { .. }) => {}
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
                 }
             }

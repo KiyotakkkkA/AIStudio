@@ -2145,3 +2145,13 @@ fn a_wake_up_of_another_dialog_or_during_a_turn_is_ignored() {
         Entry::Notice { text, .. } if text.starts_with(copy::PROCESS_ENDED_EVENT)
     )));
 }
+
+#[test]
+fn a_held_change_notice_toggles_the_waiting_state() {
+    let mut app = running();
+    let notice = |pending| Msg::Notice(zvs_contract::CliNotice::Consent { pending });
+    assert!(app.update(notice(true)).is_empty());
+    assert!(app.consent_pending);
+    assert!(app.update(notice(false)).is_empty());
+    assert!(!app.consent_pending);
+}

@@ -52,8 +52,10 @@ same result envelope the renderer gets (`{ ok, data | error }`), and `Link` reso
 matching waiter by `id`. Host events (`HostEvent`) and CLI notices (verification prompts and
 the like) arrive unsolicited and are forwarded into the event loop as `Incoming`. If the pipe
 closes, every pending call fails with `copy::DISCONNECTED` and the UI shows the session as
-closed. The host only accepts the channels listed in `zvs-host/src/cli/connection.rs`
-(`CLI_CHANNELS`); anything else is refused.
+closed. The host only accepts the channels listed in `zvs-host/src/ipc/policy.rs`
+(the console rows of `zvs_host::ipc::POLICY`); anything else is refused. A change that loosens
+access waits for a confirmation in the studio window; meanwhile the status line shows
+«Ожидает подтверждения в приложении» (a `consent` notice).
 
 ## Pipeline: the event loop
 

@@ -82,6 +82,7 @@ pub const FOLDER_ALWAYS: &str = "Разрешить всегда";
 pub const VERIFY_TITLE: &str = "Проверка браузера";
 pub const VERIFY_BODY: &str = "Провайдер запросил проверку браузера. Завершите проверку в открытом окне для продолжения ответа.";
 pub const VERIFY_SITE: &str = "Сайт";
+pub const CONSENT_PENDING: &str = "Ожидает подтверждения в приложении";
 pub const HINT_VERIFY: &str = "Enter — показать окно проверки · Esc — остановить ответ";
 
 pub const SHELL_MODE: &str = "Командная строка";

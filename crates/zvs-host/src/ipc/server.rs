@@ -13,10 +13,15 @@ use zvs_contract::{
     AppError, AppErrorCode, CHANNELS, ResultEnvelope, VALIDATION_MESSAGE, Validate,
 };
 
+use super::caller::Caller;
+use super::policy::policy;
+use crate::cli::gate;
 use crate::platform::logger::{LogLevel, SharedLogger};
 use crate::services::Services;
 
 pub const INTERNAL_MESSAGE: &str = "Внутренняя ошибка";
+pub const CLI_CHANNEL_REFUSED: &str = "Канал недоступен консольной версии";
+pub const CALLER_REFUSED: &str = "Канал недоступен этому источнику";
 
 enum Failure {
     Input(String),
@@ -25,7 +30,7 @@ enum Failure {
 }
 
 type HandlerFuture = Pin<Box<dyn Future<Output = Result<Value, Failure>> + Send>>;
-type Handler = Box<dyn Fn(Arc<Services>, Value, bool) -> HandlerFuture + Send + Sync>;
+type Handler = Box<dyn Fn(Arc<Services>, Caller, Value, bool) -> HandlerFuture + Send + Sync>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Coverage {
@@ -55,6 +60,10 @@ impl IpcServer {
         }
     }
 
+    pub const fn services(&self) -> &Arc<Services> {
+        &self.services
+    }
+
     #[must_use]
     pub const fn with_output_validation(mut self, enabled: bool) -> Self {
         self.validate_output = enabled;
@@ -66,6 +75,18 @@ impl IpcServer {
         I: DeserializeOwned + Validate + Send + 'static,
         O: Serialize + Validate + Send + 'static,
         F: Fn(Arc<Services>, I) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<O, AppError>> + Send + 'static,
+    {
+        self.handle_as(channel, move |services, _caller: Caller, input| {
+            handler(services, input)
+        })
+    }
+
+    pub fn handle_as<I, O, F, Fut>(&mut self, channel: &str, handler: F) -> &mut Self
+    where
+        I: DeserializeOwned + Validate + Send + 'static,
+        O: Serialize + Validate + Send + 'static,
+        F: Fn(Arc<Services>, Caller, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<O, AppError>> + Send + 'static,
     {
         let channel = CHANNELS
@@ -80,7 +101,7 @@ impl IpcServer {
         let handler = Arc::new(handler);
         self.handlers.insert(
             channel,
-            Box::new(move |services, payload, validate_output| {
+            Box::new(move |services, caller, payload, validate_output| {
                 let handler = Arc::clone(&handler);
                 Box::pin(async move {
                     let input: I = serde_json::from_value(payload)
@@ -88,7 +109,9 @@ impl IpcServer {
                     input
                         .validate()
                         .map_err(|error| Failure::Input(describe_validation(&error)))?;
-                    let output = handler(services, input).await.map_err(Failure::Handler)?;
+                    let output = handler(services, caller, input)
+                        .await
+                        .map_err(Failure::Handler)?;
                     if validate_output {
                         output
                             .validate()
@@ -142,7 +165,7 @@ impl IpcServer {
         coverage
     }
 
-    pub async fn dispatch(&self, channel: &str, payload: Value) -> Value {
+    pub async fn dispatch(&self, caller: Caller, channel: &str, payload: Value) -> Value {
         let Some(handler) = self.handlers.get(channel) else {
             self.logger.log(
                 LogLevel::Debug,
@@ -155,9 +178,37 @@ impl IpcServer {
                 format!("Канал «{channel}» ещё не перенесён в Tauri-хост"),
             ));
         };
-        let call = handler(Arc::clone(&self.services), payload, self.validate_output);
+        let Some(row) = policy(channel).filter(|row| row.callers.admits(caller)) else {
+            return self.refuse(caller, channel);
+        };
+        if let Some(connection) = caller.connection()
+            && let Err(error) = gate::admit(&self.services, connection, row, &payload).await
+        {
+            self.logger.log(
+                LogLevel::Warn,
+                "ipc",
+                "Held back a console call",
+                &[
+                    ("channel", json!(channel)),
+                    ("connection", json!(connection)),
+                    ("code", json!(error.code)),
+                ],
+            );
+            return failure(error);
+        }
+        let call = handler(
+            Arc::clone(&self.services),
+            caller,
+            payload,
+            self.validate_output,
+        );
         match AssertUnwindSafe(call).catch_unwind().await {
-            Ok(Ok(envelope)) => envelope,
+            Ok(Ok(envelope)) => {
+                if let Some(connection) = caller.connection() {
+                    gate::settle(&self.services, connection, channel, &envelope);
+                }
+                envelope
+            }
             Ok(Err(Failure::Input(reason))) => {
                 self.logger.log(
                     LogLevel::Warn,
@@ -208,6 +259,28 @@ impl IpcServer {
                 internal()
             }
         }
+    }
+}
+
+impl IpcServer {
+    fn refuse(&self, caller: Caller, channel: &str) -> Value {
+        self.logger.log(
+            LogLevel::Warn,
+            "ipc",
+            "Refused a channel to this caller",
+            &[
+                ("channel", json!(channel)),
+                ("caller", json!(caller.label())),
+            ],
+        );
+        let message = if caller.connection().is_some() {
+            CLI_CHANNEL_REFUSED
+        } else {
+            CALLER_REFUSED
+        };
+        failure(
+            AppError::new(AppErrorCode::PermissionDenied, message).with_detail("channel", channel),
+        )
     }
 }
 
@@ -291,7 +364,11 @@ mod tests {
         let (_host, server, _logger) = server();
         assert_eq!(
             server
-                .dispatch("system.ping", json!({ "sentAt": 1_000 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.ping",
+                    json!({ "sentAt": 1_000 })
+                )
                 .await,
             json!({ "ok": true, "data": { "pong": true, "hostTime": 1_250, "roundTripHint": 250.0 } })
         );
@@ -318,7 +395,9 @@ mod tests {
             Value::Null,
         ] {
             assert_eq!(
-                server.dispatch("system.ping", payload).await,
+                server
+                    .dispatch(crate::ipc::Caller::Studio, "system.ping", payload)
+                    .await,
                 json!({
                     "ok": false,
                     "error": { "code": "VALIDATION_FAILED", "message": "Некорректные данные запроса" },
@@ -338,7 +417,11 @@ mod tests {
         });
         assert_eq!(
             server
-                .dispatch("system.nativePing", json!({ "text": "hi" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.nativePing",
+                    json!({ "text": "hi" })
+                )
                 .await,
             json!({
                 "ok": false,
@@ -365,7 +448,11 @@ mod tests {
             },
         );
         let result = server
-            .dispatch("system.nativePing", json!({ "text": "hi" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "system.nativePing",
+                json!({ "text": "hi" }),
+            )
             .await;
         assert_eq!(
             result,
@@ -381,7 +468,11 @@ mod tests {
         );
         assert_eq!(
             server
-                .dispatch("system.ping", json!({ "sentAt": 1_000 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.ping",
+                    json!({ "sentAt": 1_000 })
+                )
                 .await["ok"],
             json!(true)
         );
@@ -409,7 +500,11 @@ mod tests {
         let (_validating_host, validating, logger) = drifting(true);
         assert_eq!(
             validating
-                .dispatch("system.ping", json!({ "sentAt": 1 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.ping",
+                    json!({ "sentAt": 1 })
+                )
                 .await,
             json!({ "ok": false, "error": { "code": "UNKNOWN", "message": "Внутренняя ошибка" } })
         );
@@ -422,7 +517,11 @@ mod tests {
         let (_trusting_host, trusting, _logger) = drifting(false);
         assert_eq!(
             trusting
-                .dispatch("system.ping", json!({ "sentAt": 1 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.ping",
+                    json!({ "sentAt": 1 })
+                )
                 .await,
             json!({ "ok": true, "data": { "pong": false, "hostTime": 1, "roundTripHint": 0.0 } })
         );
@@ -444,11 +543,15 @@ mod tests {
             },
         );
         assert_eq!(
-            server.dispatch("system.resources", Value::Null).await,
+            server
+                .dispatch(crate::ipc::Caller::Studio, "system.resources", Value::Null)
+                .await,
             json!({ "ok": true })
         );
         assert_eq!(
-            server.dispatch("system.device", json!({})).await,
+            server
+                .dispatch(crate::ipc::Caller::Studio, "system.device", json!({}))
+                .await,
             json!({ "ok": true, "data": "false" })
         );
     }
@@ -457,7 +560,9 @@ mod tests {
     async fn an_unregistered_channel_answers_not_implemented() {
         let (_host, server, logger) = server();
         for channel in ["providers.list", "system.demoStream", "unknown"] {
-            let response = server.dispatch(channel, Value::Null).await;
+            let response = server
+                .dispatch(crate::ipc::Caller::Studio, channel, Value::Null)
+                .await;
             assert_eq!(response["ok"], json!(false));
             assert_eq!(response["error"]["code"], json!("NOT_IMPLEMENTED"));
             assert!(

@@ -1,5 +1,8 @@
 import { isIpcError } from "@zvs/ipc";
-import { AppErrorCode, type CliTheme } from "@zvs/shared";
+import { AppErrorCode, type CliConnectionDto, type CliTheme } from "@zvs/shared";
+import { plural } from "../connections/connectionPresentation";
+import { EXEC_MODE_COPY } from "../execPolicy/execPolicyCopy";
+import type { ToggleRowCopy } from "./preferencesPresentation";
 
 export const CLI_SETTING_ID = "cli.install";
 export const CLI_TITLE = "Консольная версия";
@@ -32,4 +35,30 @@ export const CLI_THEME_PREVIEW_PROMPT = "Сообщение…";
 export function cliFailureCopy(error: unknown, installing: boolean): string {
   if (isIpcError(error) && error.code === AppErrorCode.CONFLICT) return CLI_NOT_BUNDLED;
   return installing ? CLI_INSTALL_FAILED : CLI_UNINSTALL_FAILED;
+}
+
+export const CLI_CONFIRM_ROW: ToggleRowCopy = {
+  key: "cli.confirmLoosening",
+  label: "Понижение режима проверки доступа",
+  hint: `Без подтверждения из консоли доступен только режим «${EXEC_MODE_COPY["auto-bypass"].label}».`,
+};
+export const CLI_CONNECTIONS_SETTING_ID = "cli.connections";
+export const CLI_CONNECTIONS_LABEL = "Подключения консоли";
+export const CLI_CONNECTIONS_EMPTY = "Активных подключений нет.";
+export const CLI_CONNECTIONS_HINT = "Процессы, подключённые к приложению через консоль.";
+export const CLI_CONNECTIONS_FAILED = "Не удалось загрузить сессии консоли.";
+export const CLI_DISCONNECT = "Отключить";
+export const CLI_DISCONNECT_FAILED = "Не удалось отключить консоль.";
+export const CLI_CLIENT_RECOGNISED = "Консольная версия";
+export const CLI_CLIENT_UNKNOWN = "Неизвестный процесс";
+export const CLI_CLIENT_NO_IMAGE = "путь не определён";
+
+export function cliDialogsWord(count: number): string {
+  return plural(count, "диалог", "диалога", "диалогов");
+}
+
+export function cliClientLine(connection: CliConnectionDto): string {
+  const name = connection.recognised ? CLI_CLIENT_RECOGNISED : CLI_CLIENT_UNKNOWN;
+  const pid = connection.pid === null ? "" : ` · PID ${String(connection.pid)}`;
+  return `${name}${pid} · ${cliDialogsWord(connection.dialogs)}`;
 }

@@ -288,7 +288,7 @@ From that one object:
   input and output, and `finish()` checks the registered set against the generated channel
   list, so a forgotten channel fails a test. Every call enters through one Tauri command,
   `ipc_call(channel, payload)`, which checks that the caller is the `studio` webview and then
-  dispatches. A panicking handler is caught and costs one call.
+  dispatches as `Caller::Studio`. A panicking handler is caught and costs one call.
 
 ### Validation policy
 
@@ -348,7 +348,8 @@ not a convenience.
 
 The `aistudio` console client is the only caller that is not a webview. It reaches the host
 over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the running app
-(`crates/zvs-pipe`, `zvs-studio/src/cli.rs`). Four rules hold:
+(`crates/zvs-pipe`, `zvs-studio/src/cli.rs`). Any process of the same user can open that pipe,
+so the rules below treat the console as a less trusted caller than the studio window:
 
 - **Owner only.** The pipe is created as the first instance with a protected DACL that grants
   access to the current user's SID alone, and it rejects remote clients. The client reads the
@@ -357,11 +358,20 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
 - **Greeting first.** Nothing is sent before the client says `hello` with the protocol
   version; only then is it subscribed to the event channel. A line over 8 MiB or a malformed
   message drops the connection.
-- **An allow-list, not the contract.** The pipe dispatches through the same `IpcServer`, but
-  only the channels in `zvs_host::cli::CLI_CHANNELS` — chat, folder and run answers, the
-  execution policy, provider and model listings, skills and MCP servers. Secrets, settings,
-  accounts, provider editing and `cli.install`/`cli.uninstall` stay studio-only. Widening the
-  list is a security decision, as above.
+- **Every call names its caller; a policy table decides (TASK_081, 2026-11-13).**
+  `IpcServer::dispatch(caller, channel, payload)` takes a `Caller`: `Studio` from `ipc_call`,
+  `Cli { connection }` from the pipe. `BrowserUi` and `Panel` name the browser chrome and the
+  computer panel, which have their own commands and are admitted to no channel. Every handler
+  receives the caller (`handle_as`; `handle` ignores it). `zvs_host::ipc::POLICY`
+  (`ipc/policy.rs`) has exactly one row per contract channel, in contract order, and a test
+  fails when a channel has none. A row names the callers allowed, an `effect` — `read`, `act`
+  or `loosen` — and a dialog `scope`: `Dialog(field)`, `Run(field)`, `Shell(field)`,
+  `Owner(field)` or `Any`. The studio is admitted to every row. The console is admitted only to
+  the rows marked for it: chat, folder and run answers, the execution policy, provider and
+  model listings, skills and MCP servers. Secrets, settings, accounts, provider editing,
+  `cli.install`/`cli.uninstall` and the `cli.connections.*`/`cli.consents.*` channels stay
+  studio-only. A caller outside a row's callers gets `PermissionDenied`. Admitting the console
+  to another row, or marking a row `loosen`, is a security decision, as above.
   Policy rules (TASK_080, 2026-11-12): `execPolicy.allowRule` takes only
   `{ runId, approvalId, scope }` for an approval still pending on that run, and the host builds
   the rule from the action it reviewed for that approval; nothing the client sends becomes part
@@ -413,9 +423,36 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   format, size, count, integrity and conversation quota checks as the native image picker.
   Bytes and manifests stay in the conversation's `attachments` folder. The CLI checks image
   support before composing a turn; the chat service also checks it before sending.
-- **Same events, same answers.** CLI connections are extra event-bus subscribers beside the
-  window. An approval or a question reaches both; the first answer wins and the other side
-  sees `Conflict`.
+- **Loosening from the console needs the studio window (TASK_081, 2026-11-13).** For a console
+  caller the host holds every call that would loosen access: `execPolicy.set` to a less strict
+  mode or a different judge, `execPolicy.allowRule`, `runs.approve` with `always`,
+  `folders.answer` with `always`, and the first opening of an existing dialog
+  (`chat.conversations.get`). The studio window is brought forward and shows a confirmation
+  naming the change and its source (`cli.consents.list`, `cli.consents.answer`, and a `step`
+  event with domain `cli` on every change). The change applies only on confirmation. A decline,
+  a closed connection or 60 s without an answer fail the call with `PermissionDenied`.
+  Tightening applies at once. With no studio window attached to the event bus the call fails
+  at once with `CLI_STUDIO_REQUIRED`. While a change is held the connection gets a pipe-only
+  `consent` notice and the console shows «Ожидает подтверждения в приложении». The setting
+  `cli.confirmLoosening` («Параметры → Командная строка», studio-only, on by default) can let
+  mode and judge changes through without a confirmation. `no-restrictions`, allow rules,
+  `always` answers and opening a dialog are confirmed either way.
+- **A connection reaches its own dialogs only.** A connection owns the dialogs it created
+  (`chat.conversations.create`) or opened (`chat.conversations.get`). Opening is confirmed
+  once per dialog until the app restarts; later connections open that dialog without asking.
+  A call that names another dialog, or a run or background process of another dialog, is
+  refused with `CLI_DIALOG_REFUSED`. A connection receives events only for runs whose subject
+  is one of its dialogs, so approvals and questions raised in the studio's other dialogs never
+  reach it. When the studio and a connection both have a dialog open, its approvals and
+  questions reach both; the first answer wins and the other side sees `Conflict`.
+- **The client image is logged, not trusted.** On connect the shell reads the client's process
+  id (`GetNamedPipeClientProcessId`) and image path, logs both, and marks the connection
+  `recognised` when the path is the installed `aistudio.exe`. An unrecognised client is held to
+  the same rules, and the confirmation names its image. A same-user process can run the real
+  `aistudio.exe` or open the pipe itself, so the check raises the bar but is not a boundary,
+  and the client is not authenticated with a secret: anything the client could read, such a
+  process could read too. «Параметры → Командная строка» lists the active connections with
+  «Отключить».
 - **Account checks are announced.** When the account gateway shows a vendor's browser check
   (§12), every CLI connection gets a pipe-only `notice`, also on connect while the check is
   still shown. The client lets the app take the foreground (`AllowSetForegroundWindow`) and

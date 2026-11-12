@@ -118,7 +118,9 @@ mod tests {
     }
 
     async fn call(server: &IpcServer, channel: &str, payload: Value) -> Value {
-        let response = server.dispatch(channel, payload).await;
+        let response = server
+            .dispatch(crate::ipc::Caller::Studio, channel, payload)
+            .await;
         assert_eq!(response["ok"], json!(true), "{channel}: {response}");
         response["data"].clone()
     }
@@ -206,6 +208,7 @@ mod tests {
         let (_host, server) = server();
         let missing = server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "providers.get",
                 json!({ "id": "0199aa11-1111-7111-8111-111111111111" }),
             )
@@ -228,7 +231,9 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                server.dispatch(channel, payload).await["error"]["code"],
+                server
+                    .dispatch(crate::ipc::Caller::Studio, channel, payload)
+                    .await["error"]["code"],
                 json!("VALIDATION_FAILED"),
                 "{channel}"
             );

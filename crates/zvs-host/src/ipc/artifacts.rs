@@ -129,16 +129,28 @@ mod tests {
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
         let escaped = server
-            .dispatch("artifacts.reveal", json!({ "id": "../secret.pdf" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "artifacts.reveal",
+                json!({ "id": "../secret.pdf" }),
+            )
             .await;
         assert_eq!(escaped["error"]["code"], json!("VALIDATION_FAILED"));
         let missing = server
-            .dispatch("artifacts.save", json!({ "id": "run/missing.pdf" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "artifacts.save",
+                json!({ "id": "run/missing.pdf" }),
+            )
             .await;
         assert_eq!(missing["error"]["code"], json!("NOT_FOUND"));
         for channel in ["artifacts.open", "artifacts.application"] {
             let escaped = server
-                .dispatch(channel, json!({ "id": "../secret.pdf" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    channel,
+                    json!({ "id": "../secret.pdf" }),
+                )
                 .await;
             assert_eq!(
                 escaped["error"]["code"],
@@ -146,7 +158,11 @@ mod tests {
                 "{channel}"
             );
             let missing = server
-                .dispatch(channel, json!({ "id": "run/missing.pdf" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    channel,
+                    json!({ "id": "run/missing.pdf" }),
+                )
                 .await;
             assert_eq!(missing["error"]["code"], json!("NOT_FOUND"), "{channel}");
         }
@@ -169,11 +185,19 @@ mod tests {
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
         let opened = server
-            .dispatch("artifacts.open", json!({ "id": "run/a.pdf" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "artifacts.open",
+                json!({ "id": "run/a.pdf" }),
+            )
             .await;
         assert_eq!(opened["ok"], json!(true), "{opened}");
         let application = server
-            .dispatch("artifacts.application", json!({ "id": "run/a.pdf" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "artifacts.application",
+                json!({ "id": "run/a.pdf" }),
+            )
             .await;
         assert_eq!(application["data"], json!({}), "{application}");
     }

@@ -8,16 +8,62 @@ use zvs_contract::{HostEventDraft, RunOutcomeDto, RunOutcomeStatus};
 use super::*;
 use crate::platform::logger::silent_logger;
 
-#[derive(Default)]
 struct Recorded {
-    calls: Mutex<Vec<String>>,
+    calls: Mutex<Vec<(Caller, String)>>,
+    hidden: Mutex<Vec<zvs_contract::StreamId>>,
+    closed: Mutex<Vec<u64>>,
+    dropped: CancellationToken,
+    notify: Mutex<Option<NoticeSender>>,
+}
+
+impl Default for Recorded {
+    fn default() -> Self {
+        Self {
+            calls: Mutex::default(),
+            hidden: Mutex::default(),
+            closed: Mutex::default(),
+            dropped: CancellationToken::new(),
+            notify: Mutex::default(),
+        }
+    }
+}
+
+impl Recorded {
+    fn channels(&self) -> Vec<String> {
+        self.calls
+            .lock()
+            .expect("calls")
+            .iter()
+            .map(|(_, channel)| channel.clone())
+            .collect()
+    }
 }
 
 #[async_trait]
 impl CliDispatch for Recorded {
-    async fn dispatch(&self, channel: &str, payload: Value) -> Value {
-        self.calls.lock().expect("calls").push(channel.to_owned());
+    async fn dispatch(&self, caller: Caller, channel: &str, payload: Value) -> Value {
+        self.calls
+            .lock()
+            .expect("calls")
+            .push((caller, channel.to_owned()));
         json!({ "ok": true, "data": payload })
+    }
+
+    fn connect(&self, _client: CliClient, notify: NoticeSender) -> (u64, CancellationToken) {
+        *self.notify.lock().expect("notify") = Some(notify);
+        (7, self.dropped.clone())
+    }
+
+    fn disconnect(&self, connection: u64) {
+        self.closed.lock().expect("closed").push(connection);
+    }
+
+    fn sees(&self, _connection: u64, event: &HostEvent) -> bool {
+        !self
+            .hidden
+            .lock()
+            .expect("hidden")
+            .contains(&event.stream_id)
     }
 }
 
@@ -46,6 +92,7 @@ fn connect(dispatch: Arc<Recorded>, events: EventBus) -> (Client, tokio::task::J
     let (client, server) = tokio::io::duplex(64 * 1024);
     let serving = tokio::spawn(serve(
         server,
+        CliClient::default(),
         dispatch,
         events,
         CliNotices::default(),
@@ -81,7 +128,7 @@ async fn a_client_that_does_not_greet_is_answered_and_closed() {
     );
     assert_eq!(client.next().await, None);
     serving.await.expect("serves");
-    assert!(dispatch.calls.lock().expect("calls").is_empty());
+    assert!(dispatch.channels().is_empty());
 }
 
 #[tokio::test]
@@ -129,7 +176,10 @@ async fn allowed_channels_are_dispatched_and_others_refused() {
     assert_eq!(envelope["ok"], json!(false));
     assert_eq!(envelope["error"]["code"], json!("PERMISSION_DENIED"));
     assert_eq!(envelope["error"]["message"], json!(CLI_CHANNEL_REFUSED));
-    assert_eq!(*dispatch.calls.lock().expect("calls"), ["system.ping"]);
+    assert_eq!(
+        *dispatch.calls.lock().expect("calls"),
+        [(Caller::Cli { connection: 7 }, "system.ping".to_owned())]
+    );
 }
 
 #[tokio::test]
@@ -176,37 +226,59 @@ async fn a_malformed_line_drops_the_client() {
     serving.await.expect("serves");
 }
 
-#[test]
-fn every_allowed_channel_is_a_contract_channel() {
-    for channel in CLI_CHANNELS {
-        assert!(zvs_contract::is_channel(channel), "{channel}");
-    }
-    assert!(CLI_CHANNELS.windows(2).all(|pair| pair[0] < pair[1]));
-    for studio_only in [
-        "cli.install",
-        "cli.uninstall",
-        "secrets.get",
-        "settings.set",
-        "accounts.link",
-        "accounts.unlink",
-        "providers.create",
-        "providers.update",
-        "mcp.create",
-        "mcp.update",
-        "mcp.remove",
-        "mcp.signOut",
-        "runs.cancel",
-        "subagents.get",
-        "subagents.set",
-    ] {
-        assert!(!CLI_CHANNELS.contains(&studio_only), "{studio_only}");
-    }
-    assert!(CLI_CHANNELS.contains(&"cli.subagents.cancel"));
-    assert!(CLI_CHANNELS.contains(&"cli.images.import"));
-    assert!(CLI_CHANNELS.contains(&"vectorStores.list"));
-    assert!(CLI_CHANNELS.contains(&"chat.conversations.updateStores"));
-    assert!(!CLI_CHANNELS.contains(&"chat.images.pick"));
-    assert!(!CLI_CHANNELS.contains(&"chat.images.read"));
+#[tokio::test]
+async fn only_events_of_the_connections_dialogs_are_written() {
+    let events = EventBus::default();
+    let dispatch = Arc::new(Recorded::default());
+    let (mut client, _serving) = connect(Arc::clone(&dispatch), events.clone());
+    client.send(hello()).await;
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Welcome { .. })
+    ));
+    let foreign = events.open_stream().expect("opens");
+    let own = events.open_stream().expect("opens");
+    dispatch.hidden.lock().expect("hidden").push(foreign.id());
+    foreign.emit(HostEventDraft::Token {
+        delta: "чужой".to_owned(),
+        kind: None,
+    });
+    own.emit(HostEventDraft::Token {
+        delta: "свой".to_owned(),
+        kind: None,
+    });
+    let Some(CliServerMessage::Event { event }) = client.next().await else {
+        panic!("an event");
+    };
+    assert_eq!(event.stream_id, own.id());
+}
+
+#[tokio::test]
+async fn a_disconnect_from_the_studio_closes_the_pipe_and_a_held_change_is_announced() {
+    let dispatch = Arc::new(Recorded::default());
+    let (mut client, serving) = connect(Arc::clone(&dispatch), EventBus::default());
+    client.send(hello()).await;
+    assert!(matches!(
+        client.next().await,
+        Some(CliServerMessage::Welcome { .. })
+    ));
+    let notify = dispatch
+        .notify
+        .lock()
+        .expect("notify")
+        .clone()
+        .expect("a notice sender");
+    notify(zvs_contract::CliNotice::Consent { pending: true });
+    assert_eq!(
+        client.next().await,
+        Some(CliServerMessage::Notice {
+            notice: zvs_contract::CliNotice::Consent { pending: true }
+        })
+    );
+    dispatch.dropped.cancel();
+    assert_eq!(client.next().await, None);
+    serving.await.expect("serves");
+    assert_eq!(*dispatch.closed.lock().expect("closed"), [7]);
 }
 
 #[tokio::test]
@@ -220,6 +292,7 @@ async fn a_shown_verification_reaches_a_new_client_and_focus_is_forwarded() {
     let (client, server) = tokio::io::duplex(64 * 1024);
     tokio::spawn(serve(
         server,
+        CliClient::default(),
         Arc::new(Recorded::default()),
         EventBus::default(),
         notices.clone(),

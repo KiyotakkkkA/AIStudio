@@ -14,7 +14,15 @@ import {
 } from "../subagents/subagentCopy";
 import { ENABLED_ROW, MEMORY_RECORDS_ROW, MODEL_ROW } from "../memory/memoryCopy";
 import { ABOUT_ROW, STYLE_ROW, TOOL_CALLS_ROW } from "./profileCopy";
-import { CLI_SETTING_ID, CLI_THEME_LABEL, CLI_THEME_SETTING_ID, CLI_TITLE } from "./cliCopy";
+import {
+  CLI_CONFIRM_ROW,
+  CLI_CONNECTIONS_LABEL,
+  CLI_CONNECTIONS_SETTING_ID,
+  CLI_SETTING_ID,
+  CLI_THEME_LABEL,
+  CLI_THEME_SETTING_ID,
+  CLI_TITLE,
+} from "./cliCopy";
 import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
 import { VOICE_DEVICE_ROW, VOICE_MODEL_ROW } from "../voice/voiceCopy";
 import {
@@ -161,6 +169,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },
   { id: CLI_SETTING_ID, section: "cli", label: CLI_TITLE },
   { id: CLI_THEME_SETTING_ID, section: "cli", label: CLI_THEME_LABEL },
+  { id: CLI_CONFIRM_ROW.key, section: "cli", label: CLI_CONFIRM_ROW.label },
+  { id: CLI_CONNECTIONS_SETTING_ID, section: "cli", label: CLI_CONNECTIONS_LABEL },
   { id: VOICE_DEVICE_ROW.key, section: "voice", label: VOICE_DEVICE_ROW.label },
   { id: VOICE_MODEL_ROW.key, section: "voice", label: VOICE_MODEL_ROW.label },
   { id: DEVICE_ENABLED_ID, section: "device", label: DEVICE_ENABLED_LABEL },

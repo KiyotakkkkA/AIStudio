@@ -521,3 +521,18 @@ fn the_queue_is_a_muted_section_above_the_input_with_its_shortcuts() {
     app.queue.clear();
     assert!(!render(&app, 120, 30).contains(copy::QUEUE_TITLE));
 }
+
+#[test]
+fn a_held_change_is_shown_as_waiting_for_the_app() {
+    let mut app = ready(WorkingFolderAccess::Granted);
+    app.update(Msg::Notice(zvs_contract::CliNotice::Consent {
+        pending: true,
+    }));
+    let screen = render(&app, 120, 30);
+    assert!(screen.contains(copy::CONSENT_PENDING), "{screen}");
+    app.update(Msg::Notice(zvs_contract::CliNotice::Consent {
+        pending: false,
+    }));
+    let screen = render(&app, 120, 30);
+    assert!(!screen.contains(copy::CONSENT_PENDING), "{screen}");
+}

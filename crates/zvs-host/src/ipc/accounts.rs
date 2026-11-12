@@ -74,32 +74,52 @@ mod tests {
         register(&mut server);
 
         assert_eq!(
-            server.dispatch("accounts.list", Value::Null).await,
+            server
+                .dispatch(crate::ipc::Caller::Studio, "accounts.list", Value::Null)
+                .await,
             json!({ "ok": true, "data": [] })
         );
         let linked = server
-            .dispatch("accounts.link", json!({ "adapter": "qwen-web" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "accounts.link",
+                json!({ "adapter": "qwen-web" }),
+            )
             .await;
         assert_eq!(linked["ok"], json!(true), "{linked}");
         assert_eq!(linked["data"]["status"], json!("linked"));
-        let listed = server.dispatch("accounts.list", Value::Null).await;
+        let listed = server
+            .dispatch(crate::ipc::Caller::Studio, "accounts.list", Value::Null)
+            .await;
         let account = serde_json::from_value::<Vec<AccountDto>>(listed["data"].clone())
             .expect("accounts")
             .remove(0);
         assert_eq!(account.email_masked.as_deref(), Some("p***@example.com"));
         let id = account.id.to_string();
         let refreshed = server
-            .dispatch("accounts.refresh", json!({ "id": id }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "accounts.refresh",
+                json!({ "id": id }),
+            )
             .await;
         assert_eq!(refreshed["ok"], json!(true), "{refreshed}");
         assert_eq!(
             server
-                .dispatch("accounts.cancelLink", json!({ "adapter": "qwen-web" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "accounts.cancelLink",
+                    json!({ "adapter": "qwen-web" })
+                )
                 .await,
             json!({ "ok": true, "data": { "cancelled": false } })
         );
         let unlinked = server
-            .dispatch("accounts.unlink", json!({ "id": id }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "accounts.unlink",
+                json!({ "id": id }),
+            )
             .await;
         assert_eq!(
             serde_json::from_value::<ResultEnvelope<AccountsUnlinkOutput>>(unlinked.clone())
@@ -111,11 +131,19 @@ mod tests {
             })
         );
         let missing = server
-            .dispatch("accounts.refresh", json!({ "id": id }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "accounts.refresh",
+                json!({ "id": id }),
+            )
             .await;
         assert_eq!(missing["error"]["code"], json!("NOT_FOUND"));
         let invalid = server
-            .dispatch("accounts.link", json!({ "adapter": "openai-compatible" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "accounts.link",
+                json!({ "adapter": "openai-compatible" }),
+            )
             .await;
         assert_eq!(invalid["error"]["code"], json!("VALIDATION_FAILED"));
         let printed = format!(

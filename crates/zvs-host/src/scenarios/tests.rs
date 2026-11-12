@@ -751,7 +751,11 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         "attachments": [{ "parentNodeId": "agent", "childNodeId": "tool", "slot": "tool" }]
     });
     let validated = server
-        .dispatch("scenarios.validate", json!({ "graph": graph }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.validate",
+            json!({ "graph": graph }),
+        )
         .await;
     assert_eq!(validated["data"]["valid"], json!(false), "{validated}");
     assert_eq!(
@@ -760,6 +764,7 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
     );
     let created = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "scenarios.create",
             json!({ "name": "Триаж", "graph": graph }),
         )
@@ -767,7 +772,11 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
     assert_eq!(created["ok"], json!(true), "{created}");
     let id = created["data"]["id"].clone();
     let refused = server
-        .dispatch("scenarios.activate", json!({ "id": id, "active": true }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.activate",
+            json!({ "id": id, "active": true }),
+        )
         .await;
     assert_eq!(refused["ok"], json!(false), "{refused}");
     assert_eq!(refused["error"]["code"], json!("VALIDATION_FAILED"));
@@ -791,14 +800,24 @@ async fn the_channels_create_validate_activate_and_list_versions_in_the_contract
         references.iter().any(|reference| reference.name == "Триаж"),
         "{references:?}"
     );
-    let listed = server.dispatch("scenarios.list", json!(null)).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "scenarios.list", json!(null))
+        .await;
     assert_eq!(listed["data"][0]["issueCount"], json!(1), "{listed}");
     let versions = server
-        .dispatch("scenarios.versions", json!({ "id": id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.versions",
+            json!({ "id": id }),
+        )
         .await;
     assert_eq!(versions["data"][0]["version"], json!(1), "{versions}");
     let removed = server
-        .dispatch("scenarios.remove", json!({ "id": id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.remove",
+            json!({ "id": id }),
+        )
         .await;
     assert_eq!(
         removed["data"],
@@ -935,7 +954,13 @@ async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
     let mut server =
         IpcServer::new(services.shared(), silent_logger()).with_output_validation(true);
     crate::ipc::scenarios::register(&mut server);
-    let catalogue = server.dispatch("scenarios.catalogue", json!(null)).await;
+    let catalogue = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.catalogue",
+            json!(null),
+        )
+        .await;
     assert_eq!(catalogue["ok"], json!(true), "{catalogue}");
     let entries = catalogue["data"].as_array().expect("a list");
     assert!(
@@ -946,11 +971,19 @@ async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
         "{catalogue}"
     );
     let created = server
-        .dispatch("scenarios.create", json!({ "name": "Триаж" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.create",
+            json!({ "name": "Триаж" }),
+        )
         .await;
     let id = created["data"]["id"].clone();
     let empty = server
-        .dispatch("scenarios.draft", json!({ "id": id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.draft",
+            json!({ "id": id }),
+        )
         .await;
     assert_eq!(empty["data"], json!(null), "{empty}");
     let graph = json!({
@@ -959,15 +992,27 @@ async fn the_catalogue_and_draft_channels_answer_in_the_contract_shape() {
         "attachments": []
     });
     let saved = server
-        .dispatch("scenarios.saveDraft", json!({ "id": id, "graph": graph }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.saveDraft",
+            json!({ "id": id, "graph": graph }),
+        )
         .await;
     assert_eq!(saved["ok"], json!(true), "{saved}");
     let draft = server
-        .dispatch("scenarios.draft", json!({ "id": id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.draft",
+            json!({ "id": id }),
+        )
         .await;
     assert_eq!(draft["data"]["graph"], graph, "{draft}");
     let discarded = server
-        .dispatch("scenarios.discardDraft", json!({ "id": id }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "scenarios.discardDraft",
+            json!({ "id": id }),
+        )
         .await;
     assert_eq!(discarded["data"], json!({ "id": id }), "{discarded}");
 }

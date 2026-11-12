@@ -78,7 +78,9 @@ fn runtime_of(listed: &Value, runtime: &str) -> ToolchainDto {
 #[tokio::test]
 async fn the_channels_connect_a_picked_copy_refuse_an_empty_path_and_disconnect() {
     let (host, server) = registered();
-    let listed = server.dispatch("toolchain.list", json!({})).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "toolchain.list", json!({}))
+        .await;
     assert_eq!(listed["ok"], json!(true), "{listed}");
     assert_eq!(listed["data"].as_array().map(Vec::len), Some(2));
     assert_eq!(runtime_of(&listed, "node").status, ToolchainStatus::Missing);
@@ -90,6 +92,7 @@ async fn the_channels_connect_a_picked_copy_refuse_an_empty_path_and_disconnect(
     );
     let selected = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "toolchain.select",
             json!({ "runtime": "node", "path": primary }),
         )
@@ -99,24 +102,40 @@ async fn the_channels_connect_a_picked_copy_refuse_an_empty_path_and_disconnect(
     assert_eq!(selected["data"]["version"], json!("22.11.0"));
 
     let scanned = server
-        .dispatch("toolchain.scan", json!({ "runtime": "uv" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "toolchain.scan",
+            json!({ "runtime": "uv" }),
+        )
         .await;
     assert_eq!(scanned["error"]["code"], json!("NOT_FOUND"));
     assert_eq!(
         server
-            .dispatch("toolchain.update", json!({ "runtime": "node" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "toolchain.update",
+                json!({ "runtime": "node" })
+            )
             .await["error"]["code"],
         json!("CONFLICT")
     );
     assert_eq!(
         server
-            .dispatch("toolchain.install", json!({ "runtime": "python" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "toolchain.install",
+                json!({ "runtime": "python" })
+            )
             .await["error"]["code"],
         json!("VALIDATION_FAILED")
     );
 
     let removed = server
-        .dispatch("toolchain.remove", json!({ "runtime": "node" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "toolchain.remove",
+            json!({ "runtime": "node" }),
+        )
         .await;
     assert_eq!(removed["data"]["status"], json!("missing"), "{removed}");
     assert!(Path::new(&primary).exists());
@@ -164,7 +183,9 @@ async fn a_download_finished_from_the_downloads_page_connects_itself_without_a_s
     }
     assert_eq!(status, DownloadStatus::Succeeded);
 
-    let listed = server.dispatch("toolchain.list", json!({})).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "toolchain.list", json!({}))
+        .await;
     let uv = runtime_of(&listed, "uv");
     assert_eq!(uv.status, ToolchainStatus::Ready, "{listed}");
     assert_eq!(uv.version.as_deref(), Some("0.9.5"));

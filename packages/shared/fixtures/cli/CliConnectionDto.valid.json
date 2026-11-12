@@ -1,0 +1,24 @@
+[
+  {
+    "name": "recognised client",
+    "value": {
+      "id": 1,
+      "pid": 4120,
+      "image": "C:/Program Files/ZVS AI Studio/cli/aistudio.exe",
+      "recognised": true,
+      "connectedAt": 1760000000000,
+      "dialogs": 2
+    }
+  },
+  {
+    "name": "unknown process",
+    "value": {
+      "id": 7,
+      "pid": null,
+      "image": null,
+      "recognised": false,
+      "connectedAt": 1760000000000,
+      "dialogs": 0
+    }
+  }
+]

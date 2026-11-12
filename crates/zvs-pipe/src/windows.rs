@@ -3,6 +3,7 @@
 use std::ffi::c_void;
 use std::io;
 use std::os::windows::io::AsRawHandle;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use tokio::net::windows::named_pipe::{
@@ -25,9 +26,10 @@ use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
 };
 use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
-use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
+use windows::Win32::System::Pipes::{GetNamedPipeClientProcessId, GetNamedPipeServerProcessId};
 use windows::Win32::System::Threading::{
-    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{ASFW_ANY, AllowSetForegroundWindow};
 use windows::core::{HSTRING, PWSTR};
@@ -196,6 +198,32 @@ fn server_sid(client: &NamedPipeClient) -> io::Result<String> {
         .map_err(|e| native(&e))?;
     let process = Owned(process);
     token_sid(process.0)
+}
+
+pub fn client_process_id(server: &NamedPipeServer) -> io::Result<u32> {
+    let pipe = HANDLE(server.as_raw_handle());
+    let mut pid = 0_u32;
+    unsafe { GetNamedPipeClientProcessId(pipe, &raw mut pid) }.map_err(|e| native(&e))?;
+    Ok(pid)
+}
+
+pub fn process_image(pid: u32) -> io::Result<PathBuf> {
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }
+        .map_err(|e| native(&e))?;
+    let process = Owned(process);
+    let mut buffer = vec![0_u16; 32_768];
+    let mut length = u32::try_from(buffer.len()).unwrap_or(u32::MAX);
+    unsafe {
+        QueryFullProcessImageNameW(
+            process.0,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &raw mut length,
+        )
+    }
+    .map_err(|e| native(&e))?;
+    buffer.truncate(usize::try_from(length).unwrap_or(0));
+    Ok(PathBuf::from(String::from_utf16_lossy(&buffer)))
 }
 
 pub async fn connect(name: &str) -> io::Result<NamedPipeClient> {

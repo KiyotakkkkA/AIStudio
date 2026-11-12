@@ -178,6 +178,10 @@ impl EventBus {
         }
     }
 
+    pub fn attached(&self) -> bool {
+        self.inner.sink.read().is_ok_and(|slot| slot.is_some())
+    }
+
     pub fn subscribe(&self, sink: Arc<dyn EventSink>) -> u64 {
         let id = self.inner.next_subscriber.fetch_add(1, Ordering::SeqCst);
         if let Ok(mut list) = self.inner.subscribers.write() {

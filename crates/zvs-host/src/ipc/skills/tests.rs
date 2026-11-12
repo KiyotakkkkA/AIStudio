@@ -33,6 +33,7 @@ async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shap
     let (host, server) = registered();
     let created = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "skills.create",
             json!({
                 "key": "inbox",
@@ -49,13 +50,22 @@ async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shap
         json!("references/rules.md")
     );
     let id = created["data"]["id"].clone();
-    let listed = server.dispatch("skills.list", json!(null)).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "skills.list", json!(null))
+        .await;
     assert_eq!(listed["data"][0]["key"], json!("inbox"), "{listed}");
     host.picker.answer(&[]);
-    let exported = server.dispatch("skills.export", json!({ "id": id })).await;
+    let exported = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "skills.export",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(exported["data"]["path"], json!(null), "{exported}");
     let rejected = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "skills.update",
             json!({ "id": id, "files": [{ "path": "other/a.md", "content": "a" }] }),
         )
@@ -66,12 +76,24 @@ async fn the_channels_create_list_export_and_remove_a_skill_in_the_contract_shap
         rejected["error"]["details"]["issues"],
         json!([{ "field": "files.0", "rule": "path" }])
     );
-    let removed = server.dispatch("skills.remove", json!({ "id": id })).await;
+    let removed = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "skills.remove",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(
         removed["data"],
         json!({ "id": id, "removed": true }),
         "{removed}"
     );
-    let gone = server.dispatch("skills.get", json!({ "id": id })).await;
+    let gone = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "skills.get",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(gone["error"]["code"], json!("NOT_FOUND"));
 }

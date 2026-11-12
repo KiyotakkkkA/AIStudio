@@ -188,7 +188,11 @@ mod tests {
     async fn secrets_create_returns_the_hint_and_no_value() {
         let host = host();
         let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         assert!(created.get("value").is_none());
         assert!(created.get("cipher").is_none());
         assert!(!created.to_string().contains(VALUE));
@@ -208,12 +212,18 @@ mod tests {
             with(draft(), json!({ "value": "   " })),
             json!({ "name": "Без значения", "scope": "personal", "tags": [] }),
         ] {
-            let response = server.dispatch("secrets.create", payload).await;
+            let response = server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", payload)
+                .await;
             assert_eq!(code(&response), "VALIDATION_FAILED");
             assert_eq!(response["error"]["message"], json!(VALUE_REQUIRED));
         }
         assert_eq!(
-            data(server.dispatch("secrets.list", json!({})).await),
+            data(
+                server
+                    .dispatch(crate::ipc::Caller::Studio, "secrets.list", json!({}))
+                    .await
+            ),
             json!([])
         );
     }
@@ -222,10 +232,18 @@ mod tests {
     async fn secrets_list_and_get_carry_the_hint_and_never_a_value() {
         let host = host();
         let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         let listed = data(
             server
-                .dispatch("secrets.list", json!({ "scope": "personal" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "secrets.list",
+                    json!({ "scope": "personal" }),
+                )
                 .await,
         );
         let rows = listed.as_array().expect("an array");
@@ -237,14 +255,22 @@ mod tests {
 
         let fetched = data(
             server
-                .dispatch("secrets.get", json!({ "id": created["id"] }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "secrets.get",
+                    json!({ "id": created["id"] }),
+                )
                 .await,
         );
         assert_eq!(fetched, created);
         assert_eq!(
             data(
                 server
-                    .dispatch("secrets.list", json!({ "query": "personal" }))
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.list",
+                        json!({ "query": "personal" })
+                    )
                     .await
             )
             .as_array()
@@ -254,7 +280,11 @@ mod tests {
         assert_eq!(
             code(
                 &server
-                    .dispatch("secrets.get", json!({ "id": MISSING }))
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.get",
+                        json!({ "id": MISSING })
+                    )
                     .await
             ),
             "NOT_FOUND"
@@ -265,11 +295,16 @@ mod tests {
     async fn secrets_update_without_a_value_leaves_the_credential_alone() {
         let host = host();
         let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         let encrypt_calls = host.crypto.encrypt_calls();
         let renamed = data(
             server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "secrets.update",
                     json!({ "id": created["id"], "name": "Ollama — work" }),
                 )
@@ -281,8 +316,7 @@ mod tests {
 
         let replaced = data(
             server
-                .dispatch(
-                    "secrets.update",
+                .dispatch(crate::ipc::Caller::Studio, "secrets.update",
                     json!({ "id": created["id"], "value": "osk_live_ffffffffffffffffffffffffffffffff9999" }),
                 )
                 .await,
@@ -291,7 +325,11 @@ mod tests {
         assert_eq!(
             code(
                 &server
-                    .dispatch("secrets.update", json!({ "id": MISSING, "name": "x" }))
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.update",
+                        json!({ "id": MISSING, "name": "x" })
+                    )
                     .await
             ),
             "NOT_FOUND"
@@ -302,10 +340,15 @@ mod tests {
     async fn secrets_update_sets_and_clears_the_rotation_reminder() {
         let host = host();
         let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         let reminded = data(
             server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "secrets.update",
                     json!({ "id": created["id"], "rotationDays": 7 }),
                 )
@@ -316,6 +359,7 @@ mod tests {
         let cleared = data(
             server
                 .dispatch(
+                    crate::ipc::Caller::Studio,
                     "secrets.update",
                     json!({ "id": created["id"], "rotationDays": null }),
                 )
@@ -341,17 +385,29 @@ mod tests {
             })
             .expect("creates");
         assert_eq!(
-            data(server.dispatch("secrets.list", json!({})).await),
+            data(
+                server
+                    .dispatch(crate::ipc::Caller::Studio, "secrets.list", json!({}))
+                    .await
+            ),
             json!([])
         );
-        let visible = data(server.dispatch("secrets.create", draft()).await);
+        let visible = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         assert_eq!(
-            data(server.dispatch("secrets.list", json!({})).await)
-                .as_array()
-                .expect("an array")
-                .iter()
-                .map(|secret| secret["id"].clone())
-                .collect::<Vec<_>>(),
+            data(
+                server
+                    .dispatch(crate::ipc::Caller::Studio, "secrets.list", json!({}))
+                    .await
+            )
+            .as_array()
+            .expect("an array")
+            .iter()
+            .map(|secret| secret["id"].clone())
+            .collect::<Vec<_>>(),
             [visible["id"].clone()]
         );
         for (channel, payload) in [
@@ -362,7 +418,9 @@ mod tests {
             ),
             ("secrets.remove", json!({ "id": token.id })),
         ] {
-            let response = server.dispatch(channel, payload).await;
+            let response = server
+                .dispatch(crate::ipc::Caller::Studio, channel, payload)
+                .await;
             assert_eq!(code(&response), "NOT_FOUND", "{channel}");
             assert!(response["error"].get("details").is_none());
         }
@@ -376,7 +434,11 @@ mod tests {
     async fn secrets_remove_deletes_an_unused_secret_and_names_the_consumers_of_a_used_one() {
         let host = host();
         let server = server_for(&host);
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         let id = created["id"].as_str().expect("an id").to_owned();
         host.secrets
             .add_usage(
@@ -393,11 +455,25 @@ mod tests {
             )
             .expect("adds");
         assert_eq!(
-            data(server.dispatch("secrets.get", json!({ "id": id })).await)["usageCount"],
+            data(
+                server
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.get",
+                        json!({ "id": id })
+                    )
+                    .await
+            )["usageCount"],
             json!(2)
         );
 
-        let refused = server.dispatch("secrets.remove", json!({ "id": id })).await;
+        let refused = server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "secrets.remove",
+                json!({ "id": id }),
+            )
+            .await;
         assert_eq!(code(&refused), "CONFLICT");
         assert_eq!(
             refused["error"]["details"]["consumers"],
@@ -422,17 +498,33 @@ mod tests {
             )
             .expect("removes");
         assert_eq!(
-            data(server.dispatch("secrets.remove", json!({ "id": id })).await),
+            data(
+                server
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.remove",
+                        json!({ "id": id })
+                    )
+                    .await
+            ),
             json!({ "id": id, "removed": true })
         );
         assert_eq!(
-            data(server.dispatch("secrets.list", json!({})).await),
+            data(
+                server
+                    .dispatch(crate::ipc::Caller::Studio, "secrets.list", json!({}))
+                    .await
+            ),
             json!([])
         );
         assert_eq!(
             code(
                 &server
-                    .dispatch("secrets.remove", json!({ "id": MISSING }))
+                    .dispatch(
+                        crate::ipc::Caller::Studio,
+                        "secrets.remove",
+                        json!({ "id": MISSING })
+                    )
                     .await
             ),
             "NOT_FOUND"
@@ -446,7 +538,11 @@ mod tests {
         let mut server = IpcServer::new(host.shared(), logger.clone()).with_output_validation(true);
         register(&mut server);
         let mut responses = Vec::new();
-        let created = data(server.dispatch("secrets.create", draft()).await);
+        let created = data(
+            server
+                .dispatch(crate::ipc::Caller::Studio, "secrets.create", draft())
+                .await,
+        );
         responses.push(created.clone());
         for (channel, payload) in [
             ("secrets.list", json!({})),
@@ -466,7 +562,11 @@ mod tests {
             ("secrets.create", draft()),
             ("secrets.remove", json!({ "id": created["id"] })),
         ] {
-            responses.push(server.dispatch(channel, payload).await);
+            responses.push(
+                server
+                    .dispatch(crate::ipc::Caller::Studio, channel, payload)
+                    .await,
+            );
         }
         for response in &responses {
             assert!(!response.to_string().contains(VALUE), "{response}");

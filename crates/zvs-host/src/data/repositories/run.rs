@@ -169,6 +169,13 @@ impl<'c> RunRepository<'c> {
             .optional()
     }
 
+    pub fn subject_of_stream(&self, stream_id: &str) -> rusqlite::Result<Option<Option<String>>> {
+        self.connection
+            .prepare_cached("SELECT subject_id FROM run WHERE stream_id = ?1")?
+            .query_row([stream_id], |row| row.get(0))
+            .optional()
+    }
+
     pub fn list(&self) -> rusqlite::Result<Vec<RunRow>> {
         self.connection
             .prepare_cached(&format!(

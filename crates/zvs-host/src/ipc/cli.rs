@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use zvs_contract::{
-    AccountLinkInput, AppError, CliImageImportInput, CliOpenInput, CliSubagentCancelInput,
-    CliThemeDto, CreateMcpServerInput,
+    AccountLinkInput, AppError, CliConnectionRef, CliConsentAnswerInput, CliImageImportInput,
+    CliOpenInput, CliSubagentCancelInput, CliThemeDto, CreateMcpServerInput,
 };
 
 use super::IpcServer;
@@ -71,6 +71,32 @@ pub fn register(server: &mut IpcServer) {
             "cli.theme.set",
             |services: Arc<Services>, input: CliThemeDto| async move {
                 services.cli_theme.set(input)
+            },
+        )
+        .handle(
+            "cli.connections.list",
+            |services: Arc<Services>, (): ()| async move {
+                Ok::<_, AppError>(services.cli_connections.list())
+            },
+        )
+        .handle(
+            "cli.connections.disconnect",
+            |services: Arc<Services>, input: CliConnectionRef| async move {
+                services.cli_connections.disconnect(input.id)
+            },
+        )
+        .handle(
+            "cli.consents.list",
+            |services: Arc<Services>, (): ()| async move {
+                Ok::<_, AppError>(services.cli_connections.pending())
+            },
+        )
+        .handle(
+            "cli.consents.answer",
+            |services: Arc<Services>, input: CliConsentAnswerInput| async move {
+                services
+                    .cli_connections
+                    .answer(&input.id, input.confirm)
             },
         );
 }

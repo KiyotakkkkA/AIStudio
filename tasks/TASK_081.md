@@ -2,7 +2,7 @@
 task: TASK_081
 title: Caller identity and the console pipe
 phase: A — Access pipeline (APS)
-status: todo
+status: done
 depends_on: []
 unblocks: [TASK_082]
 estimate: 4 h
@@ -127,8 +127,69 @@ PR what was not run.
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+
+- **Caller.** `ipc::Caller { Studio, Cli { connection }, BrowserUi, Panel }`.
+  `IpcServer::dispatch(caller, channel, payload)` passes it to every handler (`handle_as`;
+  `handle` ignores it). `ipc_call` dispatches as `Studio`, the pipe as `Cli { connection }`.
+- **Policy table (L17).** `ipc/policy.rs` `POLICY` has one row per contract channel, in contract
+  order: callers, `Effect::{Read, Act, Loosen}` and `Scope::{Any, Dialog, Run, Shell, Owner}`.
+  `policy/tests.rs` checks that every contract channel and every registered channel has a row,
+  that the console keeps its 47 channels, and which console rows loosen. `CLI_CHANNELS` is
+  deleted; `serve` and `dispatch` both use the table. `CLI_CHANNEL_REFUSED` moved to `ipc`.
+- **Held loosening (H15).** `cli/gate.rs` `admit` runs before the handler for a console
+  caller. `execPolicy.set` to a less strict mode or another judge, `execPolicy.allowRule`, and
+  `always` on `runs.approve` / `folders.answer` wait in `CliConnections::confirm`. That shows
+  the studio window (`ShellPort::show_studio`), emits a `step` with domain `cli` and sends the
+  connection a `consent { pending }` notice. The change applies only on
+  `cli.consents.answer { confirm: true }`. A decline, 60 s, a closed connection, or no studio
+  sink on the bus (`EventBus::attached`) fail it with `PERMISSION_DENIED` and a Russian
+  constant. Tightening applies at once.
+- **Connection scope (M16).** A connection owns the dialogs it created or opened. A call
+  naming another dialog's id, run or background process is refused (`CLI_DIALOG_REFUSED`).
+  Events are filtered in the writer task by the run's `subject_id` (`RunService::
+  subject_of_stream`, cached per stream). Opening an existing dialog (`chat.conversations.get`)
+  is confirmed once and then stays released until the app restarts.
+- **Client image.** `zvs_pipe::client_process_id`, `process_image`, `same_image`. The shell
+  logs pid and image and marks the connection `recognised` when it is the installed
+  `aistudio.exe`. The confirmation names an unrecognised image.
+- **Studio.** `CliAccessStore` with `CliConsentModal` in `AppFrame`.
+  «Параметры → Командная строка» gains the switch «Подтверждение ослабления доступа из
+  консоли» (`cli.confirmLoosening`, on by default) and «Подключения консоли» with
+  «Отключить» (`cli.connections.disconnect` cancels the connection).
+- **Console.** The status line shows «Ожидает подтверждения в приложении» while a change is
+  held.
+- New channels `cli.connections.list|disconnect`, `cli.consents.list|answer`. New DTOs
+  `CliConnectionDto`, `CliConnectionRef`, `CliConsentDto`, `CliChangeDto` and
+  `CliConsentAnswerInput` in Rust and Zod with fixtures. New `CliNotice::Consent`.
+- PASSPORT §7, `cli/README.md`, `ipc/README.md` and `zvs-cli/README.md` updated.
+
 **Deviated from plan:**
+
+- Decision: the user chose (c), configurable, with (a) as the default. The switch lives on the
+  CLI preferences page. With it off, mode and judge changes other than to `no-restrictions`
+  pass without a confirmation; `no-restrictions`, allow rules, `always` answers and opening a
+  dialog are confirmed either way. Also by user decision: a hidden tray window is brought
+  forward rather than failing, the timeout is 60 s, and a released dialog stays released until
+  the app restarts.
+- The switch hint uses the app's mode label «Автоматическая проверка» where the chosen wording
+  said «Авто».
+- "Opened with `cli.open`": `cli.open` takes only a folder, so a dialog is opened with
+  `chat.conversations.get`, which is what the console already calls for `--resume` and the
+  dialog picker. The protocol version and the pipe DACL are unchanged.
+- `shells.list|output|kill` are scoped to the connection's dialogs too (through the process
+  owner), as are `chat.skip`, `chat.attach`, `chat.context`, `chat.bindFolder`,
+  `chat.conversations.updateStores`, `cli.images.import` and `cli.subagents.cancel`.
+
 **Next session should know:**
+
+- Not run here: `pnpm build`, `pnpm test:e2e` and the manual check against a built app. Run
+  on Windows: `cargo test --workspace` minus `zvs-studio` ran per crate (`zvs-host`,
+  `zvs-contract`, `zvs-pipe`, `zvs-cli`, `zvs-studio`); workspace clippy, fmt, typecheck, lint
+  and test passed.
+- One `cargo test -p zvs-studio` run inside a multi-package invocation reported a failure
+  without naming a test; three reruns passed.
+- `pnpm format:check` flags `apps/studio/src/renderer/features/execPolicy/rulesCopy.ts`. That
+  file was already unformatted at `a2bd56d` and is left as is.
+- Mode changes to `safety-ask` count as loosening and are confirmed while the switch is on.
+- `CliConsentDto` carries the image but not the pid; the connections list shows both.

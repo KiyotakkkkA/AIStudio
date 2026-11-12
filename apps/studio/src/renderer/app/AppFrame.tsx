@@ -11,9 +11,10 @@ import AppShell from "../ui/templates/AppShell";
 import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
 import { ROUTES } from "./routes";
 import { FxContext } from "../ui/motion/fx";
+import CliConsentModal from "../features/preferences/CliConsentModal";
 
 function AppFrame() {
-  const { ui, chat, appSettings, browserSettings } = useStore();
+  const { ui, chat, appSettings, browserSettings, cliAccess } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
 
@@ -48,12 +49,13 @@ function AppFrame() {
     navigation.replace(ui.activeRoute);
     void appSettings.load();
     void browserSettings.load();
+    cliAccess.start();
     void appSettings.takePendingTarget().then((target) => {
       if (target?.kind === "conversation") follow(ROUTES.chat, target.conversationId);
       if (target?.kind === "downloads") follow(ROUTES.downloads);
       if (target?.kind === "scenarios") follow(ROUTES.scenarios);
     });
-  }, [ui.restored, ui.activeRoute, navigation, appSettings, browserSettings, follow]);
+  }, [ui.restored, ui.activeRoute, navigation, appSettings, browserSettings, cliAccess, follow]);
 
   const fx = useMemo(() => ({ motion: ui.motion, effects: ui.effects }), [ui.motion, ui.effects]);
 
@@ -99,6 +101,7 @@ function AppFrame() {
         >
           <Outlet />
         </AppShell>
+        <CliConsentModal />
       </MotionConfig>
     </FxContext>
   );

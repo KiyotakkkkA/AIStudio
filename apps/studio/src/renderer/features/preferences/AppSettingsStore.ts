@@ -13,6 +13,7 @@ const APP_SETTING_KEYS = [
   "computer.enabled",
   "memory.enabled",
   "memory.model",
+  "cli.confirmLoosening",
 ] as const;
 export type AppSettingKey = (typeof APP_SETTING_KEYS)[number];
 
@@ -26,6 +27,7 @@ const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
   "computer.enabled": true,
   "memory.enabled": true,
   "memory.model": true,
+  "cli.confirmLoosening": true,
 };
 
 function failureCopy(key: AppSettingKey, error: unknown): string {

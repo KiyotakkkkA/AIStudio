@@ -65,7 +65,9 @@ mod tests {
             IpcServer::new(host.shared(), silent_logger()).with_output_validation(true);
         register(&mut server);
 
-        let listed = server.dispatch("runtimes.list", Value::Null).await;
+        let listed = server
+            .dispatch(crate::ipc::Caller::Studio, "runtimes.list", Value::Null)
+            .await;
         assert_eq!(listed["ok"], json!(true), "{listed}");
         let overview: RuntimeOverviewDto =
             serde_json::from_value(listed["data"].clone()).expect("an overview");
@@ -74,13 +76,21 @@ mod tests {
 
         assert_eq!(
             server
-                .dispatch("runtimes.stop", json!({ "id": "llama-cpp-cpu" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "runtimes.stop",
+                    json!({ "id": "llama-cpp-cpu" })
+                )
                 .await,
             json!({ "ok": true, "data": { "stopped": false } })
         );
         assert_eq!(
             server
-                .dispatch("runtimes.remove", json!({ "id": "llama-cpp-cpu" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "runtimes.remove",
+                    json!({ "id": "llama-cpp-cpu" })
+                )
                 .await["error"]["code"],
             json!("CONFLICT")
         );
@@ -102,20 +112,32 @@ mod tests {
             .expect("stores");
         assert_eq!(
             server
-                .dispatch("runtimes.remove", json!({ "id": "llama-cpp-cpu" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "runtimes.remove",
+                    json!({ "id": "llama-cpp-cpu" })
+                )
                 .await,
             json!({ "ok": true, "data": { "id": "llama-cpp-cpu", "removed": true } })
         );
         assert!(!install_path.exists());
         assert_eq!(
             server
-                .dispatch("runtimes.install", json!({ "id": "ab" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "runtimes.install",
+                    json!({ "id": "ab" })
+                )
                 .await["error"]["code"],
             json!("VALIDATION_FAILED")
         );
         assert_eq!(
             server
-                .dispatch("runtimes.install", json!({ "id": "llama-cpp-nope" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "runtimes.install",
+                    json!({ "id": "llama-cpp-nope" })
+                )
                 .await["error"]["code"],
             json!("NOT_FOUND")
         );

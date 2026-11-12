@@ -1,0 +1,34 @@
+[
+  {
+    "name": "negative id",
+    "value": {
+      "id": -1,
+      "pid": null,
+      "image": null,
+      "recognised": false,
+      "connectedAt": 1,
+      "dialogs": 0
+    }
+  },
+  {
+    "name": "empty image",
+    "value": {
+      "id": 1,
+      "pid": 1,
+      "image": "",
+      "recognised": false,
+      "connectedAt": 1,
+      "dialogs": 0
+    }
+  },
+  {
+    "name": "missing pid",
+    "value": {
+      "id": 1,
+      "image": null,
+      "recognised": false,
+      "connectedAt": 1,
+      "dialogs": 0
+    }
+  }
+]

@@ -161,13 +161,21 @@ mod tests {
         let (_host, server) = serve(system().with_core(core.clone()));
         assert_eq!(
             server
-                .dispatch("system.nativePing", json!({ "text": "sample" }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.nativePing",
+                    json!({ "text": "sample" })
+                )
                 .await,
             json!({ "ok": true, "data": { "count": 1 } })
         );
         assert_eq!(*core.0.lock().expect("calls"), ["sample"]);
         let refused = server
-            .dispatch("system.nativePing", json!({ "text": 3 }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "system.nativePing",
+                json!({ "text": 3 }),
+            )
             .await;
         assert_eq!(refused["error"]["code"], json!("VALIDATION_FAILED"));
     }
@@ -177,7 +185,11 @@ mod tests {
         let (_host, server) = serve(system());
         assert_eq!(
             server
-                .dispatch("system.nativePing", json!({ "text": "word ".repeat(600) }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.nativePing",
+                    json!({ "text": "word ".repeat(600) })
+                )
                 .await,
             json!({ "ok": true, "data": { "count": 3 } })
         );
@@ -214,7 +226,9 @@ mod tests {
             ..DeviceProbeOptions::new(clock.clone())
         }));
         let (_host, server) = serve(system().with_device(device));
-        let first = server.dispatch("system.device", json!({})).await;
+        let first = server
+            .dispatch(crate::ipc::Caller::Studio, "system.device", json!({}))
+            .await;
         assert_eq!(first["ok"], json!(true));
         assert_eq!(
             first["data"]["gpu"],
@@ -231,13 +245,21 @@ mod tests {
         clock.advance(10);
         assert_eq!(
             server
-                .dispatch("system.device", json!({ "refresh": false }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.device",
+                    json!({ "refresh": false })
+                )
                 .await["data"]["measuredAt"],
             json!(5_000)
         );
         assert_eq!(
             server
-                .dispatch("system.device", json!({ "refresh": true }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.device",
+                    json!({ "refresh": true })
+                )
                 .await["data"]["measuredAt"],
             json!(5_010)
         );
@@ -272,7 +294,9 @@ mod tests {
         }));
         let (_host, server) = serve(system().with_resources(resources));
         assert_eq!(
-            server.dispatch("system.resources", json!(null)).await,
+            server
+                .dispatch(crate::ipc::Caller::Studio, "system.resources", json!(null))
+                .await,
             json!({ "ok": true, "data": {
                 "at": 7_000,
                 "cpuPercent": 12.3,
@@ -292,7 +316,11 @@ mod tests {
         let (_host, server) = server(EventBus::default(), Duration::ZERO);
         assert_eq!(
             server
-                .dispatch("system.ping", json!({ "sentAt": 1_000 }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.ping",
+                    json!({ "sentAt": 1_000 })
+                )
                 .await,
             json!({ "ok": true, "data": { "pong": true, "hostTime": 1_250, "roundTripHint": 250.0 } })
         );
@@ -305,7 +333,11 @@ mod tests {
         events.attach(sink.clone());
         let (_host, server) = server(events.clone(), Duration::from_millis(200));
         let response = server
-            .dispatch("system.demoStream", json!({ "steps": 10 }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "system.demoStream",
+                json!({ "steps": 10 }),
+            )
             .await;
         assert_eq!(response["ok"], json!(true));
         let stream_id = StreamId::parse(response["data"]["streamId"].as_str().expect("an id"))
@@ -342,7 +374,11 @@ mod tests {
         let (_host, server) = server(events.clone(), Duration::ZERO);
         for steps in [0, 101] {
             let response = server
-                .dispatch("system.demoStream", json!({ "steps": steps }))
+                .dispatch(
+                    crate::ipc::Caller::Studio,
+                    "system.demoStream",
+                    json!({ "steps": steps }),
+                )
                 .await;
             assert_eq!(response["error"]["code"], json!("VALIDATION_FAILED"));
         }

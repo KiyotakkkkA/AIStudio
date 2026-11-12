@@ -54,6 +54,8 @@ pub trait ShellPort: Send + Sync {
     fn notify(&self, draft: NotificationDraft);
 
     fn clear(&self, target: NotificationTargetDto);
+
+    fn show_studio(&self) {}
 }
 
 pub type SharedShellPort = Arc<dyn ShellPort>;

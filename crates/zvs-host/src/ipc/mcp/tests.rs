@@ -38,6 +38,7 @@ async fn the_pages_channels_round_trip_through_the_contract() {
     let (host, server) = registered();
     let created = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "mcp.create",
             json!({
                 "name": "qdrant",
@@ -49,44 +50,74 @@ async fn the_pages_channels_round_trip_through_the_contract() {
         .await;
     assert_eq!(created["ok"], json!(true), "{created}");
     let id = created["data"]["id"].clone();
-    let listed = server.dispatch("mcp.list", Value::Null).await;
+    let listed = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.list", Value::Null)
+        .await;
     assert_eq!(listed["data"].as_array().map(Vec::len), Some(1));
-    let tested = server.dispatch("mcp.test", json!({ "id": id })).await;
+    let tested = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.test", json!({ "id": id }))
+        .await;
     assert_eq!(
         (&tested["data"]["ok"], &tested["data"]["toolCount"]),
         (&json!(true), &json!(6)),
         "{tested}"
     );
-    let detail = server.dispatch("mcp.get", json!({ "id": id })).await;
+    let detail = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.get", json!({ "id": id }))
+        .await;
     assert_eq!(
         detail["data"]["capabilities"]
             .as_array()
             .map(|rows| rows.iter().filter(|row| row["kind"] == "tool").count()),
         Some(6)
     );
-    let health = server.dispatch("mcp.health", json!({ "id": id })).await;
+    let health = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "mcp.health",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(
         (&health["data"]["status"], &health["data"]["restarting"]),
         (&json!("connected"), &json!(false))
     );
-    let stopped = server.dispatch("mcp.stop", json!({ "id": id })).await;
+    let stopped = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.stop", json!({ "id": id }))
+        .await;
     assert_eq!(stopped["data"]["status"], json!("stopped"), "{stopped}");
     assert!(stopped["data"].get("capabilities").is_none());
-    let started = server.dispatch("mcp.start", json!({ "id": id })).await;
+    let started = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.start", json!({ "id": id }))
+        .await;
     assert_eq!(started["data"]["status"], json!("connected"), "{started}");
     let updated = server
-        .dispatch("mcp.update", json!({ "id": id, "enabled": false }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "mcp.update",
+            json!({ "id": id, "enabled": false }),
+        )
         .await;
     assert_eq!(updated["data"]["status"], json!("disabled"), "{updated}");
-    let refused = server.dispatch("mcp.start", json!({ "id": id })).await;
+    let refused = server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.start", json!({ "id": id }))
+        .await;
     assert_eq!(refused["data"]["status"], json!("disabled"), "{refused}");
-    let removed = server.dispatch("mcp.remove", json!({ "id": id })).await;
+    let removed = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "mcp.remove",
+            json!({ "id": id }),
+        )
+        .await;
     assert_eq!(
         removed,
         json!({ "ok": true, "data": { "id": id, "removed": true } })
     );
     assert_eq!(
-        server.dispatch("mcp.list", Value::Null).await["data"],
+        server
+            .dispatch(crate::ipc::Caller::Studio, "mcp.list", Value::Null)
+            .await["data"],
         json!([])
     );
     host.mcp.dispose().await;
@@ -97,6 +128,7 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
     let (host, server) = registered();
     let created = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "mcp.create",
             json!({
                 "name": "qdrant",
@@ -107,9 +139,15 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
         )
         .await;
     let id = created["data"]["id"].clone();
-    server.dispatch("mcp.test", json!({ "id": id })).await;
+    server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.test", json!({ "id": id }))
+        .await;
     let tools = server
-        .dispatch("tools.list", json!({ "source": "mcp" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.list",
+            json!({ "source": "mcp" }),
+        )
         .await;
     let search = tools["data"]
         .as_array()
@@ -119,19 +157,27 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
     assert_eq!(search["sourceRef"], id);
     server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.setTier",
             json!({ "id": search["id"], "tier": "off" }),
         )
         .await;
     server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.setEnabled",
             json!({ "id": search["id"], "enabled": false }),
         )
         .await;
-    server.dispatch("mcp.test", json!({ "id": id })).await;
+    server
+        .dispatch(crate::ipc::Caller::Studio, "mcp.test", json!({ "id": id }))
+        .await;
     let after = server
-        .dispatch("tools.get", json!({ "id": search["id"] }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.get",
+            json!({ "id": search["id"] }),
+        )
         .await;
     assert_eq!(
         (
@@ -143,18 +189,24 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
     );
     server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.setTier",
             json!({ "id": search["id"], "tier": "auto" }),
         )
         .await;
     server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "tools.setEnabled",
             json!({ "id": search["id"], "enabled": true }),
         )
         .await;
     let raised = server
-        .dispatch("tools.get", json!({ "id": search["id"] }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "tools.get",
+            json!({ "id": search["id"] }),
+        )
         .await;
     assert_eq!(
         (&raised["data"]["tier"], &raised["data"]["enabled"]),
@@ -167,12 +219,20 @@ async fn a_tier_set_through_the_tools_channel_is_what_the_registry_holds_for_an_
 async fn a_draft_without_a_command_or_an_address_is_refused_with_the_field() {
     let (_host, server) = registered();
     let stdio = server
-        .dispatch("mcp.create", json!({ "name": "x", "transport": "stdio" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "mcp.create",
+            json!({ "name": "x", "transport": "stdio" }),
+        )
         .await;
     assert_eq!(stdio["error"]["code"], json!("VALIDATION_FAILED"));
     assert_eq!(stdio["error"]["details"]["field"], json!("command"));
     let http = server
-        .dispatch("mcp.create", json!({ "name": "y", "transport": "http" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "mcp.create",
+            json!({ "name": "y", "transport": "http" }),
+        )
         .await;
     assert_eq!(http["error"]["details"]["field"], json!("url"));
 }

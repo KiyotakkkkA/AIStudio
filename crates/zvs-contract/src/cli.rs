@@ -1,11 +1,15 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::chat::CONVERSATION_TITLE_MAX;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::events::HostEvent;
+use crate::exec_policy::{AllowRuleScope, ExecMode};
 use crate::folders::{WorkingFolderAccess, check_folder_path};
-use crate::validate::{Validate, check, invalid, no_refinements};
+use crate::ids::{ConversationId, is_wire_uuid};
+use crate::primitives::Timestamp;
+use crate::validate::{Validate, check, invalid, nested, no_refinements};
 
 pub const CLI_COMMAND: &str = "aistudio";
 pub const CLI_PROTOCOL_VERSION: u32 = 2;
@@ -13,6 +17,9 @@ pub const CLI_LINE_MAX: usize = 8 * 1024 * 1024;
 pub const CLI_PIPE_PREFIX: &str = r"\\.\pipe\zvs-ai-studio-cli-";
 pub const CLI_LAUNCH_ARG: &str = "--cli";
 pub const CLI_THEME_FILE: &str = "theme.json";
+pub const CLI_STEP_DOMAIN: &str = "cli";
+pub const CLI_IMAGE_MAX: usize = 4096;
+pub const CLI_CONFIRM_SETTING_KEY: &str = "cli.confirmLoosening";
 
 pub fn cli_pipe_name(user_sid: &str) -> String {
     format!("{CLI_PIPE_PREFIX}{user_sid}")
@@ -45,6 +52,7 @@ pub enum CliClientMessage {
 )]
 pub enum CliNotice {
     AccountVerification { origin: String, shown: bool },
+    Consent { pending: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -100,6 +108,127 @@ impl Validate for CliInstallDto {
             return Err(invalid("installed", "available"));
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum CliChangeDto {
+    Mode {
+        from: ExecMode,
+        to: ExecMode,
+    },
+    Judge,
+    AllowRule {
+        scope: AllowRuleScope,
+    },
+    AlwaysApproval,
+    AlwaysFolder,
+    OpenDialog {
+        conversation_id: ConversationId,
+        title: String,
+    },
+}
+
+impl Validate for CliChangeDto {
+    fn validate(&self) -> Result<(), AppError> {
+        match self {
+            Self::OpenDialog { title, .. } => {
+                check::max_len("title", title, CONVERSATION_TITLE_MAX)
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+fn check_image(image: Option<&String>) -> Result<(), AppError> {
+    image.map_or(Ok(()), |image| {
+        check::non_empty("image", image)?;
+        check::max_len("image", image, CLI_IMAGE_MAX)
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliConnectionDto {
+    pub id: u64,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub pid: Option<u32>,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub image: Option<String>,
+    pub recognised: bool,
+    pub connected_at: Timestamp,
+    pub dialogs: u32,
+}
+
+impl Validate for CliConnectionDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("id", self.id)?;
+        check::timestamp("connectedAt", self.connected_at)?;
+        check_image(self.image.as_ref())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliConnectionRef {
+    pub id: u64,
+}
+
+impl Validate for CliConnectionRef {
+    fn validate(&self) -> Result<(), AppError> {
+        check::safe_integer("id", self.id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliConsentDto {
+    pub id: String,
+    pub connection_id: u64,
+    pub change: CliChangeDto,
+    pub recognised: bool,
+    #[serde(deserialize_with = "crate::wire::nullable")]
+    pub image: Option<String>,
+    pub created_at: Timestamp,
+    pub expires_at: Timestamp,
+}
+
+impl Validate for CliConsentDto {
+    fn validate(&self) -> Result<(), AppError> {
+        if !is_wire_uuid(&self.id) {
+            return Err(invalid("id", "uuid"));
+        }
+        check::safe_integer("connectionId", self.connection_id)?;
+        nested("change", self.change.validate())?;
+        check_image(self.image.as_ref())?;
+        check::timestamp("createdAt", self.created_at)?;
+        check::timestamp("expiresAt", self.expires_at)?;
+        if self.expires_at < self.created_at {
+            return Err(invalid("expiresAt", "order"));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliConsentAnswerInput {
+    pub id: String,
+    pub confirm: bool,
+}
+
+impl Validate for CliConsentAnswerInput {
+    fn validate(&self) -> Result<(), AppError> {
+        if is_wire_uuid(&self.id) {
+            Ok(())
+        } else {
+            Err(invalid("id", "uuid"))
+        }
     }
 }
 

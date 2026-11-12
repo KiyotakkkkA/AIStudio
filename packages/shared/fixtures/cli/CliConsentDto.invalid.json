@@ -1,0 +1,44 @@
+[
+  {
+    "name": "expires before it was created",
+    "value": {
+      "id": "9b2f7a3e-4c1d-4e8a-9f2b-6d5c4b3a2e10",
+      "connectionId": 2,
+      "change": {
+        "kind": "judge"
+      },
+      "recognised": true,
+      "image": null,
+      "createdAt": 10,
+      "expiresAt": 5
+    }
+  },
+  {
+    "name": "unknown change",
+    "value": {
+      "id": "9b2f7a3e-4c1d-4e8a-9f2b-6d5c4b3a2e10",
+      "connectionId": 2,
+      "change": {
+        "kind": "secrets"
+      },
+      "recognised": true,
+      "image": null,
+      "createdAt": 1,
+      "expiresAt": 1
+    }
+  },
+  {
+    "name": "not a uuid",
+    "value": {
+      "id": "x",
+      "connectionId": 2,
+      "change": {
+        "kind": "judge"
+      },
+      "recognised": true,
+      "image": null,
+      "createdAt": 1,
+      "expiresAt": 1
+    }
+  }
+]

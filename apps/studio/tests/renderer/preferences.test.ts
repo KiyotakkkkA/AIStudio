@@ -148,6 +148,7 @@ test("application settings load with their defaults and persist each toggle", as
     "computer.enabled": true,
     "memory.enabled": true,
     "memory.model": true,
+    "cli.confirmLoosening": true,
   });
   await store.set("notifications.enabled", false);
   await store.set("app.autostart", true);

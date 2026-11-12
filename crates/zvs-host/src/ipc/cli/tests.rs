@@ -37,7 +37,15 @@ async fn opening_a_folder_reports_whether_an_always_grant_covers_it() {
     std::fs::create_dir_all(project.join("src")).expect("creates");
     let cwd = project.join("src").to_string_lossy().into_owned();
 
-    let session = data(server.dispatch("cli.open", json!({ "cwd": cwd })).await);
+    let session = data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.open",
+                json!({ "cwd": cwd }),
+            )
+            .await,
+    );
     assert_eq!(session["access"], json!("missing"));
     let folder = session["folder"].as_str().expect("folder").to_owned();
 
@@ -46,7 +54,15 @@ async fn opening_a_folder_reports_whether_an_always_grant_covers_it() {
         .folders
         .grant(&project, FolderGrantScope::Always, None)
         .expect("grants");
-    let session = data(server.dispatch("cli.open", json!({ "cwd": cwd })).await);
+    let session = data(
+        server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.open",
+                json!({ "cwd": cwd }),
+            )
+            .await,
+    );
     assert_eq!(session["access"], json!("granted"));
     assert_eq!(session["folder"], json!(folder));
 }
@@ -56,20 +72,34 @@ async fn opening_a_missing_folder_fails() {
     let (_host, server) = registered();
     let outside = tempfile::tempdir().expect("dir");
     let cwd = outside.path().join("absent").to_string_lossy().into_owned();
-    let envelope = server.dispatch("cli.open", json!({ "cwd": cwd })).await;
+    let envelope = server
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "cli.open",
+            json!({ "cwd": cwd }),
+        )
+        .await;
     assert_eq!(envelope["error"]["code"], json!("NOT_FOUND"));
 }
 
 #[tokio::test]
 async fn installing_puts_the_command_on_the_path_and_turns_the_tray_on() {
     let (host, server) = registered();
-    let status = data(server.dispatch("cli.status", Value::Null).await);
+    let status = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.status", Value::Null)
+            .await,
+    );
     assert_eq!(
         status,
         json!({ "available": true, "installed": false, "command": "aistudio" })
     );
 
-    let status = data(server.dispatch("cli.install", Value::Null).await);
+    let status = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.install", Value::Null)
+            .await,
+    );
     assert_eq!(status["installed"], json!(true));
     assert_eq!(host.shell.tray(), [true]);
     let tray = host
@@ -80,7 +110,11 @@ async fn installing_puts_the_command_on_the_path_and_turns_the_tray_on() {
         .expect("stored");
     assert_eq!(tray.value, json!(true));
 
-    let status = data(server.dispatch("cli.uninstall", Value::Null).await);
+    let status = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.uninstall", Value::Null)
+            .await,
+    );
     assert_eq!(status["installed"], json!(false));
     assert_eq!(host.shell.tray(), [true]);
 }
@@ -89,7 +123,9 @@ async fn installing_puts_the_command_on_the_path_and_turns_the_tray_on() {
 async fn a_failed_install_leaves_the_tray_alone() {
     let (host, server) = registered();
     host.cli.failing.store(true, Ordering::SeqCst);
-    let envelope = server.dispatch("cli.install", Value::Null).await;
+    let envelope = server
+        .dispatch(crate::ipc::Caller::Studio, "cli.install", Value::Null)
+        .await;
     assert_eq!(envelope["error"]["code"], json!("NATIVE_ERROR"));
     assert_eq!(envelope["error"]["message"], json!(CLI_INSTALL_FAILED));
     assert!(host.shell.tray().is_empty());
@@ -100,29 +136,51 @@ async fn a_build_without_the_cli_cannot_install_it() {
     let (host, server) = registered();
     host.cli.available.store(false, Ordering::SeqCst);
     host.cli.installed.store(true, Ordering::SeqCst);
-    let status = data(server.dispatch("cli.status", Value::Null).await);
+    let status = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.status", Value::Null)
+            .await,
+    );
     assert_eq!(status["installed"], json!(false));
-    let envelope = server.dispatch("cli.install", Value::Null).await;
+    let envelope = server
+        .dispatch(crate::ipc::Caller::Studio, "cli.install", Value::Null)
+        .await;
     assert_eq!(envelope["error"]["message"], json!(CLI_NOT_BUNDLED));
 }
 
 #[tokio::test]
 async fn the_cli_theme_defaults_to_ember_and_keeps_a_saved_choice() {
     let (_host, server) = registered();
-    let theme = data(server.dispatch("cli.theme.get", Value::Null).await);
+    let theme = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.theme.get", Value::Null)
+            .await,
+    );
     assert_eq!(theme, json!({ "theme": "ember" }));
 
     let saved = data(
         server
-            .dispatch("cli.theme.set", json!({ "theme": "frost" }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.theme.set",
+                json!({ "theme": "frost" }),
+            )
             .await,
     );
     assert_eq!(saved, json!({ "theme": "frost" }));
-    let theme = data(server.dispatch("cli.theme.get", Value::Null).await);
+    let theme = data(
+        server
+            .dispatch(crate::ipc::Caller::Studio, "cli.theme.get", Value::Null)
+            .await,
+    );
     assert_eq!(theme, json!({ "theme": "frost" }));
 
     let envelope = server
-        .dispatch("cli.theme.set", json!({ "theme": "neon" }))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "cli.theme.set",
+            json!({ "theme": "neon" }),
+        )
         .await;
     assert_eq!(envelope["error"]["code"], json!("VALIDATION_FAILED"));
 }
@@ -133,6 +191,7 @@ async fn the_console_adds_an_mcp_server_with_literal_values() {
     let created = data(
         server
             .dispatch(
+                crate::ipc::Caller::Studio,
                 "cli.mcp.create",
                 json!({
                     "name": "Docs",
@@ -155,6 +214,7 @@ async fn the_console_cannot_point_a_server_at_a_stored_secret() {
     let (host, server) = registered();
     let envelope = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "cli.mcp.create",
             json!({
                 "name": "Leak",
@@ -254,6 +314,7 @@ async fn cli_image_import_reuses_conversation_storage_and_validates_selection() 
     std::fs::write(&path, &png).expect("image");
     let missing = server
         .dispatch(
+            crate::ipc::Caller::Studio,
             "cli.images.import",
             json!({"id": "0199aa11-8888-7111-8111-111111111111", "paths": [path]}),
         )
@@ -261,7 +322,11 @@ async fn cli_image_import_reuses_conversation_storage_and_validates_selection() 
     assert_eq!(missing["error"]["code"], "NOT_FOUND");
     let imported = data(
         server
-            .dispatch("cli.images.import", json!({"id": id, "paths": [path]}))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.images.import",
+                json!({"id": id, "paths": [path]}),
+            )
             .await,
     );
     let image: zvs_contract::ImageAttachmentDto =
@@ -281,13 +346,21 @@ async fn cli_image_import_reuses_conversation_storage_and_validates_selection() 
         json!([path, path, path, path, path, path]),
     ] {
         let envelope = server
-            .dispatch("cli.images.import", json!({"id": id, "paths": paths}))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.images.import",
+                json!({"id": id, "paths": paths}),
+            )
             .await;
         assert_eq!(envelope["ok"], false);
     }
     std::fs::write(&path, b"invalid image").expect("invalid contents");
     let envelope = server
-        .dispatch("cli.images.import", json!({"id": id, "paths": [path]}))
+        .dispatch(
+            crate::ipc::Caller::Studio,
+            "cli.images.import",
+            json!({"id": id, "paths": [path]}),
+        )
         .await;
     assert_eq!(envelope["error"]["message"], crate::images::IMAGE_INVALID);
 }
@@ -331,7 +404,11 @@ async fn the_console_stops_only_a_subagent_of_a_reachable_dialog() {
         &crate::platform::ids::new_id().hyphenated().to_string(),
     ] {
         let envelope = server
-            .dispatch("cli.subagents.cancel", json!({ "runId": refused }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.subagents.cancel",
+                json!({ "runId": refused }),
+            )
             .await;
         assert_eq!(
             envelope["error"]["code"],
@@ -345,7 +422,11 @@ async fn the_console_stops_only_a_subagent_of_a_reachable_dialog() {
     }
     data(
         server
-            .dispatch("cli.subagents.cancel", json!({ "runId": child }))
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "cli.subagents.cancel",
+                json!({ "runId": child }),
+            )
             .await,
     );
 }

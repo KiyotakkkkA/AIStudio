@@ -1357,6 +1357,22 @@ const TABLE: &[(&str, Check)] = &[
     ),
     ("cli/CliThemeDto", round_trip::<zvs_contract::CliThemeDto>),
     (
+        "cli/CliConnectionDto",
+        round_trip::<zvs_contract::CliConnectionDto>,
+    ),
+    (
+        "cli/CliConnectionRef",
+        round_trip::<zvs_contract::CliConnectionRef>,
+    ),
+    (
+        "cli/CliConsentDto",
+        round_trip::<zvs_contract::CliConsentDto>,
+    ),
+    (
+        "cli/CliConsentAnswerInput",
+        round_trip::<zvs_contract::CliConsentAnswerInput>,
+    ),
+    (
         "voice/RecordingDeviceDto",
         round_trip::<zvs_contract::RecordingDeviceDto>,
     ),
