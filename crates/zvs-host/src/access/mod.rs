@@ -22,6 +22,6 @@ pub use request::{
     AccessRequest, Actor, Asking, Attendant, Cleared, Effect, Gating, GrantPrompt, Prompt, Resource,
 };
 pub use stages::{
-    FloorStage, JudgeStage, ModeStage, OUTSIDE_ALLOWED_TOOLS, PERMISSION_DENIED, RulesStage,
-    TOOL_DISABLED, TierStage,
+    FloorStage, HardRulesStage, JudgeStage, ModeStage, OUTSIDE_ALLOWED_TOOLS, PERMISSION_DENIED,
+    RulesStage, TOOL_DISABLED, TierStage,
 };

@@ -6,16 +6,17 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::json;
 use zvs_contract::{
-    AllowRuleInput, AppError, AppErrorCode, ExecJudgeDto, ExecMode, ExecPolicyDto, PolicyRuleDto,
+    AllowRuleInput, AppError, AppErrorCode, ExecJudgeDto, ExecPolicyDto, PolicyRuleDto,
     ProviderCapability, TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX,
     ToolAuthorisationDto, ToolAuthorisationKind,
 };
 
 use super::action::{ReviewVerdict, ReviewedAction};
 use super::judge::{JudgeOutcome, ask_judge, judge_prompt};
-use super::rules::{RuleSet, RuleText, VENDOR_PACK};
+use super::rules::{PackStamp, RuleSet, RuleText, VENDOR_PACK};
 use crate::access::{
-    AccessPipeline, AccessRequest, Effect, JudgeStage, ModeStage, Pass, RulesStage,
+    AccessPipeline, AccessRequest, Effect, HardRulesStage, JudgeStage, ModeStage, Outcome, Pass,
+    RulesStage,
 };
 use crate::data::{Database, Repositories};
 use crate::kernel::{ExecReview, StepContext};
@@ -29,7 +30,6 @@ pub const JUDGE_CALLS_PER_RUN: u32 = 50;
 pub const JUDGE_TIMEOUT: Duration = Duration::from_secs(30);
 pub const JUDGE_UNAVAILABLE: &str =
     "Модель-арбитр недоступна: выберите включённого провайдера и доступную модель";
-pub const JUDGE_REQUIRED: &str = "Для режима «Автопроверка» нужна модель-арбитр";
 pub const RULE_DENIED: &str = "Действие запрещено правилом политики выполнения";
 pub const RULES_UNAVAILABLE: &str = "Пользовательские правила недоступны";
 const LOG_SOURCE: &str = "policy";
@@ -68,6 +68,7 @@ struct Inner {
     judge_calls: u32,
     spent: Mutex<HashMap<String, u32>>,
     writing: Mutex<()>,
+    compiled: Mutex<Option<(PackStamp, Arc<RuleSet>)>>,
 }
 
 #[derive(Clone)]
@@ -88,6 +89,7 @@ impl ExecPolicyService {
                 judge_calls: options.judge_calls,
                 spent: Mutex::new(HashMap::new()),
                 writing: Mutex::new(()),
+                compiled: Mutex::new(None),
             }),
         }
     }
@@ -141,12 +143,10 @@ impl ExecPolicyService {
             Some(judge) if self.judge_model(&judge)?.is_some() => Some(judge),
             _ => None,
         };
-        let mode = if policy.mode == ExecMode::AutoBypass && judge.is_none() {
-            ExecMode::SafetyAsk
-        } else {
-            policy.mode
-        };
-        Ok(ExecPolicyDto { mode, judge })
+        Ok(ExecPolicyDto {
+            mode: policy.mode,
+            judge,
+        })
     }
 
     pub fn get(&self) -> Result<ExecPolicyDto, AppError> {
@@ -155,7 +155,7 @@ impl ExecPolicyService {
         if policy != stored {
             self.log(
                 LogLevel::Info,
-                "The judge model is gone; execution policy adjusted",
+                "The judge model is gone; the judge was cleared",
                 &[("mode", json!(policy.mode))],
             );
             self.store(&policy)?;
@@ -170,12 +170,6 @@ impl ExecPolicyService {
             return Err(AppError::new(
                 AppErrorCode::ValidationFailed,
                 JUDGE_UNAVAILABLE,
-            ));
-        }
-        if input.mode == ExecMode::AutoBypass && input.judge.is_none() {
-            return Err(AppError::new(
-                AppErrorCode::ValidationFailed,
-                JUDGE_REQUIRED,
             ));
         }
         self.store(input)?;
@@ -194,6 +188,11 @@ impl ExecPolicyService {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let written = super::user_rules::allow(folder, input)?;
+        *self
+            .inner
+            .compiled
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = None;
         self.log(
             LogLevel::Info,
             "A user allow rule was added",
@@ -205,8 +204,20 @@ impl ExecPolicyService {
         })
     }
 
-    pub fn rules(&self) -> RuleSet {
-        let (rules, problems) = RuleSet::load(&self.inner.vendor, self.inner.packs.as_deref());
+    pub fn rules(&self) -> Arc<RuleSet> {
+        let folder = self.inner.packs.as_deref();
+        let stamp = PackStamp::read(folder);
+        let mut compiled = self
+            .inner
+            .compiled
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some((known, rules)) = compiled.as_ref()
+            && *known == stamp
+        {
+            return Arc::clone(rules);
+        }
+        let (rules, problems) = RuleSet::load(&self.inner.vendor, folder);
         for problem in problems {
             self.log(
                 LogLevel::Warn,
@@ -214,6 +225,8 @@ impl ExecPolicyService {
                 &[("problem", json!(problem))],
             );
         }
+        let rules = Arc::new(rules);
+        *compiled = Some((stamp, Arc::clone(&rules)));
         rules
     }
 
@@ -321,11 +334,28 @@ impl ExecReview for ExecPolicyService {
         let decision = self.pipeline().decide(&request, &mut pass).await?;
         Ok(decision.verdict())
     }
+
+    async fn refused(
+        &self,
+        context: &StepContext,
+        effect: &Effect,
+    ) -> Result<Option<String>, AppError> {
+        let request = AccessRequest::review(context.run_id.to_string(), effect);
+        let mut pass = Pass::new(Some(context));
+        let decision = self.hard_rules().decide(&request, &mut pass).await?;
+        Ok((decision.outcome == Outcome::Deny).then(|| decision.source.unwrap_or_default()))
+    }
 }
 
 impl ExecPolicyService {
+    pub fn hard_rules(&self) -> AccessPipeline {
+        AccessPipeline::new(vec![Box::new(HardRulesStage::new(self.clone()))])
+            .with_logger(self.inner.logger.clone())
+    }
+
     pub fn pipeline(&self) -> AccessPipeline {
         AccessPipeline::new(vec![
+            Box::new(HardRulesStage::new(self.clone())),
             Box::new(ModeStage::new(self.clone())),
             Box::new(RulesStage::new(self.clone())),
             Box::new(JudgeStage::new(self.clone())),

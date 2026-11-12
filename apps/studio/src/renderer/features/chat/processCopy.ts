@@ -6,6 +6,7 @@ export const LANGUAGE_LABEL: Record<CodeLanguage, string> = {
   python: "Python",
   javascript: "JavaScript",
   powershell: "PowerShell",
+  shell: "Командная оболочка",
 };
 
 export const CODE_LEAD = "Требуется подтверждение запуска программы с правами пользователя.";

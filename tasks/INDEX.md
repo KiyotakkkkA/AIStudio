@@ -284,7 +284,7 @@ patches on the current code; each says how.
 
 - [x] **TASK_077** — APS core: access request, decision and the staged pipeline behind the current gate
 - [x] **TASK_078** — Drivers on the pipeline: prepare, access and the `Admitted` token
-- [ ] **TASK_079** — Rules in every mode, `auto` without a judge, the vendor pack without a catch-all
+- [x] **TASK_079** — Rules in every mode, `auto` without a judge, the vendor pack without a catch-all
 - [ ] **TASK_080** — Allow rules bound to approvals, listed and removable
 - [ ] **TASK_081** — Caller identity and the console pipe
 - [ ] **TASK_082** — One grant store and the «Доступ» page

@@ -197,12 +197,72 @@
     {
       "id": "vendor.process.review-script-strings",
       "effect": "review",
-      "text": "An interpreter given a script string (cmd /c, powershell -Command, bash -c, python -c, node -e) hides what runs from the argv rules; the judge reads the script itself.",
+      "text": "An interpreter given a script string (cmd /c /k /r, powershell -Command or -EncodedCommand in any abbreviation or a bare command, bash -c, python -c, node -e, wsl <program>) hides what runs from the argv rules; the judge reads the script itself.",
+      "process": {
+        "scriptString": true
+      }
+    },
+    {
+      "id": "vendor.process.ask-package-runners",
+      "effect": "ask",
+      "text": "Package runners (npx, npm exec, pnpm dlx, yarn dlx, bunx, uvx, pipx run, go run or deno run with a remote module) download and run code; they need the user.",
+      "process": {
+        "argv": ["{npx,bunx,uvx,pnpx}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-npm-exec",
+      "effect": "ask",
+      "text": "npm exec and npm x download a package when it is not installed and run it; they need the user.",
+      "process": {
+        "argv": ["npm", "{exec,x}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-dlx",
+      "effect": "ask",
+      "text": "pnpm dlx, yarn dlx and bun x download a package and run it; they need the user.",
+      "process": {
+        "argv": ["{pnpm,yarn,bun}", "{dlx,x}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-python-runners",
+      "effect": "ask",
+      "text": "pipx run and uv tool run download a package and run it; they need the user.",
+      "process": {
+        "argv": ["pipx", "run", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-uv-tool-run",
+      "effect": "ask",
+      "text": "pipx run and uv tool run download a package and run it; they need the user.",
+      "process": {
+        "argv": ["uv", "tool", "run", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.ask-remote-modules",
+      "effect": "ask",
+      "text": "go run and deno run with a remote module download and run code; they need the user.",
       "process": {
         "argv": [
-          "{cmd,powershell,pwsh,bash,sh,zsh,wsl,python,python3,py,node,deno,bun,ruby,perl}",
+          "{go,deno}",
+          "run",
           "**",
-          "{/c,/k,-c,-command,-encodedcommand,-enc,-e,--eval,-p,--print}",
+          "{*@*,http://*,https://*,jsr:*,npm:*,github.com/*,gitlab.com/*,golang.org/*,gopkg.in/*,bitbucket.org/*}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.ask-script-hosts",
+      "effect": "ask",
+      "text": "Windows script hosts and loaders (mshta, wscript, cscript, rundll32, regsvr32, forfiles, installutil, regasm, regsvcs, cmstp, msbuild) run code the command line does not show; they need the user.",
+      "process": {
+        "argv": [
+          "{mshta,wscript,cscript,rundll32,regsvr32,forfiles,installutil,regasm,regsvcs,cmstp,msbuild}",
           "**"
         ]
       }
@@ -397,11 +457,22 @@
       }
     },
     {
-      "id": "vendor.process.allow-prettier-check",
+      "id": "vendor.process.allow-formatters",
       "effect": "allow",
-      "text": "prettier --check only reads files.",
+      "text": "Code formatters only rewrite the layout of source files inside the project.",
       "process": {
-        "argv": ["prettier", "**", "{--check,-c,--list-different,-l}", "**"]
+        "argv": [
+          "{prettier,black,isort,autopep8,yapf,gofmt,goimports,rustfmt,clang-format,dprint,stylua,shfmt,taplo}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.allow-format-subcommands",
+      "effect": "allow",
+      "text": "Code formatters only rewrite the layout of source files inside the project.",
+      "process": {
+        "argv": ["{go,dotnet,deno,biome}", "{fmt,format}", "**"]
       }
     },
     {
@@ -453,11 +524,88 @@
       }
     },
     {
-      "id": "vendor.process.allow-unflagged",
+      "id": "vendor.process.allow-inspection-utilities",
       "effect": "allow",
-      "text": "A command no other rule flags: it does not delete, move or overwrite files, download, install, publish, rewrite history, raise privileges or change the system.",
+      "text": "Printing, comparing and system inspection utilities (echo, diff, fc, comp, du, df, stat, file, uname, ver, tasklist, systeminfo) change nothing.",
       "process": {
-        "argv": ["*", "**"]
+        "argv": ["{echo,diff,fc,comp,du,df,stat,file,uname,ver,tasklist,systeminfo,nproc}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.allow-git-fetch",
+      "effect": "allow",
+      "text": "git fetch only downloads remote history into the local repository and changes no working file.",
+      "process": {
+        "argv": ["git", "fetch", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.allow-container-inspection",
+      "effect": "allow",
+      "text": "Read-only container inspection (docker or podman ps, images, inspect, logs, info, version, stats, top, port, history and ls of containers, images, volumes and networks) changes nothing.",
+      "process": {
+        "argv": [
+          "{docker,podman}",
+          "{ps,images,inspect,logs,info,version,stats,top,port,history,diff}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.allow-container-listings",
+      "effect": "allow",
+      "text": "Read-only container inspection (docker or podman ps, images, inspect, logs, info, version, stats, top, port, history and ls of containers, images, volumes and networks) changes nothing.",
+      "process": {
+        "argv": [
+          "{docker,podman}",
+          "{container,image,volume,network,context,compose}",
+          "{ls,list,ps,inspect,logs,config,images,version}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.allow-package-listings",
+      "effect": "allow",
+      "text": "Listing installed packages and their dependency trees (pip list, pip show, cargo tree, go list, gem list, winget list) changes nothing.",
+      "process": {
+        "argv": [
+          "{pip,pip3,pipx,gem,winget,choco,scoop,conda,poetry,composer}",
+          "{list,show,freeze,check}",
+          "**"
+        ]
+      }
+    },
+    {
+      "id": "vendor.process.allow-python-package-listings",
+      "effect": "allow",
+      "text": "Listing installed packages and their dependency trees (pip list, pip show, cargo tree, go list, gem list, winget list) changes nothing.",
+      "process": {
+        "argv": ["{python,python3,py}", "-m", "pip", "{list,show,freeze,check}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.allow-uv-package-listings",
+      "effect": "allow",
+      "text": "Listing installed packages and their dependency trees (pip list, pip show, cargo tree, go list, gem list, winget list) changes nothing.",
+      "process": {
+        "argv": ["uv", "pip", "{list,show,freeze,tree,check}", "**"]
+      }
+    },
+    {
+      "id": "vendor.process.allow-build-tools",
+      "effect": "allow",
+      "text": "Building the project with make or ninja without a target, or with an all, build, test, check or lint target, stays inside the project.",
+      "process": {
+        "argv": ["{make,ninja}", "{all,build,test,check,lint}"]
+      }
+    },
+    {
+      "id": "vendor.process.allow-default-build",
+      "effect": "allow",
+      "text": "Building the project with make or ninja without a target, or with an all, build, test, check or lint target, stays inside the project.",
+      "process": {
+        "argv": ["{make,ninja}"]
       }
     },
     {

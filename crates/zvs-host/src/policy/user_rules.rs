@@ -320,6 +320,7 @@ mod tests {
                 source: None,
                 packages: Vec::new(),
                 background: false,
+                script_string: false,
                 reason: None,
             },
         }

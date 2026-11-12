@@ -160,6 +160,37 @@ impl Stage for TierStage {
     }
 }
 
+pub struct HardRulesStage {
+    policy: ExecPolicyService,
+}
+
+impl HardRulesStage {
+    pub const fn new(policy: ExecPolicyService) -> Self {
+        Self { policy }
+    }
+}
+
+#[async_trait]
+impl Stage for HardRulesStage {
+    fn name(&self) -> StageName {
+        StageName::HardRules
+    }
+
+    fn fails_closed(&self) -> bool {
+        true
+    }
+
+    async fn check(&self, request: &AccessRequest, pass: &mut Pass<'_>) -> Result<Step, AppError> {
+        let rules = self.policy.rules();
+        let denied = rules.denied(pass.action(request));
+        pass.rules = Some(rules);
+        Ok(match denied {
+            Some(rule) => Step::Decide(Decision::deny(StageName::HardRules).from_source(rule)),
+            None => Step::Continue,
+        })
+    }
+}
+
 pub struct ModeStage {
     policy: ExecPolicyService,
 }
@@ -185,8 +216,12 @@ impl Stage for ModeStage {
                 Step::Decide(Decision::allow(StageName::Mode).from_source(mode.as_str()))
             }
             ModeDecision::Ask => Step::Decide(Decision::ask(StageName::Mode)),
-            ModeDecision::Review if !request.effect.reviewable() => {
+            ModeDecision::Rules | ModeDecision::Review if !request.effect.reviewable() => {
                 Step::Decide(Decision::ask(StageName::Mode))
+            }
+            ModeDecision::Rules => {
+                pass.rules_only = true;
+                Step::Continue
             }
             ModeDecision::Review => Step::Continue,
         })
@@ -210,12 +245,22 @@ impl Stage for RulesStage {
     }
 
     async fn check(&self, request: &AccessRequest, pass: &mut Pass<'_>) -> Result<Step, AppError> {
-        let rules = self.policy.rules();
+        let rules = match pass.rules.take() {
+            Some(rules) => rules,
+            None => self.policy.rules(),
+        };
         let outcome = rules.evaluate(pass.action(request));
         pass.rules = Some(rules);
         Ok(match outcome {
             RuleOutcome::Deny { rule } => {
                 Step::Decide(Decision::deny(StageName::Rules).from_source(rule))
+            }
+            RuleOutcome::Review { text, .. } if pass.rules_only => Step::Decide(
+                Decision::ask(StageName::Rules)
+                    .because(Some(limited(&text, TOOL_AUTHORISATION_REASON_MAX))),
+            ),
+            RuleOutcome::Unmatched if pass.rules_only => {
+                Step::Decide(Decision::ask(StageName::Rules))
             }
             RuleOutcome::Ask { text, .. } => Step::Decide(
                 Decision::ask(StageName::Rules)
@@ -266,7 +311,15 @@ impl Stage for JudgeStage {
             Some(policy) => policy,
             None => self.policy.get()?,
         };
-        let rules = pass.rules.take().unwrap_or_else(|| self.policy.rules());
+        if policy.judge.is_none() {
+            return Ok(Step::Decide(Decision::ask(StageName::Person).because(
+                flagged.map(|rule| limited(&rule.text, TOOL_AUTHORISATION_REASON_MAX)),
+            )));
+        }
+        let rules = match pass.rules.take() {
+            Some(rules) => rules,
+            None => self.policy.rules(),
+        };
         let verdict = self
             .policy
             .judge(

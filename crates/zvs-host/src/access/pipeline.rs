@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::json;
@@ -23,7 +24,8 @@ pub enum Step {
 pub struct Pass<'a> {
     pub step: Option<&'a StepContext>,
     pub policy: Option<ExecPolicyDto>,
-    pub rules: Option<RuleSet>,
+    pub rules: Option<Arc<RuleSet>>,
+    pub rules_only: bool,
     pub action: Option<Cow<'a, ReviewedAction>>,
     pub flagged: Option<RuleText>,
 }

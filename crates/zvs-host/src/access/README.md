@@ -15,7 +15,7 @@ the host creates or requests an approval.
 | `request.rs`  | `AccessRequest` (actor, tool, gating, minimum tier, effect, resources, `always_ask`, prompt), `Effect`, `Attendant` |
 | `decision.rs` | `Decision { outcome, stage, source, reason, trail }`, `Outcome`, `StageName`; audit record and refusals             |
 | `pipeline.rs` | `Stage` trait, `Step`, the per-call scratch `Pass`, `AccessPipeline`                                                |
-| `stages.rs`   | `FloorStage`, `TierStage`, `ModeStage`, `RulesStage`, `JudgeStage`                                                  |
+| `stages.rs`   | `FloorStage`, `TierStage`, `HardRulesStage`, `ModeStage`, `RulesStage`, `JudgeStage`                                |
 | `gate.rs`     | `AccessGate` (the kernel's port), `Gatekeeper` (every stage and the person in order), `review`                      |
 | `person.rs`   | The one approval builder: tool approvals, folder and app grants, `grant` for a grant needed during `execute`        |
 | `admitted.rs` | `Clearance` (made only here) and `Admitted<P>` (made only from a `Clearance`)                                       |
@@ -36,9 +36,12 @@ tool calls alike (`kernel/registry.rs`):
 4. **Admit.** `Gatekeeper::admit`:
    - `Gating::Open` (no tool, a kernel step, an empty `fs.apply`, `computer.request_access`)
      asks only for the resources it lists;
-   - `Gating::AppFolder` runs the floor, records `auto` and asks for resources;
-   - `Gating::Tool` runs floor → tier. An allow records the tier's authorisation. An ask is
-     reviewed through `ExecReview` (mode → rules → judge) with the node's effect, unless the
+   - `Gating::AppFolder` runs the floor and the hard rules, records `auto` and asks for
+     resources;
+   - `Gating::Tool` runs floor → tier, then the hard rules (`ExecReview::refused`: any `deny`
+     rule matching the node's effect refuses the call whatever the tier and the mode said,
+     TASK_079). An allow records the tier's authorisation. An ask is reviewed through
+     `ExecReview` (hard rules → mode → rules → judge) with the node's effect, unless the
      request is `always_ask`. Resource grants are asked next; a `Files` effect that still asks
      merges into the folder modal with the diff. Otherwise the tool approval follows, the tier is
      checked again, and the call is recorded as `approved` with the reason.

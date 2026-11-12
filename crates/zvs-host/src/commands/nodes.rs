@@ -620,6 +620,7 @@ impl NodeDef for ShellRunNode {
             source: script.map(|script| script.source),
             packages: Vec::new(),
             background: input.background,
+            script_string: skill.is_none() && super::script::script_string(&input.argv),
             reason: Some(input.reason.trim().to_owned()),
         };
         Ok(ShellRun {

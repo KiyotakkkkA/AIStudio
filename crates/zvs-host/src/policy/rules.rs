@@ -1,13 +1,15 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
-use zvs_contract::CodeLanguage;
+use zvs_contract::{CodeLanguage, ProcessPlanDto};
 
 use super::action::{FileAction, FileOperation, ReviewedAction, UNREAD_SCRIPT};
 
 pub const VENDOR_PACK: &str = include_str!("vendor.json");
 pub const ANY_REST: &str = "**";
+pub const ANY_PROGRAM: &str = "*";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,9 +37,12 @@ struct FileRuleSpec {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProcessRuleSpec {
+    #[serde(default)]
     argv: Vec<String>,
     #[serde(default)]
     cwd: Option<String>,
+    #[serde(default)]
+    script_string: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,6 +84,7 @@ enum Matcher {
     Process {
         argv: Vec<ArgPattern>,
         cwd: Option<Regex>,
+        script_string: Option<bool>,
     },
     Code {
         languages: Vec<CodeLanguage>,
@@ -236,12 +242,20 @@ impl Rule {
                 }
             }
             (None, Some(process), None) => {
-                if process
-                    .argv
-                    .first()
-                    .is_none_or(|program| program == ANY_REST)
+                let program = process.argv.first();
+                if program.is_some_and(|program| program == ANY_REST)
+                    || (program.is_none() && process.script_string.is_none())
                 {
                     return Err(format!("rule {}: argv needs a program", spec.id));
+                }
+                if spec.effect == RuleEffect::Allow
+                    && program.is_some_and(|program| program == ANY_PROGRAM)
+                    && process.argv[1..].iter().all(|pattern| pattern == ANY_REST)
+                {
+                    return Err(format!(
+                        "rule {}: an allow rule must name a program or arguments",
+                        spec.id
+                    ));
                 }
                 let argv = process
                     .argv
@@ -261,7 +275,11 @@ impl Rule {
                     .as_deref()
                     .map(|pattern| path_glob(pattern).ok_or_else(|| invalid(pattern)))
                     .transpose()?;
-                Matcher::Process { argv, cwd }
+                Matcher::Process {
+                    argv,
+                    cwd,
+                    script_string: process.script_string,
+                }
             }
             _ => {
                 return Err(format!(
@@ -283,30 +301,38 @@ impl Rule {
         let Matcher::Files { paths, operations } = &self.matcher else {
             return false;
         };
-        let path = normalised(&action.path);
+        let matches = |path: &str| {
+            let path = normalised(path);
+            paths.iter().any(|pattern| pattern.is_match(&path))
+        };
         (operations.is_empty() || operations.contains(&action.operation))
-            && paths.iter().any(|pattern| pattern.is_match(&path))
+            && (matches(&action.path) || action.from.as_deref().is_some_and(matches))
     }
 
-    fn matches_process(&self, argv: &[String], cwd: &str) -> bool {
+    fn matches_process(&self, process: &ProcessPlanDto) -> bool {
         let Matcher::Process {
             argv: patterns,
             cwd: folder,
+            script_string,
         } = &self.matcher
         else {
             return false;
         };
-        let Some((program, rest)) = argv.split_first() else {
+        if script_string.is_some_and(|wanted| wanted != process.script_string) {
             return false;
-        };
-        let program = program_name(program);
-        let arguments: Vec<&str> = std::iter::once(program.as_str())
-            .chain(rest.iter().map(String::as_str))
-            .collect();
-        match_args(patterns, &arguments)
+        }
+        let matched = patterns.is_empty()
+            || process.argv.split_first().is_some_and(|(program, rest)| {
+                let program = program_name(program);
+                let arguments: Vec<&str> = std::iter::once(program.as_str())
+                    .chain(rest.iter().map(String::as_str))
+                    .collect();
+                match_args(patterns, &arguments)
+            });
+        matched
             && folder
                 .as_ref()
-                .is_none_or(|folder| folder.is_match(&normalised(cwd)))
+                .is_none_or(|folder| folder.is_match(&normalised(&process.cwd)))
     }
 
     fn matches_code(&self, language: CodeLanguage, source: &str) -> bool {
@@ -393,19 +419,7 @@ impl RuleSet {
                 Vec::new()
             }
         };
-        let mut files: Vec<_> = user
-            .and_then(|folder| std::fs::read_dir(folder).ok())
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| {
-                path.extension()
-                    .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
-            })
-            .collect();
-        files.sort();
-        for file in files {
+        for file in pack_files(user) {
             let name = file.to_string_lossy().into_owned();
             match std::fs::read_to_string(&file)
                 .map_err(|error| error.to_string())
@@ -471,13 +485,11 @@ impl RuleSet {
             ReviewedAction::Files { actions, .. } => {
                 let items: Vec<Vec<&Rule>> = actions
                     .iter()
-                    .filter(|action| action.operation.destructive())
-                    .map(|action| {
-                        self.rules
-                            .iter()
-                            .filter(|rule| rule.matches_file(action))
-                            .collect()
+                    .map(|action| (action, self.file_rules(action)))
+                    .filter(|(action, matched)| {
+                        action.operation.destructive() || !matched.is_empty()
                     })
+                    .map(|(_, matched)| matched)
                     .collect();
                 if items.is_empty() {
                     return RuleOutcome::Unmatched;
@@ -498,27 +510,91 @@ impl RuleSet {
                         .collect()
                 };
                 let mut items = vec![code];
-                if !process.argv.is_empty() {
-                    items.push(
-                        self.rules
-                            .iter()
-                            .filter(|rule| rule.matches_process(&process.argv, &process.cwd))
-                            .collect(),
-                    );
+                let command = self.process_rules(process);
+                if !command.is_empty() {
+                    items.push(command);
                 }
                 self.resolve_items(items)
             }
             ReviewedAction::Process { process, .. }
                 if process.language.is_none() && !process.argv.is_empty() =>
             {
-                let matched = self
-                    .rules
-                    .iter()
-                    .filter(|rule| rule.matches_process(&process.argv, &process.cwd))
-                    .collect();
-                self.resolve_items(vec![matched])
+                self.resolve_items(vec![self.process_rules(process)])
             }
             _ => RuleOutcome::Unmatched,
         }
+    }
+
+    fn file_rules(&self, action: &FileAction) -> Vec<&Rule> {
+        self.rules
+            .iter()
+            .filter(|rule| rule.matches_file(action))
+            .collect()
+    }
+
+    fn process_rules(&self, process: &ProcessPlanDto) -> Vec<&Rule> {
+        self.rules
+            .iter()
+            .filter(|rule| rule.matches_process(process))
+            .collect()
+    }
+
+    pub fn denied(&self, action: &ReviewedAction) -> Option<String> {
+        let deny = |rule: &&Rule| rule.effect == RuleEffect::Deny;
+        let found = match action {
+            ReviewedAction::Files { actions, .. } => actions
+                .iter()
+                .find_map(|action| self.file_rules(action).into_iter().find(deny)),
+            ReviewedAction::Process { process, .. } => {
+                let code = match (process.language, process.source.as_deref()) {
+                    (Some(language), Some(source)) if source != UNREAD_SCRIPT => self
+                        .rules
+                        .iter()
+                        .filter(|rule| rule.matches_code(language, source))
+                        .find(deny),
+                    _ => None,
+                };
+                code.or_else(|| self.process_rules(process).into_iter().find(deny))
+            }
+            _ => None,
+        };
+        found.map(|rule| rule.id.clone())
+    }
+}
+
+pub fn pack_files(folder: Option<&Path>) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = folder
+        .and_then(|folder| std::fs::read_dir(folder).ok())
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+        })
+        .collect();
+    files.sort();
+    files
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackStamp(Vec<(PathBuf, Option<SystemTime>, u64)>);
+
+impl PackStamp {
+    pub fn read(folder: Option<&Path>) -> Self {
+        Self(
+            pack_files(folder)
+                .into_iter()
+                .map(|file| {
+                    let metadata = std::fs::metadata(&file).ok();
+                    let modified = metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.modified().ok());
+                    let length = metadata.map_or(0, |metadata| metadata.len());
+                    (file, modified, length)
+                })
+                .collect(),
+        )
     }
 }

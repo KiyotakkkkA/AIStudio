@@ -8,6 +8,7 @@ import ExecPolicyStore from "../../src/renderer/features/execPolicy/ExecPolicySt
 import {
   EXEC_MODE_COPY,
   EXEC_POLICY_LABEL,
+  JUDGE_OPTIONAL,
   JUDGE_SETUP,
   NO_RESTRICTIONS_CONFIRM,
 } from "../../src/renderer/features/execPolicy/execPolicyCopy";
@@ -36,14 +37,13 @@ test("mode information opens without selecting the mode or closing the menu", as
   expect(screen.getByRole("menu", { name: EXEC_POLICY_LABEL })).toBeTruthy();
 });
 
-test("unavailable automatic review keeps its setup action and mode information", () => {
+test("automatic review is selectable without a judge and names the judge as optional", () => {
   const { store, setup } = openMenu();
-  expect(store.isAvailable("auto-bypass")).toBe(false);
+  expect(store.judgeReady).toBe(false);
   expect(
-    screen.getByRole("button", {
-      name: `О режиме «${EXEC_MODE_COPY["auto-bypass"].label}»`,
-    }),
+    screen.getByRole("menuitemradio", { name: EXEC_MODE_COPY["auto-bypass"].label }),
   ).toBeTruthy();
+  expect(screen.getByText(JUDGE_OPTIONAL)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: JUDGE_SETUP }));
   expect(setup).toHaveBeenCalledOnce();
 });

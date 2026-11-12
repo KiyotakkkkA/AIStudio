@@ -1207,81 +1207,117 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
 - **Folder access and tool tiers are separate axes.** A grant says *where* a tool may act;
   the tier on the Tools page says *whether* and with what confirmation it may act. Neither
   widens the other.
-- **Execution policy** (2026-10-29). A third axis, above the two: it decides how a call
-  that would *ask* is answered, and nothing else. One global mode, shown and switched from the
-  composer (the shield button beside the provider control):
+- **Execution policy** (2026-10-29, rewritten by TASK_079 on 2026-11-12). A third axis, above
+  the two: it decides how a call that would *ask* is answered, and refuses what a `deny` rule
+  names. One global mode, shown and switched from the composer (the shield button beside the
+  provider control):
 
   | Call | `always-ask` | `safety-ask` | `auto-bypass` | `no-restrictions` |
   | --- | --- | --- | --- | --- |
+  | tier `off`, disabled tool, forbidden folder, outside a grant or the session workspace, credential and payment fields | refused | refused | refused | refused |
+  | a `deny` rule of any pack matches the effect (any tier; every file operation) | refused | refused | refused | refused |
   | tier `auto` | runs | runs | runs | runs |
   | tier `ask`, not destructive | asks | runs | runs | runs |
   | `fs.apply` delete, overwrite, move onto a path | asks | asks | rules → judge → asks | runs |
   | `browser.submit`, `browser.download` (site rule `ask`) | asks | asks | asks | runs |
-  | `shell.run` | asks | asks | rules → judge → asks | runs |
-  | tier `off`, disabled tool, forbidden folder, outside a grant or the session workspace, credential and payment fields | refused | refused | refused | refused |
+  | `shell.run` | asks | rule `allow` runs, else asks | rules → judge → asks | runs |
 
-  The last row is the floor: no mode reaches it. `always-ask` is today's behaviour. Destructive
-  is decided by effect, not by the operation's name: a `write` or `edit` that replaces an
-  existing file is an overwrite. A file grant is still raised as a `kind: "folder"` approval in
-  every mode; the policy answers tier approvals only. `no-restrictions` is chosen through a
-  confirmation that names process tools: they run with the user's rights and no sandbox.
-- **Judge** (`auto-bypass`). The mode is available only once a judge model is chosen
-  («Общие» → «Модель-арбитр»); without one the composer shows it inactive with a link to that
-  setting. A destructive call first meets **policy rules**, matched in code: path globs ×
-  operation for files, `argv` patterns × cwd for processes, each rule
-  `allow | review | ask | deny`. Precedence is vendor `deny` > user rules > vendor `allow`;
-  across a batch, `deny` > `ask` > `review` > `allow`. Rules ship in packs, vendor and
-  user, the way skills do, and a pack declares whether it contains any `allow`. A call no rule
-  matches, or one a `review` rule flags, goes to the judge with only the structured action (the
-  `fs.apply` batch as one diff, or program, cwd, argv and source), the rule texts and the
-  flagged rule — never the conversation, which may carry injected content. `review` marks calls
-  argv patterns cannot read, such as an interpreter given a script string (`cmd /c`,
-  `powershell -Command`, `python -c`): the judge reads the script itself, and if it fails the
-  user is asked with the rule text as the reason. The judge answers `allow` or `ask` with a
+  Per rule outcome of a reviewed `shell.run` (and of destructive `fs.apply` changes in `auto`;
+  in `safety-ask` those always ask):
+
+  | Rule outcome | `always-ask` | `safety-ask` | `auto-bypass`, judge | `auto-bypass`, no judge | `no-restrictions` |
+  | --- | --- | --- | --- | --- | --- |
+  | `deny` | refused | refused | refused | refused | refused |
+  | `ask` | asks | asks | asks | asks | runs |
+  | `review` | asks | asks | judge | asks | runs |
+  | `allow` | asks | runs | runs | runs | runs |
+  | unmatched | asks | asks | judge | asks | runs |
+
+  The first two rows are the floor: no mode reaches them. Destructive is decided by effect, not
+  by the operation's name: a `write` or `edit` that replaces an existing file is an overwrite. A
+  file grant is still raised as a `kind: "folder"` approval in every mode; the policy answers
+  tier approvals only. `no-restrictions` is chosen through a confirmation that names process
+  tools: they run with the user's rights and no sandbox.
+- **Judge** (`auto-bypass`, optional since TASK_079). The mode works without a judge model:
+  rules decide what they can and everything else asks. A judge chosen in «Общие» →
+  «Модель-арбитр» removes prompts; the composer names it as optional and links to that setting
+  while none is chosen. A destructive call first meets **policy rules**, matched in code: path
+  globs × operation for files, `argv` patterns × cwd (or the plan's `scriptString`
+  classification) for processes, each rule `allow | review | ask | deny`. Precedence is vendor
+  `deny` > user rules > vendor `allow`; across a batch, `deny` > `ask` > `review` > `allow`.
+  Rules ship in packs, vendor and user, the way skills do, and a pack declares whether it
+  contains any `allow`. A call no rule matches, or one a `review` rule flags, goes to the judge
+  with only the structured action (the `fs.apply` batch as one diff, or program, cwd, argv and
+  source), the rule texts and the flagged rule — never the conversation, which may carry
+  injected content; with no judge it asks, with the flagged rule's text as the reason. `review`
+  marks calls argv patterns cannot read, such as an interpreter given a script string
+  (`cmd /c`, `powershell -Command`, `python -c`): the judge reads the script itself, and if it
+  fails the user is asked with the rule text as the reason. The judge answers `allow` or `ask` with a
   reason; anything else, an error, a timeout or an unavailable model is `ask`. Its prompt judges
   effect, not tool use (2026-11-01, was "biased toward `ask`", which asked for every script that
   used the network or a subprocess): reading, computing, HTTP GET, scraping, inspection and
   build/test commands, and writes the agent is producing inside the project or scratch folder
   run; it asks when it can name a concrete harm — losing data that is not regenerated, sending
   local data or publishing, credentials, system changes, process control, running downloaded or
-  decoded code, or an action it cannot read. `deny` from a rule fails the call with
-  `PermissionDenied`.
+  decoded code, or an action it cannot read. `deny` from a rule of any pack fails the call
+  with `PermissionDenied` in every mode, `no-restrictions` included, before the mode is
+  consulted and whatever the tool's tier.
 - **Audit.** Every admitted call records why it ran: `auto`, `granted`, `approved`,
   `policy:<mode>` or `judge:<rule id | model>` with the judge's reason, in the run log and on
   the tool call's details.
 - **Implementation (`zvs-host/src/policy/`, TASK_048_EXTRA_1, 2026-10-29).** The mode and the
   judge are stored under the `exec.policy` setting and reached only through `execPolicy.get` /
   `execPolicy.set` (`settings.set` refuses the key). `set` refuses a judge whose provider is
-  disabled or whose model is unavailable, and `auto-bypass` without a judge; `get` clears a
-  judge that disappeared since, drops `auto-bypass` to `safety-ask` and stores the result.
-  `decide(mode, family)` is the table above as a pure function. It is consulted through the
+  disabled or whose model is unavailable and accepts `auto-bypass` with no judge; `get` clears
+  a judge that disappeared since, keeps the mode and stores the result. `decide(mode, family)`
+  is the table above as a pure function: `run`, `ask`, `rules` (`safety-ask` processes: a rule
+  `allow` runs, anything else asks) or `review` (`auto-bypass`). It is consulted through the
   `ExecReview` port in `KernelServices`, by the gate (`access::Gatekeeper`) for every call the
-  tier sends to `ask`, with the effect the node declared in `access`. A tool declared destructive whose effect the
-  host cannot see asks in every mode but `no-restrictions`. Rule packs are JSON
-  (`{ id, allows, rules[] }`, each rule `files: { paths, operations }`, `process: { argv, cwd }`
-  or `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
-  case-insensitive). A `code` rule matches a source-bearing process plan whose language is
-  listed and whose source matches none of the `avoid` regexes. **Script sources**
-  (`commands/script.rs`, 2026-11-05): when `shell.run` starts an interpreter (`python`, `py`,
-  `uv run`, `node`, `deno`, `bun`, `tsx`, `pwsh`, `powershell`) on a script file, the host reads
-  that file into the plan's `language` and `source`; code passed through `stdin` with no script
-  file is the source instead. Only a file inside the run's cwd, at most 256 KiB of UTF-8, is
-  read; anything else carries `UNREAD_SCRIPT` and matches no `code` rule, so it goes to the
-  judge. A source-bearing plan is matched by its `code` rules and its `argv` rules as two items
-  of one batch, so `allow-unflagged` alone never lets a script run, and an `ask` or `deny` on the
-  command line still applies. The approval shows the script text. Skill scripts keep the argv
-  path. Since 2026-10-29 the vendor pack ends in two
-  catch-alls so routine work stops asking: `allow-unflagged` allows any command no `ask` or
-  `deny` rule names (vendor `ask` outranks vendor `allow`), and `allow-plain-scripts` allows a
-  script without network use, process launches, generated code, deleting or moving files,
-  registry or credential access, decoded payloads or installs; a script that trips a pattern
-  goes to the judge. Among rules of equal effect the first in the pack is reported. The vendor
-  pack ships in
-  `policy/vendor.json`, user packs are read from `<app data>/policy/*.json` on every review,
-  and a pack that holds an `allow` it did not declare, or does not parse, is skipped with a
-  warning. In a batch the destructive changes are matched one by one: any `deny` refuses the
-  batch, any `ask` asks, and the batch runs on rules only when every change is allowed;
-  otherwise the judge sees it. The judge is one `generate` call through the provider's own
+  tier sends to `ask`, with the effect the node declared in `access`; the gate also calls
+  `ExecReview::refused` for every gated call, so a `deny` rule refuses an `fs.apply` or
+  `shell.run` whose tier is `auto`. A tool declared destructive whose effect the host cannot
+  see asks in every mode but `no-restrictions`. Rule packs are JSON (`{ id, allows, rules[] }`,
+  each rule `files: { paths, operations }`, `process: { argv, cwd, scriptString }` or
+  `code: { languages, avoid }`, `**` matching any run of arguments, `{a,b}` alternation,
+  case-insensitive). File rules match every operation, creates and plain moves included, and
+  an empty `operations` list means all of them; a move is matched by its target and its
+  source. A `code` rule matches a source-bearing process plan whose language is listed and
+  whose source matches none of the `avoid` regexes. **Script sources** (`commands/script.rs`,
+  2026-11-05, extended by TASK_079): when `shell.run` starts an interpreter (`python`, `py`,
+  `uv run`, `node`, `deno`, `bun`, `tsx`, `pwsh`, `powershell`, `bash`, `sh`, `zsh`) on a
+  script file, the host reads that file into the plan's `language` (`shell` for the three
+  shells) and `source`; code passed through `stdin` with no script file is the source instead.
+  Only a file inside the run's cwd, at most 256 KiB of UTF-8, is read; anything else carries
+  `UNREAD_SCRIPT` and matches no `code` rule, so it goes to the judge. A source-bearing plan is
+  matched by its `code` rules and, when some rule names its command line, by those `argv`
+  rules as a second item of one batch, so an `ask`, `review` or `deny` on the command line
+  still applies. The approval shows the script text. Skill scripts keep the argv path.
+  **Script strings** (TASK_079): `commands/script.rs` `script_string` classifies argv in code
+  and the plan carries it as `scriptString`: PowerShell `-Command`, `-EncodedCommand` and
+  `-CommandWithArgs` in any accepted prefix or alias (`-c`, `-com`, `-ec`, `-en`, `-enco`, …), a
+  bare positional command for Windows PowerShell, `cmd /c /k /r`, `forfiles /c`, `wsl <program>`
+  and the inline flags of other interpreters before their first argument (`-c` for shells and
+  Python, `-e`/`-p`/`--eval`/`--print` and `deno eval` for JavaScript runtimes). The vendor rule
+  `review-script-strings` keys on the flag, not on argv globs. **No catch-all**: the vendor pack
+  no longer ends in `allow-unflagged`, and no pack may hold an `allow` process rule of `*`
+  followed only by `**`. A command no rule names goes to the judge in `auto-bypass` and to the
+  person otherwise, every time (DECISION: option a; «always for this program in this folder»
+  follows with TASK_080). The pack names package runners (`npx`, `bunx`, `uvx`, `npm exec`,
+  `pnpm dlx`, `yarn dlx`, `bun x`, `pipx run`, `uv tool run`, `go run` and `deno run` with a
+  remote module) and Windows script hosts (`mshta`, `wscript`, `cscript`, `rundll32`,
+  `regsvr32`, `forfiles`, …) as `ask`, and grows explicit `allow` families in place of the
+  catch-all: container inspection, package listings, formatters, `git fetch`, inspection
+  utilities and `make`/`ninja` builds. `allow-plain-scripts` still allows a script without
+  network use, process launches, generated code, deleting or moving files, registry or
+  credential access, decoded payloads or installs; a script that trips a pattern goes to the
+  judge. Among rules of equal effect the first in the pack is reported. The vendor pack ships
+  in `policy/vendor.json`, user packs are read from `<app data>/policy/*.json`, and a pack that
+  holds an `allow` it did not declare, or does not parse, is skipped with a warning. Packs are
+  compiled once: `ExecPolicyService` keeps the `RuleSet` with a stamp of the pack folder (file
+  names, modified times, lengths) and recompiles when the stamp changes or a user rule is
+  written. In a batch the destructive changes, and any other change a rule names, are matched
+  one by one: any `deny` refuses the batch, any `ask` asks, and the batch runs on rules only
+  when every change is allowed; otherwise the judge sees it. The judge is one `generate` call through the provider's own
   driver with a single `verdict` tool (`decision: allow | ask`, `reason` required, written in
   Russian), a 30 s timeout and its own cap of 50 calls per run, after which every call asks.
   `ChatToolCallDto.authorisation` (`ToolAuthorisationDto`: `kind`, `source`, `reason`) carries
@@ -1293,11 +1329,12 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   ordered stages; each continues or decides, the first `Decision { outcome: allow | ask | deny,
   stage, source, reason }` wins and keeps the trail of stages it visited, and a pipeline that
   decides nothing asks the person. The stages are **floor** (graph allow-list, tool disabled,
-  tier `off`), **tier** (`admit_subject`), **mode** (`decide`), **rules** (`RuleSet::evaluate`)
-  and **judge**. The floor and the tier fail closed: an error in them fails the call; an error
-  in a later stage asks. The gate (`access::Gatekeeper`, wired by `RunService`) runs floor → tier and,
-  when the tier asks, reviews the node's effect through `ExecReview`; `ExecPolicyService::review`
-  runs mode → rules → judge. A request marked `always_ask` skips the review and goes to the
+  tier `off`), **tier** (`admit_subject`), **hard rules** (`RuleSet::denied`, TASK_079),
+  **mode** (`decide`), **rules** (`RuleSet::evaluate`) and **judge**. The floor, the tier and
+  the hard rules fail closed: an error in them fails the call; an error in a later stage asks.
+  The gate (`access::Gatekeeper`, wired by `RunService`) runs floor → tier, then the hard rules
+  on the node's effect whatever the tier decided, and, when the tier asks, reviews the effect
+  through `ExecReview`; `ExecPolicyService::review` runs hard rules → mode → rules → judge. A request marked `always_ask` skips the review and goes to the
   person in every mode. Since TASK_078 every driver goes through it: `fs.apply` (`Files`),
   `shell.run` (`Process`), the browser (`Browser` for submit and download, `Plain` otherwise),
   computer use (`Desktop { apps, sensitive }`), integrations (`Remote`, `always_ask` for a

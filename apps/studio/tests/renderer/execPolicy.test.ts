@@ -48,18 +48,21 @@ describe("ExecPolicyStore", () => {
     expect(store.judgeReady).toBe(true);
   });
 
-  test("keeps auto-bypass unavailable without a judge and saves other modes", async () => {
+  test("selects auto-bypass without a judge", async () => {
     const { store, saved } = setup();
     await store.load();
-    expect(store.isAvailable("auto-bypass")).toBe(false);
     await store.setMode("auto-bypass");
-    expect(store.mode).toBe("always-ask");
+    expect(store.mode).toBe("auto-bypass");
+    expect(store.judgeReady).toBe(false);
     await store.setMode("safety-ask");
     expect(store.mode).toBe("safety-ask");
-    expect(saved).toEqual([{ mode: "safety-ask", judge: null }]);
+    expect(saved).toEqual([
+      { mode: "auto-bypass", judge: null },
+      { mode: "safety-ask", judge: null },
+    ]);
   });
 
-  test("choosing a judge provider saves its first available model and unlocks auto-bypass", async () => {
+  test("choosing a judge provider saves its first available model", async () => {
     const { store, saved } = setup([
       provider({
         models: [
@@ -88,13 +91,13 @@ describe("ExecPolicyStore", () => {
     expect(saved).toHaveLength(1);
   });
 
-  test("clearing the judge falls back from auto-bypass to safety-ask on the host too", async () => {
+  test("clearing the judge keeps auto-bypass", async () => {
     const { store, saved } = setup([provider()], { mode: "auto-bypass", judge: JUDGE });
     await store.load();
     await store.clearJudge();
     expect(store.judgeReady).toBe(false);
-    expect(store.mode).toBe("safety-ask");
-    expect(saved.at(-1)).toEqual({ mode: "safety-ask", judge: null });
+    expect(store.mode).toBe("auto-bypass");
+    expect(saved.at(-1)).toEqual({ mode: "auto-bypass", judge: null });
   });
 
   test("keeps no-restrictions when the judge is cleared", async () => {

@@ -1,5 +1,6 @@
 [
   { "name": "python", "value": "python" },
   { "name": "javascript", "value": "javascript" },
-  { "name": "powershell", "value": "powershell" }
+  { "name": "powershell", "value": "powershell" },
+  { "name": "shell", "value": "shell" }
 ]

@@ -223,6 +223,7 @@ fn shell(argv: &[&str]) -> ReviewedAction {
             source: None,
             packages: Vec::new(),
             background: false,
+            script_string: false,
             reason: None,
         },
     }
@@ -543,7 +544,12 @@ async fn every_cell_of_the_passport_table_holds_end_to_end() {
             "shell.run",
             ToolTier::Ask,
             shell(&["git", "status"]),
-            [(Ask, Mode), (Ask, Mode), (Ask, Judge), (Allow, Mode)],
+            [
+                (Ask, Mode),
+                (Ask, StageName::Rules),
+                (Ask, Judge),
+                (Allow, Mode),
+            ],
         ),
         (
             "declared destructive",
@@ -564,29 +570,84 @@ async fn every_cell_of_the_passport_table_holds_end_to_end() {
                 "{name} in {mode}"
             );
             if stage == Judge {
-                assert_eq!(decision.trail, vec![Mode, StageName::Rules, Judge]);
+                assert_eq!(
+                    decision.trail,
+                    vec![StageName::HardRules, Mode, StageName::Rules, Judge]
+                );
             }
         }
     }
 }
 
 #[tokio::test]
-async fn vendor_rules_decide_before_the_judge_in_auto_bypass() {
+async fn deny_rules_decide_before_the_mode_in_every_mode() {
     let host = Host::new(VENDOR_PACK);
-    host.mode(ExecMode::AutoBypass);
     host.tier("fs.apply", ToolTier::Ask);
-    let denied = host
-        .admitted("fs.apply", &delete("C:/work/.git/config"))
-        .await;
-    assert_eq!(
-        (denied.outcome, denied.stage),
-        (Outcome::Deny, StageName::Rules)
+    for mode in MODES {
+        host.mode(mode);
+        let denied = host
+            .admitted("fs.apply", &delete("C:/work/.git/config"))
+            .await;
+        assert_eq!(
+            (denied.outcome, denied.stage),
+            (Outcome::Deny, StageName::HardRules),
+            "{mode}"
+        );
+        assert_eq!(denied.trail, vec![StageName::HardRules], "{mode}");
+        let refusal = denied.refusal("fs.apply");
+        assert_eq!(refusal.code, AppErrorCode::PermissionDenied);
+        assert_eq!(refusal.message, RULE_DENIED);
+    }
+}
+
+#[tokio::test]
+async fn the_gate_refuses_a_denied_change_even_when_the_tier_runs_it() {
+    let host = Host::new(VENDOR_PACK);
+    host.tier("fs.apply", ToolTier::Auto);
+    let approvals = Arc::new(
+        crate::services::approvals::ApprovalService::new(
+            host._database.shared(),
+            Arc::clone(&host.permissions),
+            std::time::Duration::from_secs(60),
+            Arc::new(FakeClock::default()),
+        )
+        .expect("an approval service"),
     );
-    assert_eq!(denied.trail, vec![StageName::Mode, StageName::Rules]);
-    assert_eq!(
-        denied.refusal("fs.apply").code,
-        AppErrorCode::PermissionDenied
-    );
+    let keeper = super::Gatekeeper::new(&host.permissions, approvals, None);
+    let startup =
+        "C:/Users/me/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/run.cmd";
+    for mode in MODES {
+        host.mode(mode);
+        let context = StepContext::new(
+            RunId::new(new_id()),
+            CancellationToken::new(),
+            KernelServices {
+                policy: Some(Arc::new(host.policy.clone())),
+                ..KernelServices::default()
+            },
+            Arc::new(Silent),
+        );
+        let created =
+            ReviewedAction::files(vec![change(FileChangeKind::Create, startup)], |_| false);
+        let request = AccessRequest::new(Actor::run(""), "fs.apply", created.into());
+        let refused = keeper
+            .admit(request, &context)
+            .await
+            .expect_err("the autostart folder is refused");
+        assert_eq!(refused.code, AppErrorCode::PermissionDenied, "{mode}");
+        assert_eq!(refused.message, RULE_DENIED, "{mode}");
+        let allowed = ReviewedAction::files(
+            vec![change(FileChangeKind::Create, "C:/work/src/new.rs")],
+            |_| false,
+        );
+        let request = AccessRequest::new(Actor::run(""), "fs.apply", allowed.into());
+        drop(
+            keeper
+                .admit(request, &context)
+                .await
+                .expect("an ordinary create runs at tier auto"),
+        );
+    }
 }
 
 #[tokio::test]

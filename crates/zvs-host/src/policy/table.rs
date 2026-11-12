@@ -14,6 +14,7 @@ pub enum Family {
 pub enum Decision {
     Run,
     Ask,
+    Rules,
     Review,
 }
 
@@ -22,6 +23,7 @@ pub const fn decide(mode: ExecMode, family: Family) -> Decision {
         (_, Family::Auto) | (ExecMode::NoRestrictions, _) => Decision::Run,
         (ExecMode::AlwaysAsk, _) => Decision::Ask,
         (_, Family::Benign) => Decision::Run,
+        (ExecMode::SafetyAsk, Family::Process) => Decision::Rules,
         (ExecMode::AutoBypass, Family::Files | Family::Process) => Decision::Review,
         _ => Decision::Ask,
     }
@@ -44,12 +46,12 @@ mod tests {
 
     #[test]
     fn every_cell_of_the_passport_table_is_enforced() {
-        use Decision::{Ask, Review, Run};
+        use Decision::{Ask, Review, Rules, Run};
         assert_eq!(row(Family::Auto), [Run, Run, Run, Run]);
         assert_eq!(row(Family::Benign), [Ask, Run, Run, Run]);
         assert_eq!(row(Family::Files), [Ask, Ask, Review, Run]);
         assert_eq!(row(Family::Browser), [Ask, Ask, Ask, Run]);
-        assert_eq!(row(Family::Process), [Ask, Ask, Review, Run]);
+        assert_eq!(row(Family::Process), [Ask, Rules, Review, Run]);
     }
 
     #[test]

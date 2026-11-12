@@ -40,6 +40,27 @@
     }
   },
   {
+    "name": "a script string",
+    "value": {
+      "program": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "argv": ["powershell", "-ec", "RwBlAHQALQBEAGEAdABlAA=="],
+      "cwd": "D:\\work\\app",
+      "packages": [],
+      "scriptString": true
+    }
+  },
+  {
+    "name": "a shell script file",
+    "value": {
+      "program": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "language": "shell",
+      "argv": ["bash", "build.sh"],
+      "cwd": "D:\\work\\app",
+      "source": "make all\n",
+      "packages": []
+    }
+  },
+  {
     "name": "background code",
     "value": {
       "program": "Python",

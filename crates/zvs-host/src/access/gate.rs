@@ -37,6 +37,16 @@ pub async fn review(context: &StepContext, effect: &Effect) -> Result<ReviewVerd
     }
 }
 
+async fn hard_rules(context: &StepContext, effect: &Effect) -> Result<(), AppError> {
+    let Some(policy) = &context.services.policy else {
+        return Ok(());
+    };
+    match policy.refused(context, effect).await? {
+        Some(rule) => Err(rule_denied(&rule)),
+        None => Ok(()),
+    }
+}
+
 pub struct Gatekeeper {
     admission: AccessPipeline,
     folder: AccessPipeline,
@@ -113,6 +123,7 @@ impl Gatekeeper {
                 if decision.outcome == Outcome::Deny {
                     return Err(decision.refusal(&request.tool));
                 }
+                hard_rules(context, &request.effect).await?;
                 context.authorise(ToolAuthorisationDto::of(ToolAuthorisationKind::Auto))?;
                 Self::cleared(&request, Cleared::Admission);
                 ask_grant(&self.approvals, context, &request, false).await?;
@@ -129,6 +140,7 @@ impl Gatekeeper {
             Outcome::Ask => true,
             Outcome::Allow => request.always_ask,
         };
+        hard_rules(context, &request.effect).await?;
         if !asking {
             if let Some(authorisation) = decision.authorisation() {
                 context.authorise(authorisation)?;

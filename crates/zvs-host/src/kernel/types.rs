@@ -260,6 +260,12 @@ pub trait ExecReview: Send + Sync {
         context: &StepContext,
         effect: &crate::access::Effect,
     ) -> Result<ReviewVerdict, AppError>;
+
+    async fn refused(
+        &self,
+        context: &StepContext,
+        effect: &crate::access::Effect,
+    ) -> Result<Option<String>, AppError>;
 }
 
 pub type ApprovalObserver =

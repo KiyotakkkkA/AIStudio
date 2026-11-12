@@ -16,11 +16,10 @@ use super::judge::{JUDGE_SYSTEM, VERDICT_TOOL, judge_prompt, verdict_spec};
 use super::rules::{
     PackOrigin, RuleEffect, RuleOutcome, RuleSet, RuleText, compile_pack, path_glob,
 };
-use super::service::{
-    EXEC_POLICY_KEY, ExecPolicyOptions, ExecPolicyService, JUDGE_REQUIRED, JUDGE_UNAVAILABLE,
-};
+use super::service::{EXEC_POLICY_KEY, ExecPolicyOptions, ExecPolicyService, JUDGE_UNAVAILABLE};
 use super::table::Family;
 use super::{ReviewVerdict, ReviewedAction, VENDOR_PACK};
+use crate::commands::script::script_string;
 use crate::data::Repositories;
 use crate::data::repositories::{ModelDraft, ProviderDraft, ProviderPatch, RunDraft};
 use crate::drivers::ai::adapters::OPENAI_COMPATIBLE_CAPABILITIES;
@@ -297,18 +296,21 @@ fn script(source: &str) -> ReviewedAction {
             source: Some(source.to_owned()),
             packages: Vec::new(),
             background: false,
+            script_string: false,
             reason: None,
         },
     }
 }
 
 fn shell(argv: &[&str]) -> ReviewedAction {
+    let argv: Vec<String> = argv.iter().map(|part| (*part).to_owned()).collect();
     ReviewedAction::Process {
         tool: "shell.run".to_owned(),
         process: ProcessPlanDto {
-            program: argv[0].to_owned(),
+            program: argv[0].clone(),
             language: None,
-            argv: argv.iter().map(|part| (*part).to_owned()).collect(),
+            script_string: script_string(&argv),
+            argv,
             cwd: "C:/work".to_owned(),
             source: None,
             packages: Vec::new(),
@@ -395,7 +397,7 @@ fn file_actions_are_classified_by_effect_not_by_name() {
 #[test]
 fn the_vendor_pack_guards_the_obvious_cases() {
     let rules = vendor();
-    let cases: [(ReviewedAction, &str, Option<&str>); 21] = [
+    let cases: Vec<(ReviewedAction, &str, Option<&str>)> = vec![
         (
             delete("C:/work/.git/config"),
             "deny",
@@ -470,7 +472,85 @@ fn the_vendor_pack_guards_the_obvious_cases() {
         (
             shell(&["make", "all"]),
             "allow",
-            Some("vendor.process.allow-unflagged"),
+            Some("vendor.process.allow-build-tools"),
+        ),
+        (shell(&["make", "install"]), "unmatched", None),
+        (shell(&["cargo", "run"]), "unmatched", None),
+        (
+            shell(&["docker", "run", "-v", "C:\\:/h", "alpine"]),
+            "unmatched",
+            None,
+        ),
+        (
+            shell(&["docker", "ps", "-a"]),
+            "allow",
+            Some("vendor.process.allow-container-inspection"),
+        ),
+        (
+            shell(&["pip", "list"]),
+            "allow",
+            Some("vendor.process.allow-package-listings"),
+        ),
+        (
+            shell(&["prettier", "--write", "src"]),
+            "allow",
+            Some("vendor.process.allow-formatters"),
+        ),
+        (
+            shell(&["npx", "cowsay", "hi"]),
+            "ask",
+            Some("vendor.process.ask-package-runners"),
+        ),
+        (
+            shell(&["pnpm", "dlx", "create-vite"]),
+            "ask",
+            Some("vendor.process.ask-dlx"),
+        ),
+        (
+            shell(&["npm", "exec", "vitest"]),
+            "ask",
+            Some("vendor.process.ask-npm-exec"),
+        ),
+        (
+            shell(&["uv", "tool", "run", "ruff"]),
+            "ask",
+            Some("vendor.process.ask-uv-tool-run"),
+        ),
+        (
+            shell(&["uv", "run", "pytest"]),
+            "allow",
+            Some("vendor.process.allow-uv-run-checks"),
+        ),
+        (
+            shell(&["go", "run", "github.com/x/y@latest"]),
+            "ask",
+            Some("vendor.process.ask-remote-modules"),
+        ),
+        (shell(&["go", "run", "./cmd/app"]), "unmatched", None),
+        (
+            shell(&["mshta", "javascript:close()"]),
+            "ask",
+            Some("vendor.process.ask-script-hosts"),
+        ),
+        (
+            shell(&["powershell", "-ec", "RwBlAHQALQBEAGEAdABlAA=="]),
+            "review",
+            Some("vendor.process.review-script-strings"),
+        ),
+        (
+            shell(&["cmd", "/r", "del", "x"]),
+            "review",
+            Some("vendor.process.review-script-strings"),
+        ),
+        (
+            shell(&["wsl", "rm", "-rf", "/mnt/c/work"]),
+            "review",
+            Some("vendor.process.review-script-strings"),
+        ),
+        (
+            shell(&["bash", "-lc", "make"]),
+            "review",
+            Some("vendor.process.review-script-strings"),
         ),
         (
             shell(&["robocopy", "a", "b", "/MIR"]),
@@ -552,6 +632,21 @@ fn a_benign_batch_and_code_run_never_meet_the_rules() {
             "C:/work/.git/x"
         )])),
         RuleOutcome::Unmatched
+    );
+    assert_eq!(
+        rules.evaluate(&files(vec![
+            change(FileChangeKind::Create, "C:/work/src/new.rs"),
+            change(FileChangeKind::Delete, "C:/work/dist/a.js"),
+        ])),
+        RuleOutcome::Allow {
+            rule: "vendor.files.allow-build-output".to_owned(),
+            text: rules
+                .texts(true)
+                .into_iter()
+                .find(|rule| rule.id == "vendor.files.allow-build-output")
+                .expect("the rule")
+                .text,
+        }
     );
     let ReviewedAction::Process { mut process, tool } = shell(&["git", "status"]) else {
         panic!("a process");
@@ -663,17 +758,15 @@ fn a_pack_must_declare_its_allow_rules_and_a_broken_pack_is_skipped() {
 }
 
 #[test]
-fn the_policy_starts_in_always_ask_and_auto_bypass_needs_an_available_judge() {
+fn the_policy_starts_in_always_ask_and_auto_bypass_needs_no_judge() {
     let host = Host::new();
     assert_eq!(host.policy.get().expect("reads"), ExecPolicyDto::default());
-    let refused = host
-        .policy
-        .set(&ExecPolicyDto {
-            mode: ExecMode::AutoBypass,
-            judge: None,
-        })
-        .expect_err("needs a judge");
-    assert_eq!(refused.message, JUDGE_REQUIRED);
+    let without = ExecPolicyDto {
+        mode: ExecMode::AutoBypass,
+        judge: None,
+    };
+    assert_eq!(host.policy.set(&without).expect("stores"), without);
+    assert_eq!(host.policy.get().expect("reads"), without);
     let gone = host
         .policy
         .set(&ExecPolicyDto {
@@ -696,12 +789,12 @@ fn the_policy_starts_in_always_ask_and_auto_bypass_needs_an_available_judge() {
 }
 
 #[test]
-fn losing_the_judge_drops_auto_bypass_to_safety_ask_and_survives_a_restart() {
+fn losing_the_judge_keeps_auto_bypass_and_survives_a_restart() {
     let host = Host::new();
     host.mode(ExecMode::AutoBypass);
     host.disable_provider();
     let expected = ExecPolicyDto {
-        mode: ExecMode::SafetyAsk,
+        mode: ExecMode::AutoBypass,
         judge: None,
     };
     assert_eq!(host.policy.get().expect("reads"), expected);
@@ -754,7 +847,12 @@ async fn the_mode_answers_calls_that_would_ask() {
         ask
     );
     assert_eq!(host.review(&context, ReviewedAction::Browser).await, ask);
-    assert_eq!(host.review(&context, shell(&["git", "status"])).await, ask);
+    assert!(matches!(
+        host.review(&context, shell(&["git", "status"])).await,
+        ReviewVerdict::Run(ToolAuthorisationDto { source: Some(ref rule), .. })
+            if rule == "vendor.process.allow-git-read"
+    ));
+    assert_eq!(host.review(&context, shell(&["make", "deps"])).await, ask);
     host.mode(ExecMode::AutoBypass);
     assert_eq!(host.review(&context, ReviewedAction::Browser).await, ask);
     assert_eq!(host.review(&context, ReviewedAction::Declared).await, ask);
@@ -762,8 +860,8 @@ async fn the_mode_answers_calls_that_would_ask() {
     for action in [
         ReviewedAction::Browser,
         ReviewedAction::Declared,
-        shell(&["git", "push", "--force"]),
-        delete("C:/work/.git/config"),
+        shell(&["git", "push"]),
+        delete("C:/work/src/a.rs"),
     ] {
         assert_eq!(
             host.review(&context, action).await,
@@ -771,6 +869,224 @@ async fn the_mode_answers_calls_that_would_ask() {
         );
     }
     assert_eq!(host.judge.calls(), 0);
+}
+
+fn kind(verdict: &ReviewVerdict) -> &'static str {
+    match verdict {
+        ReviewVerdict::Run(_) => "run",
+        ReviewVerdict::Ask { .. } => "ask",
+        ReviewVerdict::Deny { .. } => "deny",
+    }
+}
+
+const MODES: [ExecMode; 4] = [
+    ExecMode::AlwaysAsk,
+    ExecMode::SafetyAsk,
+    ExecMode::AutoBypass,
+    ExecMode::NoRestrictions,
+];
+
+#[tokio::test]
+async fn every_mode_answers_every_rule_effect_with_and_without_a_judge() {
+    let effects = [
+        ("deny", shell(&["git", "push", "--force"])),
+        ("ask", shell(&["curl", "https://example.com"])),
+        ("review", shell(&["cmd", "/c", "dir"])),
+        ("allow", shell(&["git", "status"])),
+        ("unmatched", shell(&["mytool", "sync"])),
+    ];
+    let table: [(&str, bool, [&str; 5]); 8] = [
+        ("always-ask", true, ["deny", "ask", "ask", "ask", "ask"]),
+        ("always-ask", false, ["deny", "ask", "ask", "ask", "ask"]),
+        ("safety-ask", true, ["deny", "ask", "ask", "run", "ask"]),
+        ("safety-ask", false, ["deny", "ask", "ask", "run", "ask"]),
+        ("auto-bypass", true, ["deny", "ask", "run", "run", "run"]),
+        ("auto-bypass", false, ["deny", "ask", "ask", "run", "ask"]),
+        (
+            "no-restrictions",
+            true,
+            ["deny", "run", "run", "run", "run"],
+        ),
+        (
+            "no-restrictions",
+            false,
+            ["deny", "run", "run", "run", "run"],
+        ),
+    ];
+    for (mode, judged, expected) in table {
+        let host = Host::new();
+        let mode = MODES
+            .into_iter()
+            .find(|candidate| candidate.as_str() == mode)
+            .expect("a mode");
+        host.policy
+            .set(&ExecPolicyDto {
+                mode,
+                judge: judged.then(|| host.judge()),
+            })
+            .expect("stores the policy");
+        host.reply(Reply::Verdict(r#"{"decision":"allow","reason":"x"}"#));
+        for ((effect, action), outcome) in effects.iter().zip(expected) {
+            let verdict = host.review(&host.context(), action.clone()).await;
+            assert_eq!(
+                kind(&verdict),
+                outcome,
+                "{effect} in {mode}, judge {judged}"
+            );
+        }
+        let judged_calls = usize::from(judged && mode == ExecMode::AutoBypass) * 2;
+        assert_eq!(host.judge.calls(), judged_calls, "{mode}, judge {judged}");
+    }
+}
+
+#[tokio::test]
+async fn a_review_without_a_judge_asks_with_the_flagged_rule_as_the_reason() {
+    let host = Host::new();
+    host.policy
+        .set(&ExecPolicyDto {
+            mode: ExecMode::AutoBypass,
+            judge: None,
+        })
+        .expect("stores the policy");
+    let ReviewVerdict::Ask {
+        reason: Some(reason),
+    } = host
+        .review(&host.context(), shell(&["powershell", "-enco", "AA=="]))
+        .await
+    else {
+        panic!("asks with the rule text");
+    };
+    assert!(reason.starts_with("An interpreter given a script string"));
+    assert_eq!(
+        host.review(&host.context(), shell(&["npx", "cowsay", "hi"]))
+            .await,
+        ReviewVerdict::Ask {
+            reason: Some(
+                vendor()
+                    .texts(false)
+                    .into_iter()
+                    .find(|rule| rule.id == "vendor.process.ask-package-runners")
+                    .expect("the rule")
+                    .text
+            )
+        }
+    );
+    assert!(matches!(
+        host.review(&host.context(), shell(&["git", "status"]))
+            .await,
+        ReviewVerdict::Run(_)
+    ));
+}
+
+#[tokio::test]
+async fn deny_rules_refuse_every_file_operation_in_every_mode() {
+    let startup =
+        "C:/Users/me/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/run.cmd";
+    let mut moved = change(FileChangeKind::Move, "C:/work/stolen_key");
+    moved.from = Some("C:/Users/me/.ssh/id_ed25519".to_owned());
+    let cases = [
+        (
+            files(vec![change(FileChangeKind::Create, startup)]),
+            "vendor.files.deny-autostart",
+        ),
+        (
+            files(vec![
+                change(FileChangeKind::Create, "C:/work/src/new.rs"),
+                change(FileChangeKind::Move, startup),
+            ]),
+            "vendor.files.deny-autostart",
+        ),
+        (
+            ReviewedAction::files(vec![moved], |_| true),
+            "vendor.files.deny-keys-and-credential-stores",
+        ),
+        (
+            delete("C:/work/.git/config"),
+            "vendor.files.deny-vcs-internals",
+        ),
+        (shell(&["format", "C:"]), "vendor.process.deny-system-tools"),
+    ];
+    let host = Host::new();
+    for mode in MODES {
+        host.mode(mode);
+        for (action, rule) in &cases {
+            assert_eq!(
+                host.review(&host.context(), action.clone()).await,
+                ReviewVerdict::Deny {
+                    rule: (*rule).to_owned()
+                },
+                "{mode}"
+            );
+            let effect = crate::access::Effect::from(action.clone());
+            assert_eq!(
+                host.policy
+                    .refused(&host.context(), &effect)
+                    .await
+                    .expect("checks the hard rules"),
+                Some((*rule).to_owned()),
+                "{mode}"
+            );
+        }
+    }
+    assert_eq!(host.judge.calls(), 0);
+}
+
+#[test]
+fn no_allow_rule_may_cover_every_command() {
+    for argv in [r#"["*", "**"]"#, r#"["*"]"#, r#"["*", "**", "**"]"#] {
+        let pack = format!(
+            r#"{{ "id": "p", "allows": true, "rules": [ {{ "id": "r", "effect": "allow", "text": "t", "process": {{ "argv": {argv} }} }} ] }}"#
+        );
+        assert!(compile_pack(&pack, PackOrigin::User).is_err(), "{argv}");
+    }
+    let ask = r#"{ "id": "p", "allows": false, "rules": [ { "id": "r", "effect": "ask", "text": "t", "process": { "argv": ["*", "**"] } } ] }"#;
+    assert!(compile_pack(ask, PackOrigin::User).is_ok());
+    let flagged = r#"{ "id": "p", "allows": false, "rules": [ { "id": "r", "effect": "review", "text": "t", "process": { "scriptString": true } } ] }"#;
+    assert!(compile_pack(flagged, PackOrigin::User).is_ok());
+    let empty = r#"{ "id": "p", "allows": false, "rules": [ { "id": "r", "effect": "review", "text": "t", "process": {} } ] }"#;
+    assert!(compile_pack(empty, PackOrigin::User).is_err());
+    let rules = vendor();
+    assert!(
+        rules
+            .texts(false)
+            .iter()
+            .all(|rule| rule.id != "vendor.process.allow-unflagged")
+    );
+}
+
+#[test]
+fn packs_compile_once_and_reload_when_a_pack_changes() {
+    let host = Host::new();
+    let first = host.policy.rules();
+    assert!(Arc::ptr_eq(&first, &host.policy.rules()));
+    host.pack(
+        "a.json",
+        &user_pack(
+            r#"{ "id": "user.allow-src", "effect": "allow", "text": "t", "files": { "paths": ["C:/work/src/**"] } }"#,
+        ),
+    );
+    let added = host.policy.rules();
+    assert!(!Arc::ptr_eq(&first, &added));
+    assert_eq!(
+        rule_of(&added.evaluate(&delete("C:/work/src/a.rs"))),
+        ("allow", Some("user.allow-src"))
+    );
+    assert!(Arc::ptr_eq(&added, &host.policy.rules()));
+    host.pack(
+        "a.json",
+        &user_pack(
+            r#"{ "id": "user.ask-src-changed", "effect": "ask", "text": "t", "files": { "paths": ["C:/work/src/**"] } }"#,
+        ),
+    );
+    assert_eq!(
+        rule_of(&host.policy.rules().evaluate(&delete("C:/work/src/a.rs"))),
+        ("ask", Some("user.ask-src-changed"))
+    );
+    std::fs::remove_file(host.packs.path().join("a.json")).expect("removes the pack");
+    assert_eq!(
+        rule_of(&host.policy.rules().evaluate(&delete("C:/work/src/a.rs"))),
+        ("unmatched", None)
+    );
 }
 
 #[tokio::test]

@@ -45,12 +45,8 @@ export default class ExecPolicyStore {
     };
   }
 
-  isAvailable(mode: ExecMode): boolean {
-    return mode !== "auto-bypass" || this.judgeReady;
-  }
-
   setMode(mode: ExecMode): Promise<void> {
-    if (!this.isAvailable(mode) || mode === this.mode) return this.saving;
+    if (mode === this.mode) return this.saving;
     this.mode = mode;
     return this.save({ mode });
   }
@@ -60,8 +56,7 @@ export default class ExecPolicyStore {
     if (provider === undefined) return this.saving;
     this.judgeProviderId = provider.id;
     this.judgeModelId = provider.models.find((model) => model.available)?.externalId ?? null;
-    const dropped = this.dropUnavailableMode();
-    return this.save({ judge: this.policy.judge, ...dropped });
+    return this.save({ judge: this.policy.judge });
   }
 
   setJudgeModel(id: string): Promise<void> {
@@ -75,8 +70,7 @@ export default class ExecPolicyStore {
   clearJudge(): Promise<void> {
     this.judgeProviderId = null;
     this.judgeModelId = null;
-    const dropped = this.dropUnavailableMode();
-    return this.save({ judge: null, ...dropped });
+    return this.save({ judge: null });
   }
 
   async load(): Promise<void> {
@@ -145,11 +139,5 @@ export default class ExecPolicyStore {
       }
     });
     return this.saving;
-  }
-
-  private dropUnavailableMode(): Partial<ExecPolicyDto> {
-    if (this.isAvailable(this.mode)) return {};
-    this.mode = "safety-ask";
-    return { mode: this.mode };
   }
 }

@@ -11,6 +11,7 @@ use crate::policy::{ReviewVerdict, rule_denied};
 #[serde(rename_all = "camelCase")]
 pub enum StageName {
     Floor,
+    HardRules,
     Tier,
     Mode,
     Rules,
@@ -22,6 +23,7 @@ impl StageName {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Floor => "floor",
+            Self::HardRules => "hardRules",
             Self::Tier => "tier",
             Self::Mode => "mode",
             Self::Rules => "rules",
@@ -98,7 +100,7 @@ impl Decision {
             }
         };
         match self.stage {
-            StageName::Floor => None,
+            StageName::Floor | StageName::HardRules => None,
             StageName::Tier if self.source.as_deref() == Some(TIER_GRANTED) => {
                 Some(ToolAuthorisationDto::of(ToolAuthorisationKind::Granted))
             }
@@ -138,7 +140,7 @@ impl Decision {
             (StageName::Floor, Some(FLOOR_DISABLED)) => {
                 AppError::new(AppErrorCode::PermissionDenied, TOOL_DISABLED)
             }
-            (StageName::Rules, Some(rule)) => rule_denied(rule),
+            (StageName::HardRules | StageName::Rules, Some(rule)) => rule_denied(rule),
             _ => AppError::new(AppErrorCode::PermissionDenied, PERMISSION_DENIED),
         }
     }

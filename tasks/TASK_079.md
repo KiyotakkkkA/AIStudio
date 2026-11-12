@@ -2,7 +2,7 @@
 task: TASK_079
 title: Rules in every mode, auto without a judge, the vendor pack without a catch-all
 phase: A — Access pipeline (APS)
-status: todo
+status: done
 depends_on: [TASK_077]
 unblocks: [TASK_080]
 estimate: 4 h
@@ -122,19 +122,83 @@ a file under `Start Menu\Programs\Startup` is refused.
 
 ## Definition of done
 
-- [ ] `deny` refuses in every mode, for every file operation
-- [ ] `auto` is selectable and works with no judge
-- [ ] No rule matches `["*", "**"]` with `allow`
-- [ ] Script strings are classified in code with tests for every flag form listed
-- [ ] Packs are compiled once and reloaded on change
-- [ ] PASSPORT §14 table rewritten; `policy/README.md` updated
-- [ ] All gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `deny` refuses in every mode, for every file operation
+- [x] `auto` is selectable and works with no judge
+- [x] No rule matches `["*", "**"]` with `allow`
+- [x] Script strings are classified in code with tests for every flag form listed
+- [x] Packs are compiled once and reloaded on change
+- [x] PASSPORT §14 table rewritten; `policy/README.md` updated
+- [x] All gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
+**Built:** on the APS stages of TASK_077, not on the old `ExecPolicyService::review`.
 
-**Built:**
+- **Hard rules.** `HardRulesStage` (`StageName::HardRules`, fails closed) runs `RuleSet::denied`
+  first in `ExecPolicyService::pipeline`; `ExecReview::refused` runs it alone, and
+  `Gatekeeper::admit` calls it for every `Tool` and `AppFolder` request after floor → tier,
+  whatever the tier said. So `fs.apply`/`shell.run` at tier `auto` are refused by `deny` too
+  (M4), and `deny` refuses in `no-restrictions` (H9). File rules match every operation and a
+  move's `from` as well as its target (M3); `evaluate` still resolves destructive changes and
+  adds any other change a rule names.
+- **Modes.** `table::Decision::Rules` for `safety-ask` processes: rule `allow` runs, everything
+  else asks (`Pass::rules_only`). `auto-bypass` needs no judge: `set` accepts it, `get` only
+  clears a vanished judge; `JudgeStage` asks the person (`StageName::Person`) with the flagged
+  rule's text when no judge is set (H8). `JUDGE_REQUIRED` is gone.
+- **Script strings.** `commands/script.rs` `script_string` (PowerShell prefixes and aliases,
+  bare positional for Windows PowerShell, `cmd /c /k /r`, `forfiles /c`, `wsl <program>`,
+  inline flags of shells, Python, JS runtimes, Ruby/Perl/Lua, PHP). The plan carries it as
+  `ProcessPlanDto.scriptString` (Rust, Zod, fixture); a process rule may be
+  `{ "scriptString": true }` with no argv, and `review-script-strings` is exactly that (H2).
+  `bash`/`sh`/`zsh` script files are read as `CodeLanguage::Shell` (`"shell"`, Zod and fixture
+  updated; renderer label «Командная оболочка»). A script string never reads a file source.
+- **Pack.** `allow-unflagged` removed; `compile_pack` refuses an `allow` process rule of `*`
+  plus only `**`. New `ask`: package runners (`npx`/`bunx`/`uvx`/`pnpx`, `npm exec|x`,
+  `pnpm|yarn dlx`, `bun x`, `pipx run`, `uv tool run`, `go|deno run <remote>`), Windows script
+  hosts. New `allow`: formatters (replaces `allow-prettier-check`), inspection utilities,
+  `git fetch`, container inspection and listings, package listings, `make`/`ninja` with no
+  target or all/build/test/check/lint (H1).
+- **Cache.** `ExecPolicyService::rules` returns `Arc<RuleSet>`, recompiled only when the
+  `PackStamp` (pack file names, mtimes, lengths) changes; `allow_rule` drops it (L7).
+- **Copy.** Renderer: the mode is always selectable, a note with «Настроить» under
+  «Автопроверка» names the judge as optional (`JUDGE_OPTIONAL`); `isAvailable` and the
+  drop-to-`safety-ask` logic are removed from `ExecPolicyStore`. CLI mode hints updated. The
+  user rewrote the renderer and CLI mode labels and hints during the session; their wording is
+  what ships.
+- **Tests.** `policy/tests.rs` `every_mode_answers_every_rule_effect_with_and_without_a_judge`
+  is the new table; plus deny-in-every-mode for create/move/overwrite and `format C:`, the
+  catch-all refusal, the cache, script-string cases in `script.rs`, and gate tests in
+  `access/tests.rs` (deny before the mode in every mode; a Startup create refused at tier
+  `auto`).
+
 **Deviated from plan:**
+
+- Expectations that relied on the catch-all, each with its reason: `make all` is now
+  `allow-build-tools` (explicit family); `git status` in `safety-ask` runs on
+  `allow-git-read` instead of asking (rules now apply there); the end-to-end table row for
+  `shell.run` in `safety-ask` with an empty pack asks at `Rules`, not `Mode`; the
+  `no-restrictions` cases `git push --force` and `.git/config` deletion now refuse, so the
+  test uses `git push` and a source file; a script file's verdict no longer needs an argv
+  allow — the command line joins the batch only when some rule names it, otherwise the code
+  rule decides (without this every plain script would have asked once the catch-all left).
+- `npm exec <tool>` now asks (ask outranks the old `allow-node-scripts` match), and
+  `cargo run`, `make install`, `docker run`, `go run ./x` are unmatched: they ask without a
+  judge, by decision (a).
+- `safety-ask` lets rules decide processes only; destructive file changes still ask there, as
+  the scope says.
+
 **Next session should know:**
+
+- DECISION: option (a), asked and answered on 2026-11-12. «Always for this program in this
+  folder» (option b) belongs to TASK_080, which must also stop a user `allow` from outranking
+  `review-script-strings` (H11): the script-string flag is now on the plan to key on.
+- The rule `allow` audit is still `ToolAuthorisationKind::Judge` with the rule id (L6,
+  TASK_083).
+- The CLI `rules_apply` still offers «allow this rule» only in `auto-bypass`; with rules now
+  live in `safety-ask` for processes, TASK_080 should offer it there too.
+- Gates run locally on Windows: `cargo fmt --check`, `cargo clippy --workspace --all-targets
+  -D warnings`, `cargo test -p zvs-host -p zvs-cli -p zvs-contract`, `pnpm typecheck`,
+  `pnpm lint`, `pnpm test`, `pnpm format:check`, and `cargo test` for the rest of the workspace
+  (in `target/verify`; `zvs-studio --lib` failed once with no failing test and passed on
+  rerun). Not run: `pnpm build`, `pnpm test:e2e` (CI).

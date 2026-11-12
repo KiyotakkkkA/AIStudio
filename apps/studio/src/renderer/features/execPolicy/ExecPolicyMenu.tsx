@@ -12,7 +12,7 @@ import { EXEC_MODES, type ExecMode } from "./ExecPolicyStore";
 import {
   EXEC_MODE_COPY,
   EXEC_POLICY_LABEL,
-  JUDGE_MISSING,
+  JUDGE_OPTIONAL,
   JUDGE_SETUP,
   NO_RESTRICTIONS_ACCEPT,
   NO_RESTRICTIONS_CONFIRM,
@@ -83,65 +83,52 @@ function ExecPolicyMenu({ store: execPolicy, setup }: ExecPolicyBinding) {
             {EXEC_MODES.map((mode) => {
               const copy = EXEC_MODE_COPY[mode];
               const selected = execPolicy.mode === mode;
-              if (!execPolicy.isAvailable(mode)) {
-                return (
-                  <div
-                    key={mode}
-                    aria-disabled="true"
-                    className="flex items-start gap-2.5 rounded-control px-2.5 py-2"
-                  >
-                    <Icon path={copy.icon} size={16} className="mt-0.5 flex-none text-main-500" />
-                    <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                      <ModeText mode={mode} muted />
-                      <span className="flex items-center gap-2">
-                        <span className="min-w-0 flex-1 text-[11.5px] text-warn">
-                          {JUDGE_MISSING}
-                        </span>
-                        <Button tone="ghost" size="sm" onClick={setup}>
-                          <Icon path={mdiCogOutline} size={14} />
-                          {JUDGE_SETUP}
-                        </Button>
+              const judgeNote = mode === "auto-bypass" && !execPolicy.judgeReady;
+              return (
+                <div key={mode} className={`rounded-control ${selected ? "bg-main-800" : ""}`}>
+                  <div className="flex items-center pr-1">
+                    <Dropdown.Item
+                      role="menuitemradio"
+                      aria-checked={selected}
+                      rounded=""
+                      className="min-w-0 flex-1 rounded-control px-2.5 py-2"
+                      onClick={() => {
+                        if (mode === "no-restrictions" && !selected) {
+                          setConfirming(true);
+                          return;
+                        }
+                        void execPolicy.setMode(mode);
+                      }}
+                    >
+                      <span className="flex items-center gap-2.5 text-left">
+                        <Icon
+                          path={copy.icon}
+                          size={16}
+                          className={`flex-none ${
+                            mode === "no-restrictions" ? "text-warn" : "text-main-400"
+                          }`}
+                        />
+                        <ModeText mode={mode} muted={false} />
+                        <Icon
+                          path={mdiCheck}
+                          size={15}
+                          className={`flex-none text-accent-medium ${selected ? "" : "invisible"}`}
+                        />
                       </span>
-                    </span>
+                    </Dropdown.Item>
                     <ModeInfo mode={mode} />
                   </div>
-                );
-              }
-              return (
-                <div
-                  key={mode}
-                  className={`flex items-center rounded-control pr-1 ${selected ? "bg-main-800" : ""}`}
-                >
-                  <Dropdown.Item
-                    role="menuitemradio"
-                    aria-checked={selected}
-                    rounded=""
-                    className="min-w-0 flex-1 rounded-control px-2.5 py-2"
-                    onClick={() => {
-                      if (mode === "no-restrictions" && !selected) {
-                        setConfirming(true);
-                        return;
-                      }
-                      void execPolicy.setMode(mode);
-                    }}
-                  >
-                    <span className="flex items-center gap-2.5 text-left">
-                      <Icon
-                        path={copy.icon}
-                        size={16}
-                        className={`flex-none ${
-                          mode === "no-restrictions" ? "text-warn" : "text-main-400"
-                        }`}
-                      />
-                      <ModeText mode={mode} muted={false} />
-                      <Icon
-                        path={mdiCheck}
-                        size={15}
-                        className={`flex-none text-accent-medium ${selected ? "" : "invisible"}`}
-                      />
-                    </span>
-                  </Dropdown.Item>
-                  <ModeInfo mode={mode} />
+                  {judgeNote ? (
+                    <div className="flex items-center gap-2 pb-2 pl-9 pr-2">
+                      <span className="min-w-0 flex-1 text-[11.5px] text-main-400">
+                        {JUDGE_OPTIONAL}
+                      </span>
+                      <Button tone="ghost" size="sm" onClick={setup}>
+                        <Icon path={mdiCogOutline} size={14} />
+                        {JUDGE_SETUP}
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

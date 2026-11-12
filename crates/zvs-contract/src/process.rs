@@ -21,6 +21,7 @@ wire_enum!(CodeLanguage {
     Python => "python",
     Javascript => "javascript",
     Powershell => "powershell",
+    Shell => "shell",
 });
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -45,6 +46,8 @@ pub struct ProcessPlanDto {
     pub packages: Vec<String>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub background: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub script_string: bool,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",

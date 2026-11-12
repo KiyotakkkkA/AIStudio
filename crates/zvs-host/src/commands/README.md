@@ -49,12 +49,28 @@ program (`nodemon`, `vite`, `http-server`, `live-server`, `serve`, `webpack-dev-
 `start`, `serve`, `watch` or `preview` (directly or via `run`), or when any argument is
 `serve`, `runserver`, `watch`, `--watch`, `--watch=…`, `http-server` or ends in `.server`.
 
+**Script strings** (`script_string`, TASK_079). The plan's `scriptString` flag says the
+command line itself carries a program, so argv rules cannot read it and the vendor rule
+`review-script-strings` sends it to the judge, or to the person without one. It is set for:
+PowerShell `-Command`, `-EncodedCommand` and `-CommandWithArgs` in any unambiguous prefix or
+alias (`-c`, `-com`, `-e`, `-ec`, `-en`, `-enco`, `-cwa`), with `-` or `/`, after skipping the
+values of `-ExecutionPolicy`, `-WindowStyle` and the other value parameters; a bare positional
+command for Windows PowerShell (`powershell Get-ChildItem`, not a `.ps1` file, and not for
+`pwsh`, which reads a positional as a file); `cmd` with `/c`, `/k` or `/r` in either case and
+`forfiles /c`; `wsl` with anything but its listing flags (`wsl rm …`, `wsl -e`, `wsl --`, a
+bare `wsl`); and the inline flags of other interpreters seen before their first argument —
+`-c` in any short-flag cluster for `bash`, `sh`, `zsh` and Python (`-lc`, `-Ic`; Python's
+`-m` ends the scan), `-e`, `-p`, `--eval`, `--print` and `deno eval` for JavaScript runtimes,
+`-e`/`-E` for Ruby, Perl and Lua, `-r` for PHP. An argument after the script or module belongs
+to it and is not read.
+
 **Script source** (`script_source`). If `argv[0]`'s stem is an interpreter (`python*`, `py`,
-`pyw`, `uv run`, `node`, `deno`, `bun`, `tsx`, `pwsh`, `powershell`), the first non-flag
-argument with a matching extension is the script. Its text is read only if it resolves
-inside the working folder and is below `PROCESS_SOURCE_MAX`; otherwise a placeholder says
-it could not be read. With no script file, inline code from stdin is shown. The approval
-then displays what will actually execute.
+`pyw`, `uv run`, `node`, `deno`, `bun`, `tsx`, `pwsh`, `powershell`, `bash`, `sh`, `zsh`) and
+the command is not a script string, the first non-flag argument with a matching extension
+(`.sh`, `.bash` and `.zsh` for the shells, language `shell`) is the script. Its text is read
+only if it resolves inside the working folder and is below `PROCESS_SOURCE_MAX`; otherwise a
+placeholder says it could not be read. With no script file, inline code from stdin is shown.
+The approval then displays what will actually execute.
 
 **Input limits.** `stdin` is capped at 1 MiB of characters and the composed `PATH` at
 32 767 characters (the Windows limit).

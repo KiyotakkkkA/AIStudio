@@ -3,7 +3,7 @@ import { BackgroundShellId, ConversationId, RunId } from "./primitives/branded.j
 
 export const PROCESS_APPROVAL_KIND = "process";
 
-export const CodeLanguage = z.enum(["python", "javascript", "powershell"]);
+export const CodeLanguage = z.enum(["python", "javascript", "powershell", "shell"]);
 export type CodeLanguage = z.infer<typeof CodeLanguage>;
 
 export const ProcessPlanDto = z
@@ -15,6 +15,7 @@ export const ProcessPlanDto = z
     source: z.string().max(262144).optional(),
     packages: z.array(z.string().min(1).max(214)).max(32),
     background: z.boolean().optional(),
+    scriptString: z.boolean().optional(),
     reason: z.string().min(1).max(500).optional(),
   })
   .refine((plan) => (plan.source === undefined) === (plan.language === undefined), {
