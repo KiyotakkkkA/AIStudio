@@ -12,12 +12,12 @@ export const EXTENSION_REMOVE_TITLE = "Удалить расширение?";
 export const EXTENSION_ON = "Включено";
 export const EXTENSION_OFF = "Выключено";
 export const EXTENSION_INVALID = "В выбранной папке нет распакованного расширения Chromium.";
-export const EXTENSIONS_FULL = "Достигнуто наибольшее число расширений.";
+export const EXTENSIONS_FULL = "Достигнут лимит установленных расширений.";
 export const EXTENSIONS_LOAD_FAILED = "Не удалось загрузить список расширений.";
 export const EXTENSION_ACTION_FAILED = "Не удалось изменить расширение.";
 
 export function extensionRemoveConsequence(name: string): string {
-  return `«${name}» будет удалено из встроенного браузера вместе с его копией в данных приложения.`;
+  return `Расширение «${name}» и его файлы будут удалены из встроенного браузера.`;
 }
 
 export function extensionCountLabel(count: number): string {

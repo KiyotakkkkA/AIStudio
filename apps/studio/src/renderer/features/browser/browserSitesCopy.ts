@@ -14,8 +14,8 @@ export const SITE_ADD_CONFIRM = "Добавить";
 export const SITE_ADD_CANCEL = "Отмена";
 export const SITE_REMOVE = "Удалить исключение";
 export const SITE_REMOVE_TITLE = "Удалить исключение для сайта?";
-export const SITES_EMPTY = "Здесь появятся сайты с собственными разрешениями.";
-export const SITE_INVALID = "Укажите адрес сайта HTTP или HTTPS.";
+export const SITES_EMPTY = "Исключения для отдельных сайтов не заданы.";
+export const SITE_INVALID = "Требуется адрес сайта HTTP или HTTPS.";
 export const SITES_LOAD_FAILED = "Не удалось загрузить разрешения сайтов.";
 export const SITES_SAVE_FAILED = "Не удалось сохранить разрешение.";
 

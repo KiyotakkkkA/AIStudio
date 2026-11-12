@@ -11,8 +11,7 @@ use zvs_contract::{
 use super::library::{BrowserLibrary, ImportedBookmark, ImportedVisit};
 
 pub const IMPORT_SOURCE_GONE: &str = "Браузер для импорта не найден";
-pub const IMPORT_READ_FAILED: &str =
-    "Не удалось прочитать данные браузера. Закройте его и повторите попытку.";
+pub const IMPORT_READ_FAILED: &str = "Не удалось прочитать данные браузера";
 pub const IMPORT_VISITS_MAX: usize = 10_000;
 
 const WEBKIT_EPOCH_OFFSET_MS: i64 = 11_644_473_600_000;

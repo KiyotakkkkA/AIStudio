@@ -7,7 +7,7 @@ export const CHANGE_FOLDER = "Сменить папку";
 export const REMOVE_FOLDER = "Отключить папку";
 export const FOLDER_ACCESS_MISSING = "Нет доступа";
 export const RESTORE_FOLDER_ACCESS = "Предоставить доступ";
-export const FOLDER_LOCKED = "Рабочую папку нельзя изменить во время ответа";
+export const FOLDER_LOCKED = "Изменение рабочей папки недоступно во время обработки запроса";
 
 export const ALLOW_ONCE = "Разрешить однократно";
 export const ALLOW_CONVERSATION = "Разрешить для этого диалога";
@@ -20,7 +20,7 @@ export const SUBFOLDERS_NOTE =
   "Доступ распространяется на все вложенные папки. Допустимые действия определяются на странице «Инструменты».";
 export const CREATES_LABEL = "Будут созданы:";
 
-export const FOLDER_ERROR_FALLBACK = "Не удалось изменить рабочую папку. Повторите попытку.";
+export const FOLDER_ERROR_FALLBACK = "Не удалось изменить рабочую папку.";
 const ANSWER_ERROR_FALLBACK = "Не удалось передать ответ на запрос доступа.";
 
 const ERRORS: Partial<Record<AppErrorCode, string>> = {

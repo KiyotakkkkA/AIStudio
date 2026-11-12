@@ -45,7 +45,7 @@ pub const SKILL_EXPORT_TAKEN: &str =
     "В папке назначения уже есть папка с идентификатором этого навыка";
 pub const SKILL_UP_TO_DATE: &str = "Для навыка нет обновления";
 pub const SKILL_BUNDLED_PROTECTED: &str =
-    "Встроенный навык нельзя перезаписать. Сохраните навык под другим идентификатором";
+    "Встроенный навык защищён от перезаписи. Для сохранения требуется другой идентификатор";
 pub const AUTHORED_VERSION: &str = "1.0.0";
 
 const BUNDLED_MARKER: &str = ".bundled.json";

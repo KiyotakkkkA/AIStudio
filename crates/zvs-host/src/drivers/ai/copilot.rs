@@ -10,11 +10,9 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{AppError, AppErrorCode};
 
-pub const CLI_MISSING: &str =
-    "Не удалось запустить Copilot CLI. Установите GitHub Copilot CLI и повторите вход";
-pub const PROTOCOL_ERROR: &str =
-    "Copilot CLI вернул неизвестный ответ. Обновите GitHub Copilot CLI";
-pub const SESSION_EXPIRED: &str = "Сессия GitHub Copilot недоступна. Выполните вход заново";
+pub const CLI_MISSING: &str = "Не удалось запустить GitHub Copilot CLI";
+pub const PROTOCOL_ERROR: &str = "Формат ответа GitHub Copilot CLI не поддерживается";
+pub const SESSION_EXPIRED: &str = "Сессия GitHub Copilot недоступна. Требуется повторный вход";
 pub const REQUEST_FAILED: &str = "Не удалось выполнить запрос GitHub Copilot";
 
 pub fn failure() -> AppError {

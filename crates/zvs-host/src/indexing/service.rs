@@ -40,12 +40,13 @@ pub const ONLY_LANCEDB: &str = "Поддерживается только LanceD
 pub const ALREADY_RUNNING: &str = "Индексация этого хранилища уже выполняется";
 pub const NO_SOURCES: &str = "У хранилища нет источников для индексации";
 pub const OLD_SCHEMA: &str =
-    "Хранилище создано в старом формате индекса — запустите полную переиндексацию";
+    "Хранилище использует устаревший формат индекса. Требуется полная переиндексация";
 pub const PROVIDER_NOT_FOUND: &str = "Провайдер эмбеддингов не найден";
 pub const PROVIDER_UNUSABLE: &str =
     "Провайдер эмбеддингов должен быть включён и поддерживать эмбеддинги";
 pub const NO_EMBEDDINGS: &str = "Провайдер не поддерживает эмбеддинги";
-pub const UNEXPECTED_VECTORS: &str = "Провайдер вернул неожиданное число векторов";
+pub const UNEXPECTED_VECTORS: &str =
+    "Количество векторов в ответе провайдера не соответствует запросу";
 pub const DIMENSION_MISMATCH: &str = "Размерность эмбеддинга не совпадает с хранилищем";
 pub const NOTHING_EXTRACTED: &str = "не удалось извлечь текст";
 

@@ -15,17 +15,16 @@ pub const DEVICE_GRANT: &str = "urn:ietf:params:oauth:grant-type:device_code";
 pub const SLOW_DOWN_STEP: Duration = Duration::from_secs(5);
 
 pub const SIGN_IN_REQUIRED: &str =
-    "Требуется вход через браузер. Откройте аккаунт в разделе «Плагины» и нажмите «Войти».";
+    "Требуется вход через браузер. Авторизация — «Плагины» → аккаунт → «Войти».";
 pub const OAUTH_FAILED: &str = "Сервер авторизации отклонил запрос";
-pub const OAUTH_CLIENT_REJECTED: &str =
-    "Сервер отклонил учётные данные приложения. Проверьте идентификатор и секрет приложения OAuth.";
-pub const OAUTH_REDIRECT_REJECTED: &str =
-    "Сервер отклонил адрес возврата. Проверьте настройки приложения OAuth.";
+pub const OAUTH_CLIENT_REJECTED: &str = "Сервер отклонил учётные данные приложения OAuth.";
+pub const OAUTH_REDIRECT_REJECTED: &str = "Сервер отклонил адрес возврата приложения OAuth.";
 pub const OAUTH_SCOPE_REJECTED: &str =
-    "Сервер отклонил запрошенные права доступа. Проверьте разрешения приложения OAuth.";
+    "Сервер отклонил запрошенные права доступа приложения OAuth.";
 pub const OAUTH_UNREACHABLE: &str = "Сервер авторизации недоступен";
 pub const DEVICE_DENIED: &str = "Вход отклонён на странице подтверждения";
-pub const DEVICE_EXPIRED: &str = "Код подтверждения устарел. Повторите вход.";
+pub const DEVICE_EXPIRED: &str =
+    "Срок действия кода подтверждения истёк. Требуется повторный вход.";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

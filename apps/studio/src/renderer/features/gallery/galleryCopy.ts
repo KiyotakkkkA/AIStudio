@@ -9,7 +9,8 @@ export const GALLERY_SORT = "Порядок";
 export const GALLERY_EMPTY_TITLE = "Файлов нет";
 export const GALLERY_EMPTY_DESCRIPTION = "Галерея пуста";
 export const GALLERY_NOTHING_FOUND = "Ничего не найдено";
-export const GALLERY_NOTHING_FOUND_DESCRIPTION = "Измените запрос.";
+export const GALLERY_NOTHING_FOUND_DESCRIPTION =
+  "Файлы, соответствующие условиям поиска, не найдены.";
 export const GALLERY_LOAD_FAILED = "Не удалось загрузить галерею";
 export const GALLERY_RETRY = "Повторить";
 export const GALLERY_ACTIONS = "Действия с файлом";
@@ -24,11 +25,11 @@ export const GALLERY_REMOVE_TITLE = "Удалить файл?";
 export const GALLERY_APPROVE_TITLE = "Скрипты получения данных";
 export const GALLERY_APPROVE_CONFIRM = "Разрешить обновление";
 export const GALLERY_APPROVE_HINT =
-  "Дашборды обновляются автоматически, подтверждение потребуется только в случае обновления скрипта получения данных";
+  "Подтверждение разрешает выполнение скриптов получения данных. При изменении скриптов требуется повторное подтверждение.";
 export const GALLERY_SCRIPT_TRUNCATED = "Показано начало скрипта.";
-export const GALLERY_NEEDS_APPROVAL = "Ждёт подтверждения";
+export const GALLERY_NEEDS_APPROVAL = "Ожидание подтверждения";
 export const GALLERY_OUTSIDE_DIALOG = "Вне диалога";
-const GALLERY_UNKNOWN_ERROR = "Не удалось выполнить действие. Попробуйте ещё раз.";
+const GALLERY_UNKNOWN_ERROR = "Не удалось выполнить действие.";
 
 export type GallerySort = "newest" | "oldest" | "name";
 

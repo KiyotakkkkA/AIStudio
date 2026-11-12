@@ -14,8 +14,7 @@ pub const LLAMA_RELEASES_URL: &str =
     "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=8";
 pub const LLAMA_RELEASES_PAGE: &str = "https://github.com/ggml-org/llama.cpp/releases";
 pub const DEFAULT_RELEASE_TTL: Duration = Duration::from_secs(6 * 60 * 60);
-pub const RATE_LIMITED_MESSAGE: &str =
-    "GitHub временно ограничил число запросов. Попробуйте через несколько минут.";
+pub const RATE_LIMITED_MESSAGE: &str = "GitHub временно ограничил число запросов";
 pub const UNEXPECTED_ANSWER: &str = "GitHub вернул неожиданный ответ";
 
 #[derive(Debug, Clone, PartialEq, Eq)]

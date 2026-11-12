@@ -10,6 +10,7 @@ import {
   type SecretId,
   type SecretSummaryDto,
 } from "@zvs/shared";
+import { NAME_REQUIRED } from "../../src/renderer/features/secrets/errorCopy.ts";
 import { SecretStore } from "../../src/renderer/features/secrets/SecretStore.ts";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 
@@ -172,7 +173,7 @@ test("a validation failure from the host lands on the field, not in a banner", a
   const saved = await store.submit();
 
   assert.equal(saved, false);
-  assert.equal(store.form?.errorOf("name"), "Укажите название.");
+  assert.equal(store.form?.errorOf("name"), NAME_REQUIRED);
   assert.equal(store.form?.banner, null);
 });
 

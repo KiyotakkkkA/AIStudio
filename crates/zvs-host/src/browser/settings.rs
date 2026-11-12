@@ -14,8 +14,9 @@ use crate::tools::ToolRegistry;
 
 pub const BROWSER_SETTINGS_KEY: &str = "browser.settings";
 pub const BROWSER_DISABLED: &str =
-    "Встроенный браузер выключен. Включите его в разделе «Параметры» → «Браузер».";
-pub const ACCOUNT_NEEDS_BROWSER: &str = "Вход в аккаунт выполняется во встроенном браузере. Включите его в разделе «Параметры» → «Браузер».";
+    "Встроенный браузер выключен. Настройка — «Параметры» → «Браузер».";
+pub const ACCOUNT_NEEDS_BROWSER: &str =
+    "Вход в аккаунт недоступен: встроенный браузер выключен. Настройка — «Параметры» → «Браузер».";
 
 pub type SettingsListener = Arc<dyn Fn(&BrowserSettingsDto) + Send + Sync>;
 

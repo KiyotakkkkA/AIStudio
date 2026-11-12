@@ -20,12 +20,13 @@ pub use runner::ProcessDashboardRunner;
 
 pub const LIVE_DIR: &str = ".zvs";
 pub const SETTINGS_FILE: &str = "settings.json";
-pub const NOT_LIVE: &str = "Дашборд собран без сохранённой спецификации и не подлежит обновлению.";
-pub const NEEDS_APPROVAL: &str = "Для обновления в реальном времени подтверждите примемение скриптов сбора данных со страницы «Галерея»";
+pub const NOT_LIVE: &str =
+    "Обновление дашборда недоступно: спецификация отсутствует или некорректна.";
+pub const NEEDS_APPROVAL: &str =
+    "Обновление дашборда требует подтверждения скриптов сбора данных на странице «Галерея»";
 pub const FETCH_FAILED: &str = "Получение данных завершилось с ошибкой";
 pub const BUILD_FAILED: &str = "Не удалось обновить дашборд";
-pub const STALE_APPROVAL: &str =
-    "Правила обновления дашборда изменились, обновите их на странице «Галерея»";
+pub const STALE_APPROVAL: &str = "Скрипты обновления дашборда изменились. Требуется повторное подтверждение на странице «Галерея»";
 pub const SETTINGS_FAILED: &str = "Не удалось сохранить настройки дашборда";
 
 #[async_trait]

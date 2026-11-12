@@ -40,11 +40,11 @@ pub const NO_SUCH_ENGINE: &str = "Движок не найден";
 pub const NOT_INSTALLED: &str = "Движок не установлен";
 pub const ALREADY_INSTALLING: &str = "Установка движка уже выполняется";
 pub const NO_ENGINE: &str =
-    "Локальный движок не установлен. Откройте «Загрузки» и установите llama.cpp.";
-pub const NO_ONNX_ENGINE: &str = "Формат ONNX не поддерживается. Выберите модель GGUF";
+    "Локальный движок llama.cpp не установлен. Установка доступна в разделе «Загрузки».";
+pub const NO_ONNX_ENGINE: &str = "Формат ONNX не поддерживается. Требуется модель GGUF";
 pub const NO_PROJECTOR: &str =
-    "Файл проектора mmproj не найден рядом с моделью. Установите проектор в разделе «Загрузки»";
-pub const UNSUPPORTED_PLATFORM: &str = "Для этой операционной системы такой сборки не существует";
+    "Файл проектора mmproj не найден рядом с моделью. Установка доступна в разделе «Загрузки»";
+pub const UNSUPPORTED_PLATFORM: &str = "Сборка для этой операционной системы недоступна";
 const SERVER_NAMES: [&str; 2] = ["llama-server", "llama-server.exe"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

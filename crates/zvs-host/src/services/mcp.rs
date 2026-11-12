@@ -55,7 +55,8 @@ pub const OAUTH_NO_REGISTRATION: &str =
     "Сервер авторизации не поддерживает автоматическую регистрацию клиентов";
 pub const RESOURCE_READER: &str = "read_resource";
 pub const RESOURCE_NOT_FOUND: &str = "У MCP-сервера нет такого ресурса";
-pub const OAUTH_CORRUPT: &str = "Сохранённый вход повреждён — войдите заново";
+pub const OAUTH_CORRUPT: &str =
+    "Сохранённые данные авторизации повреждены. Требуется повторный вход";
 
 pub struct McpServiceOptions {
     pub database: Arc<Database>,

@@ -11,7 +11,7 @@ export const APP_PERMISSIONS_TITLE = "Разрешения приложений"
 export const APP_PERMISSIONS_HINT = "Постоянный доступ и доступ в отдельных диалогах.";
 export const APP_PERMISSIONS_EMPTY = "Разрешений для приложений нет.";
 export const APP_LOAD_FAILED = "Не удалось загрузить разрешения приложений.";
-export const APP_ADD_FAILED = "Не удалось добавить разрешение. Проверьте выбранный файл и диалоги.";
+export const APP_ADD_FAILED = "Не удалось добавить разрешение.";
 export const APP_PICK_FAILED = "Не удалось открыть окно выбора приложения.";
 export const APP_SCOPE_OPTIONS = ACCESS_ANSWERS.filter(
   (answer) => answer.answer === "always" || answer.answer === "conversation",

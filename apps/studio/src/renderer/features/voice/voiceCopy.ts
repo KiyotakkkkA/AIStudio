@@ -18,7 +18,7 @@ export const VOICE_DEVICE_MISSING = "Устройство не подключе�
 export const VOICE_REFRESH = "Обновить список устройств";
 export const VOICE_SETUP = "Настроить";
 export const VOICE_DEVICES_FAILED = "Не удалось получить список устройств записи.";
-export const VOICE_SELECT_MISSING = "Устройство записи отключено. Обновите список устройств.";
+export const VOICE_SELECT_MISSING = "Устройство записи не подключено.";
 export const VOICE_SELECT_FAILED = "Не удалось сохранить устройство записи.";
 
 export const VOICE_NO_MODEL = "Не выбрана";
@@ -31,8 +31,8 @@ export const VOICE_DOWNLOADING = "Загрузка…";
 export const VOICE_MODELS_FAILED = "Не удалось получить список моделей распознавания речи.";
 const VOICE_INSTALL_FAILED = "Не удалось начать загрузку модели.";
 const VOICE_UNSUPPORTED = "Распознавание речи доступно только в Windows.";
-export const VOICE_MODEL_SELECT_FAILED = "Не удалось выбрать модель: она ещё не загружена.";
-export const VOICE_NOT_READY = "Модель распознавания речи не установлена.";
+export const VOICE_MODEL_SELECT_FAILED = "Не удалось выбрать модель распознавания речи.";
+export const VOICE_NOT_READY = "Распознавание речи не настроено.";
 
 export const VOICE_RECORD = "Начать запись";
 export const VOICE_STOP = "Остановить запись";

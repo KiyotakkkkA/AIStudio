@@ -10,12 +10,10 @@ use zvs_host::browser::{
 use zvs_host::platform::theme::PaletteMode;
 
 pub const NEW_TAB_TITLE: &str = "Новая вкладка";
-pub const PROCESS_GONE: &str = "Процесс страницы остановлен. Обновите страницу.";
-pub const LOAD_FAILED: &str = "Страница не загрузилась";
-pub const FORM_RESUBMISSION: &str =
-    "Страница открывается только после отправки формы. Вернитесь на страницу входа и повторите.";
-pub const TAB_LIMIT_REACHED: &str =
-    "Достигнут лимит вкладок: 30. Закройте вкладку перед открытием новой";
+pub const PROCESS_GONE: &str = "Процесс страницы остановлен. Требуется перезагрузка страницы.";
+pub const LOAD_FAILED: &str = "Не удалось загрузить страницу";
+pub const FORM_RESUBMISSION: &str = "Для загрузки страницы требуется повторная отправка формы";
+pub const TAB_LIMIT_REACHED: &str = "Достигнут лимит открытых вкладок: 30";
 pub const UNKNOWN_TAB: &str = "Вкладка не найдена";
 pub const INVALID_ORDER: &str = "Некорректный порядок вкладок";
 pub const NO_ACTIVE_TAB: &str = "Нет активной вкладки";

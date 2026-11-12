@@ -14,7 +14,7 @@ use super::{ChatService, Inner};
 use crate::platform::ids::new_id;
 use crate::platform::logger::LogLevel;
 
-pub const QUEUE_FULL: &str = "В очереди может быть не больше 10 сообщений";
+pub const QUEUE_FULL: &str = "В очереди допускается не более 10 сообщений";
 pub const QUEUE_MESSAGE_NOT_FOUND: &str = "Сообщение в очереди не найдено";
 pub const QUEUE_YIELDED: &str = "Turn ended at a safepoint to send queued messages";
 const IDLE_POLL: Duration = Duration::from_millis(20);

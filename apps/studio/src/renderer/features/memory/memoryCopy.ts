@@ -44,10 +44,10 @@ export const EDIT = "Изменить";
 export const REMOVE = "Удалить";
 export const CLEAR = "Очистить";
 export const ACCOUNT_EMPTY_TITLE = "Общая память пуста";
-export const ACCOUNT_EMPTY = "Добавьте запись.";
+export const ACCOUNT_EMPTY = "Записи общей памяти доступны во всех диалогах.";
 export const DIALOG_EMPTY_TITLE = "Память диалогов пуста";
-export const DIALOG_EMPTY = "Выберите диалог и добавьте запись.";
-export const NO_DIALOGS = "Диалогов нет. Создайте диалог для добавления записи.";
+export const DIALOG_EMPTY = "Записи добавляются в память выбранного диалога.";
+export const NO_DIALOGS = "Нет диалогов для добавления записей памяти.";
 export const LOADING = "Загрузка памяти…";
 export const SOURCE_USER = "Вручную";
 export const SOURCE_MODEL = "Модель";
@@ -57,8 +57,8 @@ export const CLEAR_DIALOG_TITLE = "Очистить память диалога"
 export const CLEAR_CONSEQUENCE = "Записи будут удалены без возможности восстановления.";
 export const REMOVE_TITLE = "Удалить запись";
 
-export const LOAD_ERROR = "Не удалось загрузить память. Повторите попытку.";
-const SAVE_ERROR = "Не удалось сохранить запись. Повторите попытку.";
+export const LOAD_ERROR = "Не удалось загрузить память.";
+const SAVE_ERROR = "Не удалось сохранить запись.";
 export const ALREADY_REMOVED = "Запись уже удалена.";
 
 const HOST_WORDED = new Set<AppErrorCode>([AppErrorCode.CONFLICT]);

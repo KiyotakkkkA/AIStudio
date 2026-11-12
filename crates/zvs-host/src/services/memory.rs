@@ -15,8 +15,8 @@ use crate::platform::ids::new_id;
 pub const MEMORY_ENABLED_KEY: &str = "memory.enabled";
 pub const MEMORY_MODEL_KEY: &str = "memory.model";
 pub const MEMORY_NOT_FOUND: &str = "Запись памяти не найдена";
-pub const ACCOUNT_MEMORY_FULL: &str = "Общая память заполнена: удалите ненужные записи";
-pub const CONVERSATION_MEMORY_FULL: &str = "Память диалога заполнена: удалите ненужные записи";
+pub const ACCOUNT_MEMORY_FULL: &str = "Достигнут лимит записей общей памяти";
+pub const CONVERSATION_MEMORY_FULL: &str = "Достигнут лимит записей памяти диалога";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemorySwitches {

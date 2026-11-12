@@ -59,7 +59,7 @@ pub const NO_SIGN_IN: &str = "Вход не обнаружен";
 pub const IDENTITY_REPLACED: &str =
     "Предыдущая учётная запись заменена: её подключения используют новый аккаунт.";
 pub const DIFFERENT_ACCOUNT: &str = "В браузере выполнен вход в другой аккаунт";
-pub const COOKIES_CLEARED_DETAIL: &str = "Куки браузера очищены — войдите снова";
+pub const COOKIES_CLEARED_DETAIL: &str = "Файлы cookie браузера удалены. Требуется повторный вход";
 pub const LINKING_FAILED: &str = "Не удалось привязать аккаунт";
 
 #[async_trait]

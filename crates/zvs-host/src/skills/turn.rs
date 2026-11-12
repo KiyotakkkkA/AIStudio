@@ -8,7 +8,7 @@ use crate::files::FS_READ;
 use crate::files::roots::SKILL_ROOT;
 use crate::services::chat_tools::{OfferedTool, wire_names};
 
-pub const READ_BEFORE_RUN: &str = "Сначала прочитайте файлы навыка";
+pub const READ_BEFORE_RUN: &str = "Перед запуском требуется прочитать файлы навыка";
 pub const SKILL_LOAD_RESULT_MAX_CHARS: usize = 40_000;
 pub const SKILL_LOAD_RESULT_SHARE: usize = 6;
 

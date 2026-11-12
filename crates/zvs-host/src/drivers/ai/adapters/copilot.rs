@@ -33,7 +33,7 @@ pub const COPILOT_CAPABILITIES: AdapterCapabilities = AdapterCapabilities {
 pub const AUTO_MODEL_NAME: &str = "Автовыбор модели";
 pub const MODEL_UNAVAILABLE: &str = "Выбранная модель Copilot недоступна";
 pub const EFFORT_UNSUPPORTED: &str =
-    "Выбранная модель Copilot не поддерживает этот режим рассуждения. Выберите «Авто»";
+    "Выбранная модель Copilot не поддерживает этот режим рассуждения. Требуется режим «Авто»";
 
 pub struct CopilotAdapter {
     identity: String,

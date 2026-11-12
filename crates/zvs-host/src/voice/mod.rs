@@ -40,7 +40,7 @@ pub const SPEECH_UNSUPPORTED: &str = "Распознавание речи дос
 pub const SPEECH_MODEL_UNKNOWN: &str = "Модель распознавания речи не найдена";
 pub const SPEECH_MODEL_NOT_INSTALLED: &str = "Модель распознавания речи не установлена";
 pub const SPEECH_NOT_READY: &str =
-    "Распознавание речи не настроено: установите модель в параметрах голосового ввода";
+    "Распознавание речи не настроено. Требуются установленный движок и выбранная модель";
 pub const ALREADY_RECORDING: &str = "Запись уже выполняется";
 pub const NOT_RECORDING: &str = "Запись не выполняется";
 pub const RECORDING_FAILED: &str = "Не удалось начать запись с микрофона";

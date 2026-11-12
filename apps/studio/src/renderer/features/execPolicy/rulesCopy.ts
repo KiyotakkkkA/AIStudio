@@ -12,7 +12,8 @@ export const RULES_ROW = {
   hint: "Постоянные разрешения, созданные из подтверждений, и правила из файлов пользователя.",
 } as const;
 
-export const RULES_EMPTY = "Правил нет. Они появляются при выборе «Всегда разрешать».";
+export const RULES_EMPTY =
+  "Правил нет. Постоянные разрешения создаются при выборе «Всегда разрешать».";
 export const RULES_LOADING = "Загрузка правил…";
 export const RULES_FAILED = "Не удалось загрузить правила.";
 export const RULE_REMOVE_LABEL = "Удалить правило";

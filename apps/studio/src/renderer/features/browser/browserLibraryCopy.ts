@@ -12,9 +12,8 @@ export const IMPORT_RUNNING = "Импорт…";
 export const IMPORT_EMPTY = "Поддерживаемые браузеры не найдены.";
 export const IMPORT_LOADING = "Поиск браузеров…";
 export const IMPORT_FAILED = "Не удалось выполнить импорт.";
-export const IMPORT_LOCKED =
-  "Не удалось прочитать данные браузера. Закройте его и повторите попытку.";
-export const IMPORT_GONE = "Браузер больше не найден. Обновите список.";
+export const IMPORT_LOCKED = "Не удалось прочитать данные браузера.";
+export const IMPORT_GONE = "Браузер для импорта не найден.";
 export const IMPORT_SOURCES_FAILED = "Не удалось найти установленные браузеры.";
 export const IMPORT_DEFAULT_PROFILE = "Основной профиль";
 

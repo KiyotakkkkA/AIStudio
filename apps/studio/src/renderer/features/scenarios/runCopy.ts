@@ -6,11 +6,11 @@ import type { RunPhase, RunTab, StepStatus } from "./runModel";
 const RUN_START_FAILED = "Не удалось запустить сценарий.";
 export const RUN_LOAD_FAILED = "Не удалось загрузить последний запуск.";
 export const RUN_CANCEL_FAILED = "Не удалось остановить запуск.";
-export const PINNED_INVALID = "Входные данные должны быть корректным JSON";
+export const PINNED_INVALID = "Некорректный JSON входных данных";
 
 export const LAST_RUN = "Последний запуск";
 export const NO_RUNS = "Запусков нет";
-export const NO_STEP_SELECTED = "Выберите шаг";
+export const NO_STEP_SELECTED = "Шаг не выбран";
 export const NO_STEP_DATA = "Нет данных";
 export const NO_STEP_LOGS = "Записей нет";
 

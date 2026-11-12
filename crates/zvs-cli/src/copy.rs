@@ -3,10 +3,8 @@ pub const SUBTITLE: &str = "Консольная версия";
 pub const CONNECTING: &str = "Подключение к ZVS AI Studio…";
 pub const LAUNCHING: &str = "Запуск ZVS AI Studio…";
 pub const APP_NOT_FOUND: &str = "Не найдено приложение ZVS AI Studio. Переустановите консольную версию в настройках приложения.";
-pub const APP_UNREACHABLE: &str =
-    "Приложение ZVS AI Studio не отвечает. Проверьте, что оно запущено, и повторите попытку.";
-pub const PROTOCOL_MISMATCH: &str =
-    "Версия консольного клиента не совпадает с приложением. Обновите ZVS AI Studio.";
+pub const APP_UNREACHABLE: &str = "Не удалось установить соединение с ZVS AI Studio";
+pub const PROTOCOL_MISMATCH: &str = "Версии консольного клиента и ZVS AI Studio несовместимы";
 pub const DISCONNECTED: &str = "Соединение с приложением потеряно";
 pub const NO_TERMINAL: &str = "Консольная версия работает только в интерактивном терминале";
 pub const USAGE_COMMANDS: &str = "Использование";
@@ -44,7 +42,7 @@ pub const WORKSPACE: &str = "Рабочая папка";
 pub const MODEL: &str = "Модель";
 pub const NO_MODEL: &str = "не выбрана";
 pub const NO_PROVIDER: &str =
-    "Нет включённого провайдера с текстовыми моделями. Подключите его командой /connect.";
+    "Нет включённого провайдера с текстовыми моделями. Подключение — /connect.";
 
 pub const YOU: &str = "Вы";
 pub const REASONING: &str = "Рассуждение";
@@ -136,8 +134,7 @@ pub const CONNECT_HINT_BROWSER: &str = "Вход во встроенном бр�
 pub const CONNECT_HINT_OPENAI: &str = "Вход в системном браузере";
 pub const CONNECT_HINT_COPILOT: &str = "Требуется GitHub Copilot CLI";
 pub const DESKTOP_OPENED: &str = "Диалог открыт в приложении";
-pub const DESKTOP_NO_CONVERSATION: &str =
-    "Нет открытого диалога. Отправьте сообщение или выберите диалог через /resume";
+pub const DESKTOP_NO_CONVERSATION: &str = "Нет открытого диалога. Выбор диалога — /resume.";
 pub const DESKTOP_FAILED: &str = "Не удалось открыть приложение ZVS AI Studio";
 pub const COPILOT_EFFORT_LOW: &str = "Низкое";
 pub const COPILOT_EFFORT_HIGH: &str = "Высокое";
@@ -214,7 +211,7 @@ pub const HINT_THEME: &str = "↑/↓ — предпросмотр · Enter — 
 pub const EFFORT_TITLE: &str = "Режим рассуждения";
 pub const EFFORT_FAST: &str = "Быстрый";
 pub const EFFORT_AUTO: &str = "Авто";
-pub const EFFORT_THINKING: &str = "Мышление";
+pub const EFFORT_THINKING: &str = "Рассуждение";
 pub const EFFORT_HINT_FAST: &str = "Ответ без этапа рассуждения.";
 pub const EFFORT_HINT_AUTO: &str = "Рассуждение используется при необходимости.";
 pub const EFFORT_HINT_THINKING: &str = "Рассуждение перед каждым ответом.";
@@ -281,7 +278,7 @@ pub const QUEUE_EDIT: &str = "изменить";
 pub const QUEUE_REMOVE: &str = "удалить";
 pub const QUEUE_SEND: &str = "отправить все сейчас";
 pub const QUEUE_ADDED: &str = "Сообщение добавлено в очередь";
-pub const QUEUE_FULL: &str = "В очереди может быть не больше 10 сообщений";
+pub const QUEUE_FULL: &str = "В очереди допускается не более 10 сообщений";
 pub const QUEUE_EMPTY: &str = "Очередь пуста";
 pub const QUEUE_EDITING: &str = "Изменение сообщения в очереди: Enter — сохранить, Esc — отмена";
 pub const QUEUE_SAVED: &str = "Сообщение в очереди изменено";
@@ -297,7 +294,7 @@ pub const SHORTCUT_SET: &str = "Назначено";
 pub const SHORTCUT_MOVED: &str = "снято с действия";
 pub const SHORTCUT_REMOVED: &str = "Сочетание удалено";
 pub const SHORTCUT_INVALID: &str =
-    "Используйте Ctrl или Alt с буквой, стрелкой или Enter либо клавиши F1–F12";
+    "Допустимы сочетания Ctrl или Alt с буквой, стрелкой или Enter, а также клавиши F1–F12";
 pub const SHORTCUT_RESERVED: &str =
     "Это сочетание используется терминалом и не может быть назначено";
 pub const SHORTCUTS_RESTORED: &str = "Восстановлены сочетания по умолчанию";
@@ -343,7 +340,7 @@ pub const CONTEXT_FREE: &str = "Свободно";
 pub const CONTEXT_TRIMMED: &str = "Сокращено сообщений";
 pub const LIMIT_USED: &str = "использовано";
 pub const LIMIT_RESETS: &str = "Обновится";
-pub const CONTEXT_NEEDS_MODEL: &str = "Выберите модель через /models";
+pub const CONTEXT_NEEDS_MODEL: &str = "Модель не выбрана. Выбор модели — /models.";
 
 pub const SKILLS_TITLE: &str = "Навыки";
 pub const PROCESSES_TITLE: &str = "Фоновые процессы";
@@ -415,7 +412,7 @@ pub const MCP_STARTED: &str = "Сервер запущен";
 pub const MCP_HALTED: &str = "Сервер остановлен";
 pub const MCP_SIGN_IN_REQUIRED: &str = "требуется вход";
 pub const MCP_SIGN_IN_HINT: &str = "Enter — войти через браузер";
-pub const MCP_EMPTY: &str = "Серверов нет. Подключите сервер командой /mcp add";
+pub const MCP_EMPTY: &str = "MCP-серверов нет. Подключение — /mcp add.";
 pub const MCP_SERVER: &str = "Сервер";
 pub const MCP_ADDING: &str = "Подключение сервера";
 pub const MCP_STARTING_SERVER: &str = "Запуск сервера";
@@ -490,12 +487,11 @@ pub const SUBAGENT_DETAILS: &str = "Текущая работа субагент
 pub const SUBAGENT_NOT_FOUND: &str = "Субагент не найден";
 pub const SUBAGENTS_USAGE: &str = "Доступно: /subagents list [id], /subagents stop [id]";
 pub const MODAL_HINT: &str = "↑/↓, PgUp/PgDn, колесо — прокрутка · Esc — закрыть";
-pub const IMAGE_PROVIDER_WARNING: &str = "Выбранный вами провайдер не поддерживает прикрепление изображений, очистите поле ввода для смены";
+pub const IMAGE_PROVIDER_WARNING: &str = "Выбранный провайдер не поддерживает изображения. Для смены провайдера требуется удалить изображения из поля ввода.";
 pub const ATTACHMENTS_TITLE: &str = "Вложения";
 pub const ATTACHMENTS_LIMIT: &str =
-    "К сообщению можно прикрепить не больше 5 изображений и 64 хранилищ";
-pub const ATTACHMENTS_BUSY: &str =
-    "Дождитесь завершения ответа, чтобы отправить сообщение с вложениями";
+    "Допустимо не более 5 изображений и 64 хранилищ в одном сообщении";
+pub const ATTACHMENTS_BUSY: &str = "Отправка сообщения с вложениями недоступна во время обработки запроса или редактирования очереди";
 pub const IMAGE_KIND: &str = "изображение";
 pub const STORE_KIND: &str = "хранилище";
 

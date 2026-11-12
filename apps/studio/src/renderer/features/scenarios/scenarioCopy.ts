@@ -88,7 +88,8 @@ export function grantedBy(name: string): string {
 export const SCENARIO_LOAD_FAILED = "Не удалось загрузить сценарий.";
 const SCENARIO_ACTION_FAILED = "Не удалось выполнить операцию со сценарием.";
 const SCENARIO_MISSING = "Сценарий не найден.";
-export const DRAFT_SAVE_FAILED = "Черновик не сохранён. Изменения останутся в редакторе.";
+export const DRAFT_SAVE_FAILED =
+  "Не удалось сохранить черновик. В редакторе остаются несохранённые изменения.";
 
 export const CONNECT_REFUSALS: Record<ConnectRefusal, string> = {
   selfLoop: "Узел нельзя соединить с самим собой",
@@ -121,7 +122,7 @@ function attachRefusalText(
     noSlot: `У узла ${parent} нет слота ${slot}`,
     wrongKind: `Узел ${child} не подходит для слота ${slot}: он ${fillsText(fillsOf(refusal.childId))}`,
     occupied: `Слот ${slot} узла ${parent} уже занят`,
-    hasEdges: `Узел ${child} соединён основными связями — удалите их перед подключением к слоту`,
+    hasEdges: `Подключение узла ${child} к слоту недоступно, пока у него есть основные связи`,
     cycle: `Узел ${child} уже содержит ${parent} среди своих подузлов`,
     sameKind: `В слоте ${slot} узла ${parent} уже есть узел этого вида`,
   };
@@ -161,7 +162,7 @@ export function issueText(issue: ScenarioIssueDto, nameOf: (id: string) => strin
     invalidPort: `У узла ${node} нет выхода «${issue.param ?? ""}»`,
     missingDialog: `Узлу ${node} требуется триггер «Сообщение в диалоге»`,
     limitedDialog: `Без триггера «Сообщение в диалоге» узел ${node} работает только с общей памятью`,
-    duplicateKind: `Слот ${slot} узла ${node} принимает не больше одного узла каждого вида`,
+    duplicateKind: `Слот ${slot} узла ${node} принимает не более одного узла каждого вида`,
   };
   return texts[issue.rule];
 }

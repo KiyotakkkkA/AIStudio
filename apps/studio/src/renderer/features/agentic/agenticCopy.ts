@@ -28,7 +28,7 @@ export const DECIDE_FAILED = "Не удалось передать решени�
 export const FOLDER_FAILED = "Не удалось выбрать папку.";
 
 export const EMPTY_TITLE = "Сессий нет";
-export const EMPTY_DESCRIPTION = "Создайте сессию для выполнения задачи в рабочей папке.";
+export const EMPTY_DESCRIPTION = "Выполнение задач в рабочей папке.";
 export const LOADING = "Загрузка…";
 
 export const PLAN_TITLE = "План";
@@ -86,7 +86,7 @@ export const MODE_LABELS: Record<AgenticPermissionMode, string> = {
 
 export const MODE_HINTS: Record<AgenticPermissionMode, string> = {
   "read-only": "Доступны только инструменты чтения.",
-  ask: "Каждое изменяющее действие подтверждается.",
+  ask: "Каждое действие, изменяющее данные, требует подтверждения.",
   auto: "Подтверждаются только разрушающие действия.",
 };
 

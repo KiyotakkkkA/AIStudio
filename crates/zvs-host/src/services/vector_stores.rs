@@ -59,8 +59,8 @@ pub const CREATION_CLEANUP_FAILED: &str =
     "Не удалось создать хранилище и очистить данные; метаданные сохранены для удаления";
 pub const REMOVAL_FAILED: &str = "Не удалось удалить векторное хранилище; метаданные сохранены";
 pub const CLEAR_FAILED: &str = "Не удалось очистить хранилище";
-pub const RERANK_MODEL_REQUIRED: &str = "Выберите модель переранжирования";
-pub const OCR_MODEL_REQUIRED: &str = "Выберите модель OCR";
+pub const RERANK_MODEL_REQUIRED: &str = "Модель переранжирования не выбрана";
+pub const OCR_MODEL_REQUIRED: &str = "Модель OCR не выбрана";
 pub const RERANK_MALFORMED: &str = "Модель переранжирования вернула некорректный ответ";
 pub const RERANK_UNAVAILABLE: &str = "Reranker unavailable, using vector order";
 pub const RERANK_FAILED: &str = "Reranking failed, using vector order";

@@ -11,11 +11,11 @@ use zvs_contract::{AppError, AppErrorCode, AuthMode, ErrorDetails};
 pub type Headers = BTreeMap<String, String>;
 
 pub const CANCELLED_MESSAGE: &str = "Запрос к провайдеру отменён";
-pub const TIMED_OUT_MESSAGE: &str = "Провайдер не ответил вовремя";
+pub const TIMED_OUT_MESSAGE: &str = "Превышено время ожидания ответа провайдера";
 pub const UNREACHABLE_MESSAGE: &str = "Провайдер недоступен";
 pub const REQUEST_FAILED_MESSAGE: &str = "Не удалось выполнить запрос к провайдеру";
 pub const SESSION_EXPIRED_MESSAGE: &str = "Сессия аккаунта истекла — требуется повторная привязка";
-pub const BROWSER_VERIFICATION_MESSAGE: &str = "Провайдер запросил проверку браузера. Откройте страницу аккаунта, завершите проверку и повторите запрос";
+pub const BROWSER_VERIFICATION_MESSAGE: &str = "Провайдер запросил проверку браузера. Для повторного запроса требуется завершить проверку на странице аккаунта";
 
 const MAX_CAUSE_DEPTH: usize = 8;
 

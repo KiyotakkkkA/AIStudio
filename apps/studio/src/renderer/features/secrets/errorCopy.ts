@@ -6,11 +6,11 @@ export interface SecretConsumerRef {
   readonly id: string;
 }
 
-const UNKNOWN_ERROR_COPY = "Не удалось выполнить операцию. Повторите попытку.";
+const UNKNOWN_ERROR_COPY = "Не удалось выполнить операцию.";
 
 const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.UNKNOWN]: UNKNOWN_ERROR_COPY,
-  [AppErrorCode.VALIDATION_FAILED]: "Проверьте заполненные поля.",
+  [AppErrorCode.VALIDATION_FAILED]: "Некорректные данные в полях формы.",
   [AppErrorCode.NOT_FOUND]: "Секрет не найден.",
   [AppErrorCode.CONFLICT]: "Секрет используется и не может быть удалён.",
   [AppErrorCode.PERMISSION_DENIED]: "Недостаточно прав для этой операции.",
@@ -20,14 +20,14 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.PROVIDER_UNREACHABLE]: "Провайдер недоступен.",
   [AppErrorCode.PROVIDER_AUTH_FAILED]: "Провайдер отклонил учётные данные.",
   [AppErrorCode.PROVIDER_SESSION_EXPIRED]:
-    "Сессия провайдера истекла. Повторите привязку аккаунта.",
-  [AppErrorCode.RATE_LIMITED]: "Превышен лимит запросов. Повторите попытку позже.",
+    "Срок действия сессии провайдера истёк. Требуется повторная привязка аккаунта.",
+  [AppErrorCode.RATE_LIMITED]: "Превышен лимит запросов.",
   [AppErrorCode.RUN_CANCELLED]: "Операция отменена.",
   [AppErrorCode.RUN_FAILED]: "Операция завершилась ошибкой.",
   [AppErrorCode.APPROVAL_DENIED]: "Действие не подтверждено.",
   [AppErrorCode.SIDECAR_UNAVAILABLE]: "Фоновый сервис недоступен.",
   [AppErrorCode.MCP_UNAVAILABLE]: "MCP-сервер недоступен.",
-  [AppErrorCode.MCP_TIMEOUT]: "MCP-сервер не ответил вовремя.",
+  [AppErrorCode.MCP_TIMEOUT]: "Превышено время ожидания ответа MCP-сервера.",
   [AppErrorCode.NATIVE_ERROR]: "Сбой нативного модуля.",
   [AppErrorCode.DB_ERROR]: "Сбой локальной базы данных.",
   [AppErrorCode.UNSUPPORTED_FORMAT]: "Формат не поддерживается.",
@@ -35,9 +35,11 @@ const COPY: Record<AppErrorCode, string> = {
   [AppErrorCode.NOT_IMPLEMENTED]: "Функция недоступна.",
 };
 
+export const NAME_REQUIRED = "Название не указано.";
+
 const FIELD_COPY: Record<string, string> = {
-  name: "Укажите название.",
-  value: "Укажите значение секрета.",
+  name: NAME_REQUIRED,
+  value: "Значение секрета не указано.",
 };
 
 export function errorCopy(error: unknown): string {

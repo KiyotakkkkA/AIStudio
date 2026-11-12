@@ -22,9 +22,9 @@ pub const CALL_TIMEOUT: Duration = Duration::from_secs(45);
 pub const ACT_TIMEOUT: Duration = Duration::from_secs(180);
 const STDERR_KEPT: usize = 20;
 
-pub const SIDECAR_FAILED: &str = "Не удалось запустить управление компьютером. Проверьте, что uv подключён в разделе «Расширения → Компоненты».";
-pub const SIDECAR_LOST: &str = "Процесс управления компьютером завершился. Повторите действие.";
-pub const SIDECAR_TIMEOUT: &str = "Управление компьютером не ответило вовремя";
+pub const SIDECAR_FAILED: &str = "Не удалось запустить управление компьютером";
+pub const SIDECAR_LOST: &str = "Соединение с процессом управления компьютером потеряно";
+pub const SIDECAR_TIMEOUT: &str = "Превышено время ожидания ответа службы управления компьютером";
 pub const SIDECAR_PROTOCOL: &str = "Версия сценария управления компьютером не поддерживается";
 
 #[derive(Debug, Clone, PartialEq)]

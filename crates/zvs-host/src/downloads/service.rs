@@ -35,15 +35,17 @@ pub const DEFAULT_CONCURRENCY: usize = 2;
 pub const FREE_SPACE_MARGIN_BYTES: u64 = 1024 * 1024 * 1024;
 pub const DEFAULT_PERSIST_INTERVAL: Duration = Duration::from_secs(1);
 pub const SERVICE_STOPPED: &str = "Сервис загрузок остановлен";
-pub const ALREADY_QUEUED: &str = "Этот элемент уже в очереди загрузки";
+pub const ALREADY_QUEUED: &str = "Элемент уже находится в очереди загрузки";
 pub const NOT_RUNNING: &str = "Загрузка не выполняется";
-pub const RESUME_REFUSED: &str = "Возобновить можно только приостановленную загрузку";
-pub const PRIORITY_REFUSED: &str = "Приоритет меняется только у ожидающих загрузок";
-pub const CANCEL_FIRST: &str = "Сначала отмените загрузку";
+pub const RESUME_REFUSED: &str =
+    "Возобновление доступно только для приостановленной или завершившейся ошибкой загрузки";
+pub const PRIORITY_REFUSED: &str = "Изменение приоритета доступно только для ожидающих загрузок";
+pub const CANCEL_FIRST: &str =
+    "Удаление недоступно для загрузки, которая выполняется или ожидает запуска";
 pub const DOWNLOAD_NOT_FOUND: &str = "Загрузка не найдена";
 pub const RUN_ENDED_EMPTY: &str = "Запуск завершился без результата";
 pub const UNEXPECTED_RESULT: &str = "Загрузка вернула неожиданный результат";
-pub const NO_PATH: &str = "Загрузка не сообщила путь";
+pub const NO_PATH: &str = "В результате загрузки отсутствует путь к файлу";
 
 pub const fn priority_by_kind(kind: DownloadItemKind) -> u64 {
     match kind {

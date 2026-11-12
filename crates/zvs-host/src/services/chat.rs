@@ -158,7 +158,7 @@ pub const CHAT_TITLE_MAX: usize = 120;
 
 pub type ChatMessageListener = Arc<dyn Fn(&Value) + Send + Sync>;
 
-pub const NO_EVAL_CASES: &str = "Добавьте хотя бы один вопрос для проверки";
+pub const NO_EVAL_CASES: &str = "Для проверки требуется хотя бы один вопрос";
 pub const WORKING_FOLDER_HEADING: &str = "Working folder";
 pub const NO_WORKING_FOLDER_NOTE: &str = "This conversation has no working folder. Every folder needs the user's approval before you can read or change files in it.";
 pub const WORKING_FOLDER_RULES: &str = "Relative paths resolve against the working folder. Any other folder needs the user's approval before you can read or change files in it.";

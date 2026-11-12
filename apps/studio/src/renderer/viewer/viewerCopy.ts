@@ -37,13 +37,13 @@ export const CHIP_APPROXIMATE_HINT =
 export const PPTX_NOTE = "Для презентации показан только текст слайдов.";
 
 export const MISSING_TITLE = "Файл не найден";
-const MISSING_HINT = "Файл перемещён или удалён. Проверьте исходную папку.";
+const MISSING_HINT = "Файл перемещён или удалён.";
 export const UNSUPPORTED_TITLE = "Формат не поддерживается";
-const UNSUPPORTED_HINT = "Этот файл нельзя показать в просмотрщике.";
+const UNSUPPORTED_HINT = "Формат файла не поддерживается средством просмотра.";
 const FORBIDDEN_TITLE = "Доступ к файлу закрыт";
-const TOO_LARGE_TITLE = "Файл слишком большой";
+const TOO_LARGE_TITLE = "Превышен допустимый размер файла";
 const FAILED_TITLE = "Не удалось открыть документ";
-const FAILED_HINT = "Повторите попытку позже.";
+const FAILED_HINT = "Просмотр документа недоступен.";
 export const RENDER_FAILED = "Не удалось отобразить документ.";
 export const EMPTY_DOCUMENT = "Документ пуст.";
 export const SAVE_FAILED = "Не удалось сохранить документ.";

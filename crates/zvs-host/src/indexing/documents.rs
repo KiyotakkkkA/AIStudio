@@ -18,8 +18,8 @@ use crate::platform::long_path::to_extended_path;
 use crate::runtimes::RuntimeService;
 
 pub const DOCUMENT_JOB: &str = "job.document.extract";
-pub const OCR_OFF: &str = "распознавание выключено — включите OCR в настройках хранилища";
-pub const IMAGE_UNREADABLE: &str = "Этот формат изображения не читается";
+pub const OCR_OFF: &str = "распознавание текста выключено или не настроено в параметрах хранилища";
+pub const IMAGE_UNREADABLE: &str = "Формат изображения не поддерживается";
 pub const DOCUMENT_UNREADABLE: &str = "Не удалось прочитать документ";
 
 pub const IMAGE_MEDIA_TYPES: &[(&str, &str)] = &[
