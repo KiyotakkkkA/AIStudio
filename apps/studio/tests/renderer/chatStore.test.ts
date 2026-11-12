@@ -766,3 +766,41 @@ test("image previews load through the host once and failures resolve to a placeh
   store.dispose();
   events.dispose();
 });
+
+test("always-allow writes the rule for the pending approval before approving it", async () => {
+  const { store, events, bridge } = setup();
+  await store.mount();
+  await store.select(conversation.id);
+  store.composer.setText("Build");
+  await store.send();
+  const approvalId = "0199bb11-5555-7111-8111-000000000003";
+  events.dispatch({
+    type: "approval",
+    streamId: handle.streamId,
+    seq: 1,
+    ts: Date.now(),
+    request: {
+      id: approvalId,
+      runId: handle.id,
+      subject: "shell.run",
+      kind: "process",
+      process: { program: "cargo", argv: ["cargo", "build"], cwd: "D:\\work", packages: [] },
+    },
+  });
+  bridge.handle("execPolicy.allowRule", () => {
+    throw new Error("refused");
+  });
+  bridge.handle("runs.approve", () => undefined);
+  await store.allowAlways(approvalId, "folder");
+  const channels = bridge.calls.map((call) => call.channel);
+  expect(channels.slice(-2)).toEqual(["execPolicy.allowRule", "runs.approve"]);
+  expect(bridge.calls.at(-2)?.payload).toEqual({
+    runId: handle.id,
+    approvalId,
+    scope: "folder",
+  });
+  expect(store.approvals).toEqual([]);
+  expect(store.error).not.toBeNull();
+  store.dispose();
+  events.dispose();
+});

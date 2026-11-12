@@ -7,7 +7,7 @@ use zvs_contract::{
 use super::request::{AccessRequest, Asking, Effect, Resource};
 use crate::data::schema::ApprovalDecision;
 use crate::kernel::StepContext;
-use crate::services::approvals::ApprovalService;
+use crate::services::approvals::{ApprovalService, PendingReview};
 use crate::services::permissions::GLOBAL_SCOPE;
 
 pub const APPROVAL_DENIED: &str = "Approval denied";
@@ -110,6 +110,20 @@ pub fn tool_approval(
     if let Some(action) = &request.prompt.action {
         insert(&mut approval, "tool", json!(request.tool));
         insert(&mut approval, "action", json!(action));
+    }
+    if matches!(
+        request.effect,
+        Effect::Process { .. } | Effect::Files { .. }
+    ) && let Some(id) = approval.get("id").and_then(Value::as_str)
+    {
+        approvals.remember(
+            id,
+            PendingReview {
+                run_id: request.actor.run_id.clone(),
+                action: request.effect.reviewed(),
+                conversation: request.prompt.conversation.clone(),
+            },
+        );
     }
     match &request.effect {
         Effect::Process { process, .. } => insert(&mut approval, "process", json!(process)),

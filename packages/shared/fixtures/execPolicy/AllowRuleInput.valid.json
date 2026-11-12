@@ -1,37 +1,18 @@
 [
   {
-    "name": "files in a workspace",
+    "name": "in the folder",
     "value": {
-      "kind": "files",
-      "changes": [
-        {
-          "path": "D:\\work\\a.txt",
-          "kind": "modify"
-        }
-      ],
-      "folder": "D:\\work"
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "approvalId": "0199aa11-3333-7111-8111-111111111111",
+      "scope": "folder"
     }
   },
   {
-    "name": "exact files",
+    "name": "anywhere",
     "value": {
-      "kind": "files",
-      "changes": [
-        {
-          "path": "D:\\work\\a.txt",
-          "kind": "delete"
-        }
-      ],
-      "folder": null
-    }
-  },
-  {
-    "name": "process anywhere",
-    "value": {
-      "kind": "process",
-      "argv": ["cargo", "test", "--workspace"],
-      "cwd": "D:\\work",
-      "folder": null
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "approvalId": "0199aa11-3333-7111-8111-111111111111",
+      "scope": "anywhere"
     }
   }
 ]

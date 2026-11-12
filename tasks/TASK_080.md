@@ -2,7 +2,7 @@
 task: TASK_080
 title: Allow rules bound to approvals, listed and removable
 phase: A — Access pipeline (APS)
-status: todo
+status: done
 depends_on: [TASK_079]
 unblocks: [TASK_082]
 estimate: 3 h
@@ -96,19 +96,91 @@ offers no «always». Append an `allow` rule to `user.json` by hand → it is ig
 
 ## Definition of done
 
-- [ ] `execPolicy.allowRule` accepts only a pending approval id and a scope
-- [ ] Interpreters and script strings cannot be allowed by rule
-- [ ] Rules are listed and removable in the studio
-- [ ] Hand-edited `allow` rules do not apply until confirmed
-- [ ] Contract, schema and fixture updated together
-- [ ] PASSPORT §14 and §7 updated
-- [ ] All gates pass
-- [ ] Handoff block filled in, status set to `done`, INDEX.md ticked
+- [x] `execPolicy.allowRule` accepts only a pending approval id and a scope
+- [x] Interpreters and script strings cannot be allowed by rule
+- [x] Rules are listed and removable in the studio
+- [x] Hand-edited `allow` rules do not apply until confirmed
+- [x] Contract, schema and fixture updated together
+- [x] PASSPORT §14 and §7 updated
+- [x] All gates pass
+- [x] Handoff block filled in, status set to `done`, INDEX.md ticked
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
-
 **Built:**
+
+- **Bound to the approval (H12).** `AllowRuleInput` is `{ runId, approvalId, scope: "folder" |
+  "anywhere" }` (Rust, Zod, fixtures; `AllowRuleChangeDto` is gone). `access::tool_approval`
+  stores the reviewed action and the conversation on `ApprovalService` (`remember`) for process
+  and file approvals; `reviewed(run, id)` returns it only while that approval is pending on that
+  run and the entry is dropped when the approval is decided, settled or found gone
+  (`APPROVAL_GONE`). The IPC handler resolves the working folder from the conversation
+  (`FolderAccessService::working_folder_of`) and passes action, scope and folder to
+  `ExecPolicyService::allow_rule`.
+- **Derivation and refusals (H11).** `user_rules::derive`: program name plus every leading
+  plain-word argument (`[A-Za-z0-9][A-Za-z0-9_-]*`) up to the first flag or path, then `**`;
+  `folder` adds `{folder,folder/**}` as `cwd`. File rules take the destructive operations and
+  `<folder>/**` or the exact paths, a move's source included. Refusals (`ValidationFailed`,
+  Russian constants): `SOURCE_RULE` (a plan with a language or source), `SCRIPT_RULE`
+  (`scriptString` or `commands::script::interpreter_program`: shells, PowerShell, `cmd`, `wsl`,
+  Python, JS runtimes, script hosts, `env`, `xargs`, `start`), `VENDOR_RULE` (vendor `ask` or
+  `deny` matches the action), `OUTSIDE_FOLDER`, `NO_WORKING_FOLDER`, `NOTHING_TO_ALLOW`,
+  `PATTERN_CHARACTERS`. `rules.rs` `resolve` now puts a vendor rule keyed on `scriptString`
+  before any user rule, so no confirmed hand-written `allow powershell **` outranks
+  `review-script-strings`.
+- **List and remove (M13).** `execPolicy.rules` → `UserRulesDto { rules: UserRuleDto[] (id,
+  text, effect, pack, createdAt, active), unconfirmed: string[] }`; `execPolicy.removeRule {
+  id }` and `execPolicy.confirmPack { pack }` return the new list. The console allow-list gained
+  `execPolicy.rules` only. Stored rules carry `createdAt`; `RuleSpec` accepts it.
+- **Integrity (M14).** `policy/integrity.rs`: `PackKey` (keyed BLAKE3, `blake3` added to
+  `zvs-host`), `<pack>.mac` beside the pack, `SealedPackKeys` keeps a generated key sealed by
+  the OS keychain in the `exec.policy.packKey` setting (wired in `src-tauri/lib.rs`).
+  `RuleSet::load(vendor, folder, key)` drops `allow` rules of a pack whose MAC is missing or
+  wrong and reports it in `RuleSet::unconfirmed` (logged on each recompile). `PackStamp` covers
+  `.mac` files. Removal re-signs only a pack that was signed.
+- **Pack file.** `user.json`; `user.cli.json` is moved once on first use (or set aside as
+  `user.unconfirmed*.json` when `user.json` exists).
+- **Clients.** CLI: «always» is one `Request::AllowRule { run, approval, scope }` that calls
+  `execPolicy.allowRule` and then `runs.approve` in order; offered for processes in
+  `safety-ask` and `auto-bypass` and for files in `auto-bypass`, hidden for script files and
+  script strings. Studio: `AlwaysAllowButtons` in the process and file approval blocks of the
+  chat card under the same conditions (`approvalModel.alwaysAllowable`),
+  `ChatStore.allowAlways` (rule, then approve; a refused rule shows the error and still
+  approves); «Правила» (`RuleList`) on the judge settings page with removal, the unconfirmed
+  warning and «Подтвердить» behind a confirmation. Copy in `execPolicy/rulesCopy.ts`.
+- **Tests.** `user_rules.rs`: a test per refusal and per pattern shape, folder and exact file
+  rules, dedupe, hand-edit ignored then confirmed, set-aside, removal from signed and unsigned
+  packs, migration, damaged/absent confirm. `integrity.rs`: MAC and file signing.
+  `policy/tests.rs`: approve-always → runs → removed → asks; hand-written allow ignored until
+  confirmed while its deny applies; script-string review outranks a user allow; an interpreter
+  refused; migration. `access/tests.rs`: the approval keeps its reviewed action until answered.
+  Renderer: `policyRules.test.ts`, `chatStore.test.ts` (rule before approve, approve on
+  refusal). CLI: the prompt test now covers `safety-ask` and script strings.
+
 **Deviated from plan:**
+
+- Hand-written packs keep loading without their `allow` rules; confirming signs the whole pack
+  as it is. An unconfirmed `user.json` is renamed rather than signed when a new rule is written,
+  so a planted rule can never ride along with a legitimate one.
+- The migrated `user.cli.json` is not trusted: its `allow` rules wait for confirmation in the
+  list. Existing console rules therefore stop applying after the update until the person
+  confirms the pack once.
+- A confirm channel (`execPolicy.confirmPack`) was added; the scope implies it ("unless the
+  person confirms them in the list").
+- With no OS keychain (`SealedPackKeys` errors) no user `allow` applies and none can be
+  written; `deny`/`ask`/`review` still do.
+- `cargo build` is already allowed by the vendor `allow-build-tools` family, so the manual
+  check needs an unmatched command (`deploytool sync` in the tests) to see «always» change the
+  outcome.
+- `docs/APS_AUDIT.md` is not annotated per task, so it is unchanged.
+
 **Next session should know:**
+
+- The reviewed actions live in memory on `ApprovalService`; an approval that survives a host
+  restart (it does not today) would have no action and `allowRule` would refuse it.
+- The «Правила» row is not in `SETTING_ENTRIES` search: it lives on the judge sub-page, which
+  search cannot open yet.
+- Gates run locally on Windows: `cargo fmt --check`, `cargo clippy --workspace --all-targets
+  -D warnings`, `cargo test -p zvs-host -p zvs-cli -p zvs-contract`, `pnpm typecheck`,
+  `pnpm lint`, `pnpm test`, `pnpm format:check`; the rest of the workspace in `target/verify`.
+  Not run: `pnpm build`, `pnpm test:e2e` (CI), and the manual check in the running app.

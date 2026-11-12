@@ -11,16 +11,16 @@ pub mod transcript;
 use std::collections::VecDeque;
 
 use zvs_contract::{
-    AccountFamily, AllowRuleChangeDto, AllowRuleInput, AppError, BackgroundShellDto,
-    BackgroundShellId, BackgroundShellStatusDto, BindFolderResultDto, ChatAnswerInput,
-    ChatAttachDto, ChatCommand, ChatContextDto, ChatGoalDto, ChatGoalStepDto, ChatSendInput,
-    ChatSkipInput, ChatWakeStepDto, CliSessionDto, CliTheme, ConversationDetailDto,
-    ConversationDto, ConversationId, CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto,
-    FolderAccessAnswer, FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus,
-    GoalUsageDto, HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto,
-    McpServerId, McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto,
-    RunHandleDto, RunId, RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId,
-    ThinkingEffort, WAKE_STEP_DOMAIN, WorkingFolderAccess,
+    AccountFamily, AllowRuleScope, AppError, BackgroundShellDto, BackgroundShellId,
+    BackgroundShellStatusDto, BindFolderResultDto, ChatAnswerInput, ChatAttachDto, ChatCommand,
+    ChatContextDto, ChatGoalDto, ChatGoalStepDto, ChatSendInput, ChatSkipInput, ChatWakeStepDto,
+    CliSessionDto, CliTheme, ConversationDetailDto, ConversationDto, ConversationId,
+    CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer,
+    FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus, GoalUsageDto,
+    HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId,
+    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
+    RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort,
+    WAKE_STEP_DOMAIN, WorkingFolderAccess,
 };
 use zvs_contract::{
     CHAT_QUEUE_MAX, ChatQueueDto, ChatQueueStepDto, ChatQueuedMessageDto, QUEUE_STEP_DOMAIN,
@@ -31,7 +31,7 @@ use self::input::Input;
 use self::modal::{Content, Modal};
 use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
 use self::palette::{Arg, Command, Item, Palette, Pick, Sources, Sub, arg_slot, is_command_text};
-use self::prompt::{ApprovalDetail, Choice, Prompt, PromptKind};
+use self::prompt::{Choice, Prompt, PromptKind};
 use self::shortcuts::{Chord, ChordKey, Keymap, SHORTCUTS, Shortcut};
 use self::transcript::{ShellEnd, ShellRun, Tone, Transcript};
 use crate::copy;
@@ -215,7 +215,11 @@ pub enum Request {
         run: RunId,
         approval: String,
     },
-    AllowRule(AllowRuleInput),
+    AllowRule {
+        run: RunId,
+        approval: String,
+        scope: AllowRuleScope,
+    },
     AnswerFolder {
         run: RunId,
         approval: String,
@@ -2978,19 +2982,18 @@ impl App {
                 self.phase = Phase::Chat;
                 self.pending_resume()
             }
-            PromptKind::Approval {
-                run, id, detail, ..
-            } => match choice {
+            PromptKind::Approval { run, id, .. } => match choice {
                 Choice::Approve => vec![Request::Approve { run, approval: id }],
-                Choice::AlwaysHere | Choice::AlwaysEverywhere => {
-                    let folder = (choice == Choice::AlwaysHere).then(|| self.folder.clone());
-                    let mut requests = Vec::new();
-                    if let Some(rule) = allow_rule(&detail, folder) {
-                        requests.push(Request::AllowRule(rule));
-                    }
-                    requests.push(Request::Approve { run, approval: id });
-                    requests
-                }
+                Choice::AlwaysHere => vec![Request::AllowRule {
+                    run,
+                    approval: id,
+                    scope: AllowRuleScope::Folder,
+                }],
+                Choice::AlwaysEverywhere => vec![Request::AllowRule {
+                    run,
+                    approval: id,
+                    scope: AllowRuleScope::Anywhere,
+                }],
                 _ => vec![Request::Deny { run, approval: id }],
             },
             PromptKind::Folder { run, id, .. } => {
@@ -3039,27 +3042,6 @@ pub fn server_outcome(server: &McpServerDto, prefix: Option<&str>) -> (Tone, Str
                 copy::MCP_NOT_STARTED
             ),
         )
-    }
-}
-
-fn allow_rule(detail: &ApprovalDetail, folder: Option<String>) -> Option<AllowRuleInput> {
-    match detail {
-        ApprovalDetail::Plain => None,
-        ApprovalDetail::Process { argv, cwd, .. } => Some(AllowRuleInput::Process {
-            argv: argv.clone(),
-            cwd: cwd.clone(),
-            folder,
-        }),
-        ApprovalDetail::Files { changes } => Some(AllowRuleInput::Files {
-            changes: changes
-                .iter()
-                .map(|change| AllowRuleChangeDto {
-                    path: change.path.clone(),
-                    kind: change.kind,
-                })
-                .collect(),
-            folder,
-        }),
     }
 }
 

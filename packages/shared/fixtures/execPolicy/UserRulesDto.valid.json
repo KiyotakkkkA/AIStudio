@@ -1,0 +1,25 @@
+[
+  {
+    "name": "empty",
+    "value": {
+      "rules": [],
+      "unconfirmed": []
+    }
+  },
+  {
+    "name": "one rule and an unconfirmed pack",
+    "value": {
+      "rules": [
+        {
+          "id": "user.0199aa11",
+          "text": "Разрешено из подтверждения: `cargo build **` в D:/work",
+          "effect": "allow",
+          "pack": "user.json",
+          "createdAt": 1700000000000,
+          "active": true
+        }
+      ],
+      "unconfirmed": ["mine.json"]
+    }
+  }
+]

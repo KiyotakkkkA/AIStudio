@@ -1,17 +1,20 @@
 use std::collections::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use async_trait::async_trait;
 use serde_json::json;
 use zvs_contract::{
-    AllowRuleInput, AppError, AppErrorCode, ExecJudgeDto, ExecPolicyDto, PolicyRuleDto,
+    AllowRuleScope, AppError, AppErrorCode, ExecJudgeDto, ExecPolicyDto, PolicyRuleDto,
     ProviderCapability, TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX,
-    ToolAuthorisationDto, ToolAuthorisationKind,
+    ToolAuthorisationDto, ToolAuthorisationKind, UserRulesDto,
 };
 
 use super::action::{ReviewVerdict, ReviewedAction};
+use super::integrity::{PackKey, SharedPackKeys};
 use super::judge::{JudgeOutcome, ask_judge, judge_prompt};
 use super::rules::{PackStamp, RuleSet, RuleText, VENDOR_PACK};
 use crate::access::{
@@ -42,6 +45,7 @@ pub struct ExecPolicyOptions {
     pub vendor: String,
     pub timeout: Duration,
     pub judge_calls: u32,
+    pub keys: Option<SharedPackKeys>,
 }
 
 impl ExecPolicyOptions {
@@ -50,6 +54,7 @@ impl ExecPolicyOptions {
             database,
             clock,
             logger: silent_logger(),
+            keys: None,
             packs: None,
             vendor: VENDOR_PACK.to_owned(),
             timeout: JUDGE_TIMEOUT,
@@ -61,6 +66,9 @@ impl ExecPolicyOptions {
 struct Inner {
     database: Arc<Database>,
     settings: SettingService,
+    clock: SharedClock,
+    keys: Option<SharedPackKeys>,
+    migrated: AtomicBool,
     logger: SharedLogger,
     packs: Option<PathBuf>,
     vendor: String,
@@ -80,7 +88,10 @@ impl ExecPolicyService {
     pub fn new(options: ExecPolicyOptions) -> Self {
         Self {
             inner: Arc::new(Inner {
-                settings: SettingService::new(Arc::clone(&options.database), options.clock),
+                settings: SettingService::new(Arc::clone(&options.database), options.clock.clone()),
+                clock: options.clock,
+                keys: options.keys,
+                migrated: AtomicBool::new(false),
                 database: options.database,
                 logger: options.logger,
                 packs: options.packs,
@@ -176,36 +187,148 @@ impl ExecPolicyService {
         Ok(input.clone())
     }
 
-    pub fn allow_rule(&self, input: &AllowRuleInput) -> Result<PolicyRuleDto, AppError> {
+    fn folder(&self) -> Result<&Path, AppError> {
         let folder = self
             .inner
             .packs
             .as_deref()
             .ok_or_else(|| AppError::new(AppErrorCode::Conflict, RULES_UNAVAILABLE))?;
-        let _writing = self
-            .inner
-            .writing
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        let written = super::user_rules::allow(folder, input)?;
+        if !self.inner.migrated.swap(true, Ordering::SeqCst) {
+            match super::user_rules::migrate(folder) {
+                Ok(Some(pack)) => self.log(
+                    LogLevel::Warn,
+                    "The CLI rule pack was migrated and waits for confirmation",
+                    &[("pack", json!(pack))],
+                ),
+                Ok(None) => {}
+                Err(error) => {
+                    self.inner.migrated.store(false, Ordering::SeqCst);
+                    self.log(
+                        LogLevel::Warn,
+                        "The CLI rule pack could not be migrated",
+                        &[("error", json!(error.message))],
+                    );
+                }
+            }
+        }
+        Ok(folder)
+    }
+
+    fn signing_key(&self) -> Result<PackKey, AppError> {
+        self.inner
+            .keys
+            .as_ref()
+            .ok_or_else(|| AppError::new(AppErrorCode::Conflict, RULES_UNAVAILABLE))?
+            .key()
+    }
+
+    fn known_key(&self) -> Option<PackKey> {
+        let keys = self.inner.keys.as_ref()?;
+        match keys.key() {
+            Ok(key) => Some(key),
+            Err(error) => {
+                self.log(
+                    LogLevel::Warn,
+                    "The rule signing key is unavailable; user allow rules are ignored",
+                    &[("error", json!(error.message))],
+                );
+                None
+            }
+        }
+    }
+
+    fn forget_rules(&self) {
         *self
             .inner
             .compiled
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = None;
+    }
+
+    pub fn allow_rule(
+        &self,
+        action: &ReviewedAction,
+        scope: AllowRuleScope,
+        working: Option<&str>,
+    ) -> Result<PolicyRuleDto, AppError> {
+        let folder = self.folder()?;
+        let (vendor, _) = RuleSet::load(&self.inner.vendor, None, None);
+        let rule =
+            super::user_rules::derive(action, scope, working, &vendor, self.inner.clock.now())?;
+        let key = self.signing_key()?;
+        let _writing = self
+            .inner
+            .writing
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let allowed = super::user_rules::allow(folder, &key, rule)?;
+        self.forget_rules();
+        if let Some(pack) = &allowed.set_aside {
+            self.log(
+                LogLevel::Warn,
+                "An unconfirmed user pack was set aside",
+                &[("pack", json!(pack))],
+            );
+        }
         self.log(
             LogLevel::Info,
             "A user allow rule was added",
-            &[("rule", json!(written.id))],
+            &[("rule", json!(allowed.rule.id))],
         );
         Ok(PolicyRuleDto {
-            id: written.id,
-            text: written.text,
+            id: allowed.rule.id,
+            text: allowed.rule.text,
         })
     }
 
+    pub fn user_rules(&self) -> Result<UserRulesDto, AppError> {
+        let folder = self.folder()?;
+        let key = self.known_key();
+        Ok(super::user_rules::list(folder, key.as_ref()))
+    }
+
+    pub fn remove_rule(&self, id: &str) -> Result<UserRulesDto, AppError> {
+        let folder = self.folder()?;
+        let key = self.known_key();
+        {
+            let _writing = self
+                .inner
+                .writing
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            let pack = super::user_rules::remove(folder, key.as_ref(), id)?;
+            self.forget_rules();
+            self.log(
+                LogLevel::Info,
+                "A user rule was removed",
+                &[("rule", json!(id)), ("pack", json!(pack))],
+            );
+        }
+        self.user_rules()
+    }
+
+    pub fn confirm_pack(&self, pack: &str) -> Result<UserRulesDto, AppError> {
+        let folder = self.folder()?;
+        let key = self.signing_key()?;
+        {
+            let _writing = self
+                .inner
+                .writing
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            super::user_rules::confirm(folder, &key, pack)?;
+            self.forget_rules();
+            self.log(
+                LogLevel::Info,
+                "A user pack was confirmed",
+                &[("pack", json!(pack))],
+            );
+        }
+        self.user_rules()
+    }
+
     pub fn rules(&self) -> Arc<RuleSet> {
-        let folder = self.inner.packs.as_deref();
+        let folder = self.folder().ok();
         let stamp = PackStamp::read(folder);
         let mut compiled = self
             .inner
@@ -217,12 +340,20 @@ impl ExecPolicyService {
         {
             return Arc::clone(rules);
         }
-        let (rules, problems) = RuleSet::load(&self.inner.vendor, folder);
+        let key = folder.and_then(|_| self.known_key());
+        let (rules, problems) = RuleSet::load(&self.inner.vendor, folder, key.as_ref());
         for problem in problems {
             self.log(
                 LogLevel::Warn,
                 "A policy rule pack was skipped",
                 &[("problem", json!(problem))],
+            );
+        }
+        for pack in rules.unconfirmed() {
+            self.log(
+                LogLevel::Warn,
+                "A user pack does not match its signature; its allow rules are ignored",
+                &[("pack", json!(pack))],
             );
         }
         let rules = Arc::new(rules);

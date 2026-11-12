@@ -6,19 +6,20 @@ use async_trait::async_trait;
 use futures::future::BoxFuture;
 use tokio_util::sync::CancellationToken;
 use zvs_contract::{
-    AppError, AppErrorCode, ApprovalRequestDto, ExecJudgeDto, ExecMode, ExecPolicyDto,
-    FileChangeKind, FileDiffDto, HostEventDraft, ProcessPlanDto, ProviderCapability, ProviderKind,
-    RunGraph, RunId, RunKind, RunStatus, ToolAuthorisationDto, ToolAuthorisationKind,
+    AllowRuleScope, AppError, AppErrorCode, ApprovalRequestDto, ExecJudgeDto, ExecMode,
+    ExecPolicyDto, FileChangeKind, FileDiffDto, HostEventDraft, ProcessPlanDto, ProviderCapability,
+    ProviderKind, RunGraph, RunId, RunKind, RunStatus, ToolAuthorisationDto, ToolAuthorisationKind,
 };
 
 use super::action::FileOperation;
+use super::integrity::{PackKey, sign};
 use super::judge::{JUDGE_SYSTEM, VERDICT_TOOL, judge_prompt, verdict_spec};
 use super::rules::{
     PackOrigin, RuleEffect, RuleOutcome, RuleSet, RuleText, compile_pack, path_glob,
 };
 use super::service::{EXEC_POLICY_KEY, ExecPolicyOptions, ExecPolicyService, JUDGE_UNAVAILABLE};
 use super::table::Family;
-use super::{ReviewVerdict, ReviewedAction, VENDOR_PACK};
+use super::{LEGACY_PACK_FILE, ReviewVerdict, ReviewedAction, USER_PACK_FILE, VENDOR_PACK};
 use crate::commands::script::script_string;
 use crate::data::Repositories;
 use crate::data::repositories::{ModelDraft, ProviderDraft, ProviderPatch, RunDraft};
@@ -38,6 +39,7 @@ use crate::testing::{
 };
 
 const JUDGE_MODEL: &str = "judge-model";
+const KEY: PackKey = PackKey::new([3; 32]);
 
 #[derive(Clone)]
 enum Reply {
@@ -181,6 +183,7 @@ impl Host {
         let packs = temporary_directory("policy-packs");
         let policy = ExecPolicyService::new(ExecPolicyOptions {
             packs: Some(packs.path().to_path_buf()),
+            keys: Some(Arc::new(KEY)),
             timeout: Duration::from_millis(200),
             judge_calls: 2,
             ..ExecPolicyOptions::new(database.shared(), Arc::new(FakeClock::default()))
@@ -219,6 +222,12 @@ impl Host {
     }
 
     fn pack(&self, name: &str, text: &str) {
+        let file = self.packs.path().join(name);
+        std::fs::write(&file, text).expect("writes a pack");
+        sign(&file, text.as_bytes(), &KEY).expect("signs the pack");
+    }
+
+    fn unsigned_pack(&self, name: &str, text: &str) {
         std::fs::write(self.packs.path().join(name), text).expect("writes a pack");
     }
 
@@ -749,7 +758,7 @@ fn a_pack_must_declare_its_allow_rules_and_a_broken_pack_is_skipped() {
         ),
     );
     host.pack("notes.txt", "ignored");
-    let (rules, problems) = RuleSet::load(VENDOR_PACK, Some(host.packs.path()));
+    let (rules, problems) = RuleSet::load(VENDOR_PACK, Some(host.packs.path()), Some(&KEY));
     assert_eq!(problems.len(), 2, "{problems:?}");
     assert_eq!(
         rule_of(&rules.evaluate(&delete("C:/work/src/a.rs"))),
@@ -1351,4 +1360,135 @@ fn the_judge_prompt_fences_the_action_and_carries_only_rule_texts() {
         spec.parameters["required"],
         serde_json::json!(["decision", "reason"])
     );
+}
+
+#[tokio::test]
+async fn an_always_rule_from_an_approval_runs_the_command_until_it_is_removed() {
+    let host = Host::new();
+    let context = host.context();
+    host.policy
+        .set(&ExecPolicyDto {
+            mode: ExecMode::AutoBypass,
+            judge: None,
+        })
+        .expect("stores the policy");
+    let build = shell(&["deploytool", "sync", "--all"]);
+    assert!(matches!(
+        host.review(&context, build.clone()).await,
+        ReviewVerdict::Ask { .. }
+    ));
+    let rule = host
+        .policy
+        .allow_rule(&build, AllowRuleScope::Folder, Some("C:/work"))
+        .expect("allowed");
+    assert!(rule.text.contains("`deploytool sync **`"));
+    assert!(matches!(
+        host.review(&context, build.clone()).await,
+        ReviewVerdict::Run(_)
+    ));
+    let listed = host.policy.user_rules().expect("lists");
+    assert_eq!(listed.rules.len(), 1);
+    assert_eq!(listed.rules[0].id, rule.id);
+    assert_eq!(listed.rules[0].pack, USER_PACK_FILE);
+    assert!(listed.rules[0].active);
+    let left = host.policy.remove_rule(&rule.id).expect("removes");
+    assert!(left.rules.is_empty());
+    assert!(matches!(
+        host.review(&context, build).await,
+        ReviewVerdict::Ask { .. }
+    ));
+}
+
+#[tokio::test]
+async fn a_hand_written_allow_is_ignored_until_the_pack_is_confirmed() {
+    let host = Host::new();
+    let context = host.context();
+    host.policy
+        .set(&ExecPolicyDto {
+            mode: ExecMode::AutoBypass,
+            judge: None,
+        })
+        .expect("stores the policy");
+    host.unsigned_pack(
+        "mine.json",
+        &user_pack(
+            r#"{ "id": "user.allow-deploy", "effect": "allow", "text": "t", "process": { "argv": ["deploytool", "**"] } },
+            { "id": "user.deny-wipe", "effect": "deny", "text": "t", "process": { "argv": ["wipetool", "**"] } }"#,
+        ),
+    );
+    assert!(matches!(
+        host.review(&context, shell(&["deploytool", "sync"])).await,
+        ReviewVerdict::Ask { .. }
+    ));
+    assert!(matches!(
+        host.review(&context, shell(&["wipetool"])).await,
+        ReviewVerdict::Deny { .. }
+    ));
+    assert_eq!(host.policy.rules().unconfirmed(), ["mine.json".to_owned()]);
+    let listed = host.policy.user_rules().expect("lists");
+    assert_eq!(listed.unconfirmed, ["mine.json".to_owned()]);
+    let confirmed = host.policy.confirm_pack("mine.json").expect("confirms");
+    assert!(confirmed.unconfirmed.is_empty());
+    assert!(matches!(
+        host.review(&context, shell(&["deploytool", "sync"])).await,
+        ReviewVerdict::Run(_)
+    ));
+}
+
+#[test]
+fn a_user_allow_never_outranks_the_script_string_review() {
+    let host = Host::new();
+    host.pack(
+        "mine.json",
+        &user_pack(
+            r#"{ "id": "user.allow-powershell", "effect": "allow", "text": "t", "process": { "argv": ["powershell", "**"] } }"#,
+        ),
+    );
+    assert_eq!(
+        rule_of(&host.policy.rules().evaluate(&shell(&[
+            "powershell",
+            "-Command",
+            "Get-ChildItem"
+        ]))),
+        ("review", Some("vendor.process.review-script-strings"))
+    );
+    assert_eq!(
+        rule_of(
+            &host
+                .policy
+                .rules()
+                .evaluate(&shell(&["powershell", "-File", "a.ps1"]))
+        )
+        .0,
+        "allow"
+    );
+}
+
+#[test]
+fn an_interpreter_offers_no_always_rule() {
+    let host = Host::new();
+    let refused = host
+        .policy
+        .allow_rule(
+            &shell(&["powershell", "-Command", "Remove-Item x"]),
+            AllowRuleScope::Anywhere,
+            Some("C:/work"),
+        )
+        .expect_err("refused");
+    assert_eq!(refused.code, AppErrorCode::ValidationFailed);
+    assert!(host.policy.user_rules().expect("lists").rules.is_empty());
+}
+
+#[test]
+fn the_cli_pack_is_migrated_to_the_user_pack_on_first_use() {
+    let host = Host::new();
+    host.unsigned_pack(
+        LEGACY_PACK_FILE,
+        &user_pack(
+            r#"{ "id": "user.cli.a", "effect": "allow", "text": "t", "process": { "argv": ["deploytool", "**"] } }"#,
+        ),
+    );
+    let listed = host.policy.user_rules().expect("lists");
+    assert_eq!(listed.unconfirmed, [USER_PACK_FILE.to_owned()]);
+    assert!(!host.packs.path().join(LEGACY_PACK_FILE).exists());
 }

@@ -1303,8 +1303,8 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ToolAuthorisationDto>,
     ),
     (
-        "execPolicy/AllowRuleChangeDto",
-        round_trip::<zvs_contract::AllowRuleChangeDto>,
+        "execPolicy/AllowRuleScope",
+        round_trip::<zvs_contract::AllowRuleScope>,
     ),
     (
         "execPolicy/AllowRuleInput",
@@ -1313,6 +1313,26 @@ const TABLE: &[(&str, Check)] = &[
     (
         "execPolicy/PolicyRuleDto",
         round_trip::<zvs_contract::PolicyRuleDto>,
+    ),
+    (
+        "execPolicy/PolicyRuleEffect",
+        round_trip::<zvs_contract::PolicyRuleEffect>,
+    ),
+    (
+        "execPolicy/UserRuleDto",
+        round_trip::<zvs_contract::UserRuleDto>,
+    ),
+    (
+        "execPolicy/UserRulesDto",
+        round_trip::<zvs_contract::UserRulesDto>,
+    ),
+    (
+        "execPolicy/RemoveRuleInput",
+        round_trip::<zvs_contract::RemoveRuleInput>,
+    ),
+    (
+        "execPolicy/ConfirmRulePackInput",
+        round_trip::<zvs_contract::ConfirmRulePackInput>,
     ),
     (
         "subagents/SubagentModelDto",

@@ -152,10 +152,11 @@ pub use events::{
     RunOutcomeDto, RunOutcomeStatus, StepEventDto,
 };
 pub use exec_policy::{
-    ALLOW_RULE_CHANGES_MAX, AllowRuleChangeDto, AllowRuleInput, EXEC_JUDGE_ID_MAX, ExecJudgeDto,
-    ExecMode, ExecPolicyDto, POLICY_RULE_ID_MAX, POLICY_RULE_TEXT_MAX, PolicyRuleDto,
-    TOOL_AUTHORISATION_REASON_MAX, TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto,
-    ToolAuthorisationKind,
+    AllowRuleInput, AllowRuleScope, ConfirmRulePackInput, EXEC_JUDGE_ID_MAX, ExecJudgeDto,
+    ExecMode, ExecPolicyDto, POLICY_PACK_NAME_MAX, POLICY_RULE_ID_MAX, POLICY_RULE_TEXT_MAX,
+    PolicyRuleDto, PolicyRuleEffect, RemoveRuleInput, TOOL_AUTHORISATION_REASON_MAX,
+    TOOL_AUTHORISATION_SOURCE_MAX, ToolAuthorisationDto, ToolAuthorisationKind, USER_RULES_MAX,
+    UserRuleDto, UserRulesDto,
 };
 pub use explorer::{
     EXPLORER_CHANGES_MAX, EXPLORER_LIST_MAX, EXPLORER_STEP_DOMAIN, EXPLORER_TEXT_MAX,

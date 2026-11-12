@@ -13,7 +13,8 @@ user, is reviewed by a judge model, or is denied. It sits on top of the permissi
 | `rules.rs`      | Rule packs: compile, match file / process / code actions, resolve conflicts (`RuleSet::evaluate`), the deny check (`RuleSet::denied`), `PackStamp`            |
 | `judge.rs`      | The judge prompt, the `verdict` tool, verdict parsing                                                                                                         |
 | `service.rs`    | `ExecPolicyService`: get/set mode and judge model, compiled rules, `review` and `refused` (implements `ExecReview`) through hard rules → mode → rules → judge |
-| `user_rules.rs` | "Allow this rule" from an approval: writes a user rule to `user.cli.json`                                                                                     |
+| `user_rules.rs` | Rules from approvals: derivation and refusals, `user.json` writes, list, remove, confirm, the `user.cli.json` migration                                       |
+| `integrity.rs`  | `PackKey` (keyed BLAKE3 MAC), `SealedPackKeys` (the key sealed by the OS keychain in `exec.policy.packKey`), `<pack>.mac` files                               |
 | `vendor.json`   | The built-in rule pack                                                                                                                                        |
 
 ## Decision table
@@ -69,8 +70,9 @@ applies to processes only; destructive file changes still ask there.
    - code rules: for scripts whose source is known (see `../commands/README.md`), language plus
      patterns to avoid in the source. A script's command line counts only when some rule names
      it, so its `ask`, `deny` or `review` still applies and the code rule speaks for the rest.
-4. **Resolution per item.** A vendor `deny` always wins. Otherwise the strongest user rule
-   wins (deny > ask > review > allow), then the strongest vendor rule. Across items (several
+4. **Resolution per item.** A vendor `deny` always wins, then a vendor rule keyed on
+   `scriptString` (no user `allow` outranks `review-script-strings`). Otherwise the strongest
+   user rule wins (deny > ask > review > allow), then the strongest vendor rule. Across items (several
    files, or a script plus its process), any deny → **deny**; else any ask → **ask** with the
    rule's text as the reason; else any review → judge with that rule _flagged_; else, if every
    item has an allow, **run** with the allow rule recorded as the source. In `safety ask`
@@ -112,7 +114,27 @@ logged once per change.
 
 ## User rules
 
-Choosing "allow this rule" in an approval (`allow_rule`) writes an `allow` rule built from
-the concrete action (program and argv, or paths and operations) into `user.cli.json` in the
-user rule folder. User packs are reloaded with the vendor pack; compile problems are reported,
-not fatal, and a broken user pack never disables the vendor deny rules.
+`allow_rule` takes the action the host reviewed for a pending approval
+(`ApprovalService::reviewed`, kept by `access::tool_approval` until the approval is answered)
+and a scope, never client-supplied argv or paths. `user_rules::derive` builds the rule:
+
+- process: the program name and every leading plain-word argument up to the first flag or
+  path, then `**`; `folder` scope adds `{folder,folder/**}` as the `cwd`;
+- files: the destructive operations, and `<folder>/**` or the exact paths (a move's source
+  too).
+
+It refuses (`ValidationFailed`, Russian constants in `user_rules.rs`) a script string or an
+interpreter (`commands::script::interpreter_program`), a plan with a script source, an action
+the vendor pack asks about or denies, a path or `cwd` outside the working folder for `folder`,
+a conversation with no working folder, and paths with glob characters.
+
+Rules go to `user.json`; `user.cli.json` is moved there once (or set aside if `user.json`
+exists) and waits for confirmation. Every write signs the pack (`integrity.rs`): a keyed
+BLAKE3 MAC of the exact bytes in `<pack>.mac`. On load a pack whose MAC is missing or wrong
+keeps its `deny`, `ask` and `review` rules and loses its `allow` rules, and its name is in
+`RuleSet::unconfirmed`. `list` returns every user rule with its pack, creation time and whether
+it is active; `remove` deletes one rule and re-signs the pack only if it was signed;
+`confirm` signs a pack as it is. A new rule never signs an unconfirmed `user.json`: it is
+renamed to `user.unconfirmed.json` first. `PackStamp` covers `.mac` files, so confirming or
+tampering recompiles. User packs are reloaded with the vendor pack; compile problems are
+reported, not fatal, and a broken user pack never disables the vendor deny rules.

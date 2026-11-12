@@ -288,6 +288,29 @@ pub fn script_string(argv: &[String]) -> bool {
     }
 }
 
+pub fn interpreter_program(program: &str) -> bool {
+    program_stem(program).is_some_and(|stem| {
+        interpreter(&stem).is_some()
+            || options(&stem).is_some()
+            || matches!(
+                stem.as_str(),
+                "cmd"
+                    | "powershell"
+                    | "pwsh"
+                    | "wsl"
+                    | "forfiles"
+                    | "cscript"
+                    | "wscript"
+                    | "mshta"
+                    | "rundll32"
+                    | "regsvr32"
+                    | "env"
+                    | "xargs"
+                    | "start"
+            )
+    })
+}
+
 fn read_inside(path: &Path, cwd: &Path) -> Option<String> {
     let root = cwd.canonicalize().ok()?;
     let file = path.canonicalize().ok()?;

@@ -4,6 +4,7 @@ import {
   FilesApprovalDto,
   ProcessApprovalDto,
   type ApprovalRequestDto,
+  type ExecMode,
   type FileDiffDto,
   type ProcessPlanDto,
 } from "@zvs/shared";
@@ -44,4 +45,20 @@ export function approvalView(request: ApprovalRequestDto): ApprovalView | null {
       ? { apps: apps.data, ...(detail === undefined ? {} : { detail }) }
       : {}),
   };
+}
+
+export function alwaysAllowable(
+  approval: { readonly changes?: readonly FileDiffDto[]; readonly process?: ProcessPlanDto },
+  mode: ExecMode,
+): boolean {
+  const process = approval.process;
+  if (process !== undefined) {
+    return (
+      (mode === "safety-ask" || mode === "auto-bypass") &&
+      process.language === undefined &&
+      process.scriptString !== true &&
+      process.argv.length > 0
+    );
+  }
+  return mode === "auto-bypass" && (approval.changes?.length ?? 0) > 0;
 }

@@ -103,12 +103,15 @@ fn subagent_label(request: &ApprovalRequestDto) -> Option<String> {
 }
 
 pub fn rules_apply(mode: ExecMode, detail: &ApprovalDetail) -> bool {
-    mode == ExecMode::AutoBypass
-        && match detail {
-            ApprovalDetail::Plain => false,
-            ApprovalDetail::Process { scripted, argv, .. } => !scripted && !argv.is_empty(),
-            ApprovalDetail::Files { changes } => !changes.is_empty(),
+    match detail {
+        ApprovalDetail::Plain => false,
+        ApprovalDetail::Process { scripted, argv, .. } => {
+            matches!(mode, ExecMode::SafetyAsk | ExecMode::AutoBypass)
+                && !scripted
+                && !argv.is_empty()
         }
+        ApprovalDetail::Files { changes } => mode == ExecMode::AutoBypass && !changes.is_empty(),
+    }
 }
 
 pub fn from_request(request: &ApprovalRequestDto, mode: ExecMode) -> Option<Prompt> {
@@ -133,7 +136,7 @@ fn from_value(request: &ApprovalRequestDto, mode: ExecMode) -> Option<Prompt> {
         ApprovalDetail::Process {
             argv: process.process.argv,
             cwd: process.process.cwd,
-            scripted: process.process.language.is_some(),
+            scripted: process.process.language.is_some() || process.process.script_string,
         }
     } else {
         ApprovalDetail::Plain
@@ -358,21 +361,25 @@ mod tests {
     }
 
     #[test]
-    fn always_allow_is_offered_only_for_plain_commands_in_auto_bypass() {
-        let prompt = from_request(&process(None), ExecMode::AutoBypass).expect("prompt");
-        assert_eq!(
-            prompt.choices(),
-            [
-                Choice::Approve,
-                Choice::AlwaysHere,
-                Choice::AlwaysEverywhere,
-                Choice::Deny
-            ]
-        );
-        let ask = from_request(&process(None), ExecMode::SafetyAsk).expect("prompt");
+    fn always_allow_is_offered_only_for_plain_commands_where_rules_apply() {
+        let always = [
+            Choice::Approve,
+            Choice::AlwaysHere,
+            Choice::AlwaysEverywhere,
+            Choice::Deny,
+        ];
+        for mode in [ExecMode::AutoBypass, ExecMode::SafetyAsk] {
+            let prompt = from_request(&process(None), mode).expect("prompt");
+            assert_eq!(prompt.choices(), always, "{mode:?}");
+        }
+        let ask = from_request(&process(None), ExecMode::AlwaysAsk).expect("prompt");
         assert_eq!(ask.choices(), [Choice::Approve, Choice::Deny]);
         let script = from_request(&process(Some("python")), ExecMode::AutoBypass).expect("prompt");
         assert_eq!(script.choices(), [Choice::Approve, Choice::Deny]);
+        let mut string = process(None);
+        string["process"]["scriptString"] = json!(true);
+        let string = from_request(&string, ExecMode::AutoBypass).expect("prompt");
+        assert_eq!(string.choices(), [Choice::Approve, Choice::Deny]);
     }
 
     #[test]

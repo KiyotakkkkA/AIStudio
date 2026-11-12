@@ -69,6 +69,7 @@ import { STATS_EXPORT_GROUP, STATS_TOGGLE } from "./stats/chatStatsCopy";
 import PluginMark from "../plugins/PluginMark";
 import { pluginChipLabel } from "../plugins/pluginPresentation";
 import { useStore } from "../../stores/useStore";
+import { alwaysAllowable } from "./approvalModel";
 
 export default observer(function ChatThread({
   store,
@@ -521,6 +522,14 @@ export default observer(function ChatThread({
                       calls={calls}
                       approvalFor={store.approvalFor}
                       onDecide={(id, approve) => void store.decideApproval(id, approve)}
+                      {...(policy === undefined
+                        ? {}
+                        : {
+                            always: {
+                              available: (approval) => alwaysAllowable(approval, policy.store.mode),
+                              allow: (id, scope) => void store.allowAlways(id, scope),
+                            },
+                          })}
                       onAnswerAccess={(id, answer) => void store.answerAccess(id, answer)}
                       questionFor={store.questionFor}
                       onAnswer={(id, answers) => void store.answerQuestion(id, answers)}

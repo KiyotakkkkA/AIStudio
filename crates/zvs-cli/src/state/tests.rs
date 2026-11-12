@@ -324,17 +324,11 @@ fn always_allow_writes_a_workspace_rule_and_approves() {
     let requests = app.update(Msg::Key(Key::Enter));
     assert_eq!(
         requests,
-        [
-            Request::AllowRule(AllowRuleInput::Process {
-                argv: vec!["deploytool".to_owned(), "sync".to_owned()],
-                cwd: FOLDER.to_owned(),
-                folder: Some(FOLDER.to_owned()),
-            }),
-            Request::Approve {
-                run: handle().id,
-                approval: APPROVAL.to_owned()
-            }
-        ]
+        [Request::AllowRule {
+            run: handle().id,
+            approval: APPROVAL.to_owned(),
+            scope: AllowRuleScope::Folder,
+        }]
     );
     assert!(app.prompts.is_empty());
 }

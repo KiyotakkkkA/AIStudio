@@ -24,6 +24,7 @@ import {
   type AdapterDescriptorDto,
   type ApprovalRequestDto,
   type RunId,
+  type AllowRuleScope,
   type ChatAttachDto,
   type ChatCitationDto,
   type ChatCommand,
@@ -1550,6 +1551,31 @@ export default class ChatStore {
       if (approve)
         await this.ipc.call("runs.approve", { id: runId, approvalId: id, always: false });
       else await this.ipc.call("runs.deny", { id: runId, approvalId: id });
+      runInAction(() => {
+        this.approvals = this.approvals.filter((item) => item.id !== id);
+      });
+    } catch (error) {
+      runInAction(() => {
+        request.busy = false;
+        this.error = errorCopy(error);
+      });
+    }
+  }
+
+  async allowAlways(id: string, scope: AllowRuleScope) {
+    const request = this.approvals.find((item) => item.id === id);
+    if (!request || request.busy || !this.run) return;
+    request.busy = true;
+    const runId = request.runId as RunId;
+    try {
+      await this.ipc.call("execPolicy.allowRule", { runId, approvalId: id, scope });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    }
+    try {
+      await this.ipc.call("runs.approve", { id: runId, approvalId: id, always: false });
       runInAction(() => {
         this.approvals = this.approvals.filter((item) => item.id !== id);
       });

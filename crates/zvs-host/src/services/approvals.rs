@@ -13,10 +13,12 @@ use crate::data::{Database, Repositories};
 use crate::kernel::ApprovalDecision;
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
+use crate::policy::ReviewedAction;
 
 pub const DEFAULT_APPROVAL_TIMEOUT: Duration = Duration::from_secs(60);
 pub const NO_LONGER_PENDING: &str = "Approval is no longer pending";
 pub const PERMISSION_REVOKED: &str = "Permission revoked";
+pub const APPROVAL_GONE: &str = "Подтверждение уже не ожидает ответа";
 const MAX_TIMEOUT_MS: u128 = 2_147_483_647;
 
 pub struct ApprovalService {
@@ -25,6 +27,14 @@ pub struct ApprovalService {
     timeout: Duration,
     clock: SharedClock,
     waiting: Mutex<HashMap<String, oneshot::Sender<ApprovalDecision>>>,
+    reviews: Mutex<HashMap<String, PendingReview>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PendingReview {
+    pub run_id: String,
+    pub action: ReviewedAction,
+    pub conversation: Option<String>,
 }
 
 impl ApprovalService {
@@ -49,6 +59,7 @@ impl ApprovalService {
             timeout,
             clock,
             waiting: Mutex::new(HashMap::new()),
+            reviews: Mutex::new(HashMap::new()),
         })
     }
 
@@ -89,7 +100,37 @@ impl ApprovalService {
         })
     }
 
+    pub fn remember(&self, id: &str, review: PendingReview) {
+        self.reviews
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id.to_owned(), review);
+    }
+
+    fn forget(&self, id: &str) {
+        self.reviews
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(id);
+    }
+
+    pub fn reviewed(&self, run_id: &str, id: &str) -> Result<PendingReview, AppError> {
+        let gone = || AppError::new(AppErrorCode::Conflict, APPROVAL_GONE);
+        if !self.is_pending(run_id, id)? {
+            self.forget(id);
+            return Err(gone());
+        }
+        self.reviews
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .filter(|review| review.run_id == run_id)
+            .cloned()
+            .ok_or_else(gone)
+    }
+
     fn settle(&self, id: &str, decision: ApprovalDecision) -> Result<(), AppError> {
+        self.forget(id);
         self.waiting
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -116,9 +157,11 @@ impl ApprovalService {
             })
             .unwrap_or_default();
         let Some(row) = self.row(&id)? else {
+            self.forget(&id);
             return Ok(ApprovalDecision::Denied);
         };
         if let Some(decision) = row.decision {
+            self.forget(&id);
             return Ok(decision);
         }
         let (sender, receiver) = oneshot::channel();
@@ -196,6 +239,7 @@ impl ApprovalService {
             repositories.permissions.decide(id, decision)?;
             Ok(())
         })?;
+        self.forget(id);
         let waiter = self
             .waiting
             .lock()

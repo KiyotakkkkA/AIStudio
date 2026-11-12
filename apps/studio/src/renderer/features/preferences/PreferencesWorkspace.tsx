@@ -157,6 +157,8 @@ import {
   storageSize,
 } from "./storageCopy";
 import MemoryFacts from "../memory/MemoryFacts";
+import RuleList from "../execPolicy/RuleList";
+import { RULES_ROW } from "../execPolicy/rulesCopy";
 import {
   VOICE_CHOOSE,
   VOICE_DEVICE_MISSING,
@@ -643,6 +645,11 @@ const GeneralSection = observer(function GeneralSection() {
       <SettingsSubPage title={JUDGE_ROW.label} hint={JUDGE_ROW.hint} onBack={() => setPage("main")}>
         <PreferenceContainer title={JUDGE_ROW.label}>
           <JudgeModelRow />
+        </PreferenceContainer>
+        <PreferenceContainer title={RULES_ROW.label}>
+          <SettingRow id={RULES_ROW.key} label={RULES_ROW.label} hint={RULES_ROW.hint} stacked>
+            <RuleList store={execPolicy} />
+          </SettingRow>
         </PreferenceContainer>
       </SettingsSubPage>
     );

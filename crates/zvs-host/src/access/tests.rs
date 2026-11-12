@@ -863,3 +863,41 @@ async fn a_call_that_always_asks_reaches_the_person_in_no_restrictions() {
         1
     );
 }
+
+#[test]
+fn a_process_approval_keeps_its_reviewed_action_until_it_is_answered() {
+    let host = Host::new(EMPTY_PACK);
+    let approvals = crate::services::approvals::ApprovalService::new(
+        host._database.shared(),
+        Arc::clone(&host.permissions),
+        std::time::Duration::from_secs(60),
+        Arc::new(FakeClock::default()),
+    )
+    .expect("an approval service");
+    let action = shell(&["deploytool", "sync"]);
+    let mut request = AccessRequest::new(Actor::run("run-1"), "shell.run", action.clone().into());
+    request.prompt.conversation = Some("conversation-1".to_owned());
+    let approval = super::tool_approval(&approvals, &request).expect("asks");
+    let id = approval
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .expect("an id")
+        .to_owned();
+    let review = approvals.reviewed("run-1", &id).expect("pending");
+    assert_eq!(review.action, action);
+    assert_eq!(review.conversation.as_deref(), Some("conversation-1"));
+    assert_eq!(
+        approvals
+            .reviewed("run-2", &id)
+            .expect_err("another run")
+            .message,
+        crate::services::approvals::APPROVAL_GONE
+    );
+    approvals
+        .decide("run-1", &id, ApprovalDecision::Denied, false)
+        .expect("answered");
+    assert_eq!(
+        approvals.reviewed("run-1", &id).expect_err("answered").code,
+        AppErrorCode::Conflict
+    );
+}

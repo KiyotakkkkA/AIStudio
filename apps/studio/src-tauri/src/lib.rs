@@ -79,7 +79,7 @@ use zvs_host::platform::theme::{
     apply_palette, apply_theme_source,
 };
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
-use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, POLICY_DIR};
+use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, POLICY_DIR, SealedPackKeys};
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
 };
@@ -900,6 +900,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let exec_policy = ExecPolicyService::new(ExecPolicyOptions {
         logger: logger.clone(),
         packs: Some(paths.data_dir.join(POLICY_DIR)),
+        keys: Some(Arc::new(SealedPackKeys::new(
+            SettingService::new(Arc::clone(&database), clock.clone()),
+            Arc::clone(&secrets),
+        ))),
         ..ExecPolicyOptions::new(Arc::clone(&database), clock.clone())
     });
     let runs = RunService::new(RunServiceOptions {

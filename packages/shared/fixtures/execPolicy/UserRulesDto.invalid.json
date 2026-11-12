@@ -1,0 +1,15 @@
+[
+  {
+    "name": "unconfirmed omitted",
+    "value": {
+      "rules": []
+    }
+  },
+  {
+    "name": "unconfirmed pack with a path",
+    "value": {
+      "rules": [],
+      "unconfirmed": ["C:/policy/mine.json"]
+    }
+  }
+]

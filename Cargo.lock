@@ -11020,6 +11020,7 @@ dependencies = [
  "async-trait",
  "axum",
  "base64 0.22.1",
+ "blake3",
  "encoding_rs",
  "flate2",
  "futures",

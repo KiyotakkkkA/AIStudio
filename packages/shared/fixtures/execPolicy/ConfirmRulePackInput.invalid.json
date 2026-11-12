@@ -1,0 +1,14 @@
+[
+  {
+    "name": "path",
+    "value": {
+      "pack": "../mine.json"
+    }
+  },
+  {
+    "name": "empty",
+    "value": {
+      "pack": ""
+    }
+  }
+]

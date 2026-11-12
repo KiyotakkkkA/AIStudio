@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use zvs_contract::{CodeLanguage, ProcessPlanDto};
 
 use super::action::{FileAction, FileOperation, ReviewedAction, UNREAD_SCRIPT};
+use super::integrity::{MAC_EXTENSION, PackKey, signed};
 
 pub const VENDOR_PACK: &str = include_str!("vendor.json");
 pub const ANY_REST: &str = "**";
@@ -65,6 +66,8 @@ struct RuleSpec {
     process: Option<ProcessRuleSpec>,
     #[serde(default)]
     code: Option<CodeRuleSpec>,
+    #[serde(default, rename = "createdAt")]
+    _created_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -346,6 +349,16 @@ impl Rule {
         matches!(self.matcher, Matcher::Files { .. })
     }
 
+    const fn pinned(&self) -> bool {
+        matches!(
+            self.matcher,
+            Matcher::Process {
+                script_string: Some(true),
+                ..
+            }
+        ) && !matches!(self.effect, RuleEffect::Allow)
+    }
+
     pub fn text(&self) -> RuleText {
         RuleText {
             id: self.id.clone(),
@@ -389,6 +402,7 @@ fn resolve<'a>(matched: &[&'a Rule]) -> Option<&'a Rule> {
     };
     vendor()
         .find(|rule| rule.effect == RuleEffect::Deny)
+        .or_else(|| strongest(vendor().filter(|rule| rule.pinned())))
         .or_else(|| {
             strongest(
                 matched
@@ -403,14 +417,37 @@ fn resolve<'a>(matched: &[&'a Rule]) -> Option<&'a Rule> {
 #[derive(Debug, Clone, Default)]
 pub struct RuleSet {
     rules: Vec<Rule>,
+    unconfirmed: Vec<String>,
+}
+
+pub fn user_pack(
+    text: &str,
+    file: &Path,
+    key: Option<&PackKey>,
+) -> Result<(Vec<Rule>, bool), String> {
+    let mut rules = compile_pack(text, PackOrigin::User)?;
+    if signed(file, text.as_bytes(), key) {
+        return Ok((rules, false));
+    }
+    let before = rules.len();
+    rules.retain(|rule| rule.effect != RuleEffect::Allow);
+    let ignored = rules.len() != before;
+    Ok((rules, ignored))
 }
 
 impl RuleSet {
     pub const fn new(rules: Vec<Rule>) -> Self {
-        Self { rules }
+        Self {
+            rules,
+            unconfirmed: Vec::new(),
+        }
     }
 
-    pub fn load(vendor: &str, user: Option<&Path>) -> (Self, Vec<String>) {
+    pub fn unconfirmed(&self) -> &[String] {
+        &self.unconfirmed
+    }
+
+    pub fn load(vendor: &str, user: Option<&Path>, key: Option<&PackKey>) -> (Self, Vec<String>) {
         let mut problems = Vec::new();
         let mut rules = match compile_pack(vendor, PackOrigin::Vendor) {
             Ok(rules) => rules,
@@ -419,17 +456,23 @@ impl RuleSet {
                 Vec::new()
             }
         };
+        let mut unconfirmed = Vec::new();
         for file in pack_files(user) {
             let name = file.to_string_lossy().into_owned();
             match std::fs::read_to_string(&file)
                 .map_err(|error| error.to_string())
-                .and_then(|text| compile_pack(&text, PackOrigin::User))
+                .and_then(|text| user_pack(&text, &file, key))
             {
-                Ok(pack) => rules.extend(pack),
+                Ok((pack, ignored)) => {
+                    rules.extend(pack);
+                    if ignored {
+                        unconfirmed.push(pack_name(&file));
+                    }
+                }
                 Err(problem) => problems.push(format!("{name}: {problem}")),
             }
         }
-        (Self { rules }, problems)
+        (Self { rules, unconfirmed }, problems)
     }
 
     pub fn texts(&self, files: bool) -> Vec<RuleText> {
@@ -562,7 +605,13 @@ impl RuleSet {
     }
 }
 
-pub fn pack_files(folder: Option<&Path>) -> Vec<PathBuf> {
+pub fn pack_name(file: &Path) -> String {
+    file.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn files_with(folder: Option<&Path>, extensions: &[&str]) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = folder
         .and_then(|folder| std::fs::read_dir(folder).ok())
         .into_iter()
@@ -570,12 +619,19 @@ pub fn pack_files(folder: Option<&Path>) -> Vec<PathBuf> {
         .filter_map(Result::ok)
         .map(|entry| entry.path())
         .filter(|path| {
-            path.extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+            path.extension().is_some_and(|extension| {
+                extensions
+                    .iter()
+                    .any(|known| extension.eq_ignore_ascii_case(known))
+            })
         })
         .collect();
     files.sort();
     files
+}
+
+pub fn pack_files(folder: Option<&Path>) -> Vec<PathBuf> {
+    files_with(folder, &["json"])
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -584,7 +640,7 @@ pub struct PackStamp(Vec<(PathBuf, Option<SystemTime>, u64)>);
 impl PackStamp {
     pub fn read(folder: Option<&Path>) -> Self {
         Self(
-            pack_files(folder)
+            files_with(folder, &["json", MAC_EXTENSION])
                 .into_iter()
                 .map(|file| {
                     let metadata = std::fs::metadata(&file).ok();

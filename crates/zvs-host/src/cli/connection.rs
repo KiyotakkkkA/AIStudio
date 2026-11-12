@@ -42,6 +42,7 @@ pub const CLI_CHANNELS: &[&str] = &[
     "cli.subagents.cancel",
     "execPolicy.allowRule",
     "execPolicy.get",
+    "execPolicy.rules",
     "execPolicy.set",
     "folders.answer",
     "mcp.cancelSignIn",

@@ -1,0 +1,24 @@
+[
+  {
+    "name": "confirmed allow",
+    "value": {
+      "id": "user.0199aa11",
+      "text": "Разрешено из подтверждения: `cargo build **` в D:/work",
+      "effect": "allow",
+      "pack": "user.json",
+      "createdAt": 1700000000000,
+      "active": true
+    }
+  },
+  {
+    "name": "hand-written allow, ignored",
+    "value": {
+      "id": "mine.allow-tests",
+      "text": "Tests",
+      "effect": "allow",
+      "pack": "mine.json",
+      "createdAt": null,
+      "active": false
+    }
+  }
+]

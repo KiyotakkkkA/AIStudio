@@ -113,7 +113,14 @@ import {
   OpenArtifactInBrowserInput,
 } from "../artifacts.js";
 import { OpenSiteInput, SiteIconDto, SiteIconInput } from "../sites.js";
-import { AllowRuleInput, ExecPolicyDto, PolicyRuleDto } from "../execPolicy.js";
+import {
+  AllowRuleInput,
+  ConfirmRulePackInput,
+  ExecPolicyDto,
+  PolicyRuleDto,
+  RemoveRuleInput,
+  UserRulesDto,
+} from "../execPolicy.js";
 import { CliSubagentCancelInput, SubagentPreferencesDto } from "../subagents.js";
 import { CliInstallDto, CliOpenInput, CliSessionDto, CliThemeDto } from "../cli.js";
 import {
@@ -652,6 +659,9 @@ export const contract = defineContract({
   "execPolicy.get": { input: z.void(), output: ExecPolicyDto },
   "execPolicy.set": { input: ExecPolicyDto, output: ExecPolicyDto },
   "execPolicy.allowRule": { input: AllowRuleInput, output: PolicyRuleDto },
+  "execPolicy.rules": { input: z.void(), output: UserRulesDto },
+  "execPolicy.removeRule": { input: RemoveRuleInput, output: UserRulesDto },
+  "execPolicy.confirmPack": { input: ConfirmRulePackInput, output: UserRulesDto },
   "subagents.get": { input: z.void(), output: SubagentPreferencesDto },
   "subagents.set": { input: SubagentPreferencesDto, output: SubagentPreferencesDto },
   "cli.open": { input: CliOpenInput, output: CliSessionDto },

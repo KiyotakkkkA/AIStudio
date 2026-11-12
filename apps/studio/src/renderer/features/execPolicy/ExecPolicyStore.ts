@@ -6,6 +6,8 @@ import {
   type ExecMode,
   type ExecPolicyDto,
   type ProviderDto,
+  type UserRuleDto,
+  type UserRulesDto,
 } from "@zvs/shared";
 
 export { EXEC_MODES, type ExecMode };
@@ -17,6 +19,11 @@ export default class ExecPolicyStore {
   providers: ProviderDto[] = [];
   loading = false;
   loaded = false;
+  rules: UserRuleDto[] = [];
+  unconfirmed: string[] = [];
+  rulesState: "idle" | "loading" | "ready" | "failed" = "idle";
+  rulesBusy: string | null = null;
+  rulesError: unknown = null;
   private saving: Promise<void> = Promise.resolve();
 
   constructor(private readonly ipc: IpcClient<Contract>) {
@@ -33,6 +40,58 @@ export default class ExecPolicyStore {
 
   get judgeReady(): boolean {
     return this.judgeProviderId !== null && this.judgeModelId !== null;
+  }
+
+  inactiveRules(pack: string): number {
+    return this.rules.filter((rule) => rule.pack === pack && !rule.active).length;
+  }
+
+  async loadRules(): Promise<void> {
+    if (this.rulesState === "loading") return;
+    this.rulesState = "loading";
+    try {
+      const rules = await this.ipc.call("execPolicy.rules", undefined);
+      runInAction(() => {
+        this.applyRules(rules);
+        this.rulesState = "ready";
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.rulesState = "failed";
+        this.rulesError = error;
+      });
+    }
+  }
+
+  removeRule(id: string): Promise<void> {
+    return this.changeRules(id, () => this.ipc.call("execPolicy.removeRule", { id }));
+  }
+
+  confirmPack(pack: string): Promise<void> {
+    return this.changeRules(pack, () => this.ipc.call("execPolicy.confirmPack", { pack }));
+  }
+
+  private async changeRules(key: string, change: () => Promise<UserRulesDto>): Promise<void> {
+    if (this.rulesBusy !== null) return;
+    this.rulesBusy = key;
+    this.rulesError = null;
+    try {
+      const rules = await change();
+      runInAction(() => this.applyRules(rules));
+    } catch (error) {
+      runInAction(() => {
+        this.rulesError = error;
+      });
+    } finally {
+      runInAction(() => {
+        this.rulesBusy = null;
+      });
+    }
+  }
+
+  private applyRules(rules: UserRulesDto): void {
+    this.rules = rules.rules;
+    this.unconfirmed = rules.unconfirmed;
   }
 
   get policy(): ExecPolicyDto {

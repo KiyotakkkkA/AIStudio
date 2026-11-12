@@ -1,0 +1,34 @@
+[
+  {
+    "name": "pack with a path",
+    "value": {
+      "id": "user.0199aa11",
+      "text": "Разрешено из подтверждения: `cargo build **` в D:/work",
+      "effect": "allow",
+      "pack": "..\u000bendor.json",
+      "createdAt": 1700000000000,
+      "active": true
+    }
+  },
+  {
+    "name": "createdAt omitted",
+    "value": {
+      "id": "user.0199aa11",
+      "text": "Разрешено из подтверждения: `cargo build **` в D:/work",
+      "effect": "allow",
+      "pack": "user.json",
+      "active": true
+    }
+  },
+  {
+    "name": "unknown effect",
+    "value": {
+      "id": "user.0199aa11",
+      "text": "Разрешено из подтверждения: `cargo build **` в D:/work",
+      "effect": "block",
+      "pack": "user.json",
+      "createdAt": 1700000000000,
+      "active": true
+    }
+  }
+]

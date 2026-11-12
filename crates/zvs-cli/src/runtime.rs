@@ -9,9 +9,9 @@ use ratatui::crossterm::execute;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use zvs_contract::{
-    AnswerFolderRequestInput, AppError, AppErrorCode, BindFolderInput, CliOpenInput,
-    CreateMcpServerInput, ExecPolicyDto, McpOAuthState, McpServerDetailDto, McpServerDto,
-    ProviderDto, ProviderSummaryDto,
+    AllowRuleInput, AnswerFolderRequestInput, AppError, AppErrorCode, BindFolderInput,
+    CliOpenInput, CreateMcpServerInput, ExecPolicyDto, McpOAuthState, McpServerDetailDto,
+    McpServerDto, ProviderDto, ProviderSummaryDto,
 };
 
 use crate::args::{self, Args};
@@ -346,8 +346,31 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             link.call("runs.deny", &json!({ "id": run, "approvalId": approval }))
                 .await,
         ),
-        Request::AllowRule(input) => {
-            Msg::RuleAdded(link.call("execPolicy.allowRule", &input).await)
+        Request::AllowRule {
+            run,
+            approval,
+            scope,
+        } => {
+            let rule = link
+                .call(
+                    "execPolicy.allowRule",
+                    &AllowRuleInput {
+                        run_id: run,
+                        approval_id: approval.clone(),
+                        scope,
+                    },
+                )
+                .await;
+            let approved: Result<Value, AppError> = link
+                .call(
+                    "runs.approve",
+                    &json!({ "id": run, "approvalId": approval, "always": false }),
+                )
+                .await;
+            match approved {
+                Ok(_) => Msg::RuleAdded(rule),
+                Err(error) => Msg::Answered(Err(error)),
+            }
         }
         Request::AnswerFolder {
             run,

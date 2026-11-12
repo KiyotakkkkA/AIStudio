@@ -71,6 +71,7 @@ import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import MailDraftView from "../mail/MailDraftView";
 import { useToolCallSlots } from "./ToolCallSlots";
 import AppAccessRequest from "../computer/AppAccessRequest";
+import AlwaysAllowButtons, { type AlwaysAllow } from "./AlwaysAllowButtons";
 import { toolImageReferences } from "./imageData";
 import { MAIL_LEAD, REJECT_MAIL, SEND_MAIL, type MailPreview } from "../mail/mailCopy";
 
@@ -174,6 +175,7 @@ function ToolCallCard({
   asking,
   live,
   onDecide,
+  always,
   onAnswer,
   onSkip,
   onAnswerAccess,
@@ -183,6 +185,7 @@ function ToolCallCard({
   readonly asking: ToolCallQuestion | undefined;
   readonly live: boolean;
   readonly onDecide?: ((id: string, approve: boolean) => void) | undefined;
+  readonly always?: AlwaysAllow | undefined;
   readonly onAnswerAccess?: ((id: string, answer: FolderAccessAnswer) => void) | undefined;
   readonly onAnswer?: ((id: string, answers: QuestionAnswerDto[]) => void) | undefined;
   readonly onSkip?: ((id: string) => void) | undefined;
@@ -344,6 +347,7 @@ function ToolCallCard({
                 >
                   {APPROVE_CHANGES}
                 </Button>
+                <AlwaysAllowButtons approval={approval} always={always} files />
                 <Button
                   size="sm"
                   disabled={approval.busy}
@@ -367,6 +371,7 @@ function ToolCallCard({
                 >
                   {RUN_PROCESS}
                 </Button>
+                <AlwaysAllowButtons approval={approval} always={always} files={false} />
                 <Button
                   size="sm"
                   disabled={approval.busy}
@@ -466,6 +471,7 @@ export interface ToolCallItemsProps {
   readonly calls: readonly ChatToolCallDto[];
   readonly approvalFor?: (id: string | null) => ToolCallApproval | undefined;
   readonly onDecide?: (id: string, approve: boolean) => void;
+  readonly always?: AlwaysAllow;
   readonly questionFor?: (id: string) => ToolCallQuestion | undefined;
   readonly onAnswer?: (id: string, answers: QuestionAnswerDto[]) => void;
   readonly onSkip?: (id: string) => void;
@@ -477,6 +483,7 @@ export function ToolCallItems({
   calls,
   approvalFor,
   onDecide,
+  always,
   questionFor,
   onAnswer,
   onSkip,
@@ -497,6 +504,7 @@ export function ToolCallItems({
         asking={undefined}
         live={live}
         onDecide={onDecide}
+        always={always}
       />
     ),
   };
@@ -521,6 +529,7 @@ export function ToolCallItems({
           asking={asking}
           live={live}
           onDecide={onDecide}
+          always={always}
           onAnswer={onAnswer}
           onSkip={onSkip}
           onAnswerAccess={onAnswerAccess}

@@ -362,6 +362,11 @@ over a named pipe, `\\.\pipe\zvs-ai-studio-cli-<user SID>`, served by the runnin
   execution policy, provider and model listings, skills and MCP servers. Secrets, settings,
   accounts, provider editing and `cli.install`/`cli.uninstall` stay studio-only. Widening the
   list is a security decision, as above.
+  Policy rules (TASK_080, 2026-11-12): `execPolicy.allowRule` takes only
+  `{ runId, approvalId, scope }` for an approval still pending on that run, and the host builds
+  the rule from the action it reviewed for that approval; nothing the client sends becomes part
+  of the rule. The console may list rules (`execPolicy.rules`); `execPolicy.removeRule` and
+  `execPolicy.confirmPack` stay studio-only.
   Account exception (2026-11-01, widened from the Copilot-only login of 2026-10-31):
   `cli.accounts.link` and `cli.accounts.cancelLink` are allowed. They take only an account
   family (`openai`, `copilot`, `qwen-web`, `zai-web`); the sign-in runs in the app's own
@@ -1301,8 +1306,8 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   `review-script-strings` keys on the flag, not on argv globs. **No catch-all**: the vendor pack
   no longer ends in `allow-unflagged`, and no pack may hold an `allow` process rule of `*`
   followed only by `**`. A command no rule names goes to the judge in `auto-bypass` and to the
-  person otherwise, every time (DECISION: option a; «always for this program in this folder»
-  follows with TASK_080). The pack names package runners (`npx`, `bunx`, `uvx`, `npm exec`,
+  person otherwise, every time (DECISION: option a), until the person answers an approval
+  with «always» (below). The pack names package runners (`npx`, `bunx`, `uvx`, `npm exec`,
   `pnpm dlx`, `yarn dlx`, `bun x`, `pipx run`, `uv tool run`, `go run` and `deno run` with a
   remote module) and Windows script hosts (`mshta`, `wscript`, `cscript`, `rundll32`,
   `regsvr32`, `forfiles`, …) as `ask`, and grows explicit `allow` families in place of the
@@ -1312,7 +1317,30 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   credential access, decoded payloads or installs; a script that trips a pattern goes to the
   judge. Among rules of equal effect the first in the pack is reported. The vendor pack ships
   in `policy/vendor.json`, user packs are read from `<app data>/policy/*.json`, and a pack that
-  holds an `allow` it did not declare, or does not parse, is skipped with a warning. Packs are
+  holds an `allow` it did not declare, or does not parse, is skipped with a warning.
+  **User allow rules** (TASK_080, 2026-11-12) come only from approvals. When an approval for a
+  process or a file change is raised, the host keeps the reviewed action with it until it is
+  answered; `execPolicy.allowRule { runId, approvalId, scope: folder | anywhere }` derives the
+  rule from that action and writes it to `user.json` (migrated once from `user.cli.json`). A
+  process rule keeps the program and every leading plain-word argument up to the first flag or
+  path, then `**` (`git stash list` → `git stash list **`); `folder` adds the conversation's
+  working folder as the `cwd`, `anywhere` drops it. A file rule names the destructive
+  operations and either `<working folder>/**` or the exact paths. The host refuses, with a
+  `ValidationFailed` and a Russian message, a script string or any interpreter (shells,
+  PowerShell, `cmd`, `wsl`, Python, JavaScript runtimes, script hosts), a plan that carries a
+  script source, an action the vendor pack asks about or denies, and, for `folder`, anything
+  outside the working folder or a conversation without one. A vendor rule keyed on
+  `scriptString` is never outranked by a user `allow`. «Always» is offered, in the console and
+  in the chat approval card, for processes in `safety-ask` and `auto-bypass` and for file
+  changes in `auto-bypass`, never for a script file or script string. **Integrity**: every pack
+  the host writes gets a keyed BLAKE3 MAC beside it (`<pack>.mac`); the key is generated once
+  and kept sealed by the OS keychain in the `exec.policy.packKey` setting. A pack whose MAC is
+  missing or does not match loads without its `allow` rules (its `deny`, `ask` and `review`
+  still apply), is logged, and is flagged in the «Правила» list under the judge settings,
+  where the person may confirm it (which writes the MAC) or remove single rules. Removing a
+  rule from a signed pack re-signs it; from an unsigned pack it does not. A new rule never
+  signs an unconfirmed `user.json`: the old file is set aside as `user.unconfirmed.json`
+  first. With no keychain, user `allow` rules are ignored and none can be written. Packs are
   compiled once: `ExecPolicyService` keeps the `RuleSet` with a stamp of the pack folder (file
   names, modified times, lengths) and recompiles when the stamp changes or a user rule is
   written. In a batch the destructive changes, and any other change a rule names, are matched

@@ -1,47 +1,34 @@
 [
   {
-    "name": "no changes",
-    "value": {
-      "kind": "files",
-      "changes": [],
-      "folder": null
-    }
-  },
-  {
-    "name": "folder omitted",
-    "value": {
-      "kind": "files",
-      "changes": [
-        {
-          "path": "D:\\work\\a.txt",
-          "kind": "delete"
-        }
-      ]
-    }
-  },
-  {
-    "name": "no program",
+    "name": "free-form argv",
     "value": {
       "kind": "process",
-      "argv": [],
+      "argv": ["cargo", "test"],
       "cwd": "D:\\work",
       "folder": null
     }
   },
   {
-    "name": "unknown kind",
+    "name": "approval id not a uuid",
     "value": {
-      "kind": "browser",
-      "folder": null
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "approvalId": "approval-1",
+      "scope": "folder"
     }
   },
   {
-    "name": "empty program",
+    "name": "unknown scope",
     "value": {
-      "kind": "process",
-      "argv": [""],
-      "cwd": "D:\\work",
-      "folder": null
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "approvalId": "0199aa11-3333-7111-8111-111111111111",
+      "scope": "workspace"
+    }
+  },
+  {
+    "name": "scope omitted",
+    "value": {
+      "runId": "0199aa11-1111-7111-8111-111111111111",
+      "approvalId": "0199aa11-3333-7111-8111-111111111111"
     }
   }
 ]

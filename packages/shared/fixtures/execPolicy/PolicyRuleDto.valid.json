@@ -2,8 +2,8 @@
   {
     "name": "rule",
     "value": {
-      "id": "user.cli.0199aa11",
-      "text": "Allowed from the CLI: cargo test ** in D:\\work"
+      "id": "user.0199aa11",
+      "text": "Разрешено из подтверждения: `cargo build **` в D:/work"
     }
   }
 ]
