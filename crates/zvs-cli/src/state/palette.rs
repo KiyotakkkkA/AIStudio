@@ -16,6 +16,8 @@ pub enum Command {
     Connect,
     Desktop,
     Context,
+    Compact,
+    Config,
     Goal,
     Skills,
     Mcp,
@@ -37,6 +39,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Desktop,
     Command::New,
     Command::Context,
+    Command::Compact,
     Command::Goal,
     Command::Skills,
     Command::Mcp,
@@ -44,6 +47,7 @@ pub const COMMANDS: &[Command] = &[
     Command::Permissions,
     Command::Shortcuts,
     Command::Theme,
+    Command::Config,
     Command::Subagents,
     Command::Clear,
     Command::Exit,
@@ -60,6 +64,8 @@ impl Command {
             Self::Connect => "connect",
             Self::Desktop => "desktop",
             Self::Context => "context",
+            Self::Compact => "compact",
+            Self::Config => "config",
             Self::Goal => "goal",
             Self::Skills => "skills",
             Self::Mcp => "mcp",
@@ -83,6 +89,8 @@ impl Command {
             Self::Connect => copy::CMD_CONNECT,
             Self::Desktop => copy::CMD_DESKTOP,
             Self::Context => copy::CMD_CONTEXT,
+            Self::Compact => copy::CMD_COMPACT,
+            Self::Config => copy::CMD_CONFIG,
             Self::Goal => copy::CMD_GOAL,
             Self::Skills => copy::CMD_SKILLS,
             Self::Mcp => copy::CMD_MCP,
@@ -642,12 +650,17 @@ mod tests {
             [
                 Command::Mcp,
                 Command::Models,
+                Command::Compact,
                 Command::Permissions,
                 Command::Resume,
                 Command::Theme
             ]
         );
-        assert_eq!(commands("/con"), [Command::Connect, Command::Context]);
+        assert_eq!(
+            commands("/con"),
+            [Command::Config, Command::Connect, Command::Context]
+        );
+        assert_eq!(matches("/comp"), [Item::Command(Command::Compact)]);
         assert_eq!(matches("/desk"), [Item::Command(Command::Desktop)]);
         assert_eq!(matches("/rsm"), [Item::Command(Command::Resume)]);
         assert!(matches("/zzz").is_empty());

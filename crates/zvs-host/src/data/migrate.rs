@@ -265,6 +265,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0043_access_grant",
         sql: include_str!("../../migrations/0043_access_grant.sql"),
     },
+    Migration {
+        id: 44,
+        name: "0044_chat_compaction",
+        sql: include_str!("../../migrations/0044_chat_compaction.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

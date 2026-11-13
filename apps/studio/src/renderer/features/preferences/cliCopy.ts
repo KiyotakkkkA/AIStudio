@@ -38,6 +38,15 @@ export function cliFailureCopy(error: unknown, installing: boolean): string {
   return installing ? CLI_INSTALL_FAILED : CLI_UNINSTALL_FAILED;
 }
 
+export const CLI_GENERAL_TITLE = "Общие";
+export const CLI_AUTO_COPY_ROW = {
+  key: "cli.autoCopy",
+  label: "Автоматическое копирование в буфер обмена",
+  hint: "Копирование выделенного мышью текста при отпускании кнопки.",
+} as const;
+export const CLI_PREFERENCES_LOAD_FAILED = "Не удалось загрузить настройки консольной версии.";
+export const CLI_PREFERENCES_SAVE_FAILED = "Не удалось сохранить настройки консольной версии.";
+
 export const CLI_CONFIRM_ROW: ToggleRowCopy = {
   key: "cli.confirmLoosening",
   label: "Дополнительное подтверждение при снятии ограничений",

@@ -1365,6 +1365,34 @@ const TABLE: &[(&str, Check)] = &[
     ),
     ("cli/CliThemeDto", round_trip::<zvs_contract::CliThemeDto>),
     (
+        "cli/CliPreferencesDto",
+        round_trip::<zvs_contract::CliPreferencesDto>,
+    ),
+    (
+        "assistant/AssistantPreferencesDto",
+        round_trip::<zvs_contract::AssistantPreferencesDto>,
+    ),
+    (
+        "chat/ChatCompactionDto",
+        round_trip::<zvs_contract::ChatCompactionDto>,
+    ),
+    (
+        "chat/ChatCompactInput",
+        round_trip::<zvs_contract::ChatCompactInput>,
+    ),
+    (
+        "chat/ChatCompactionRef",
+        round_trip::<zvs_contract::ChatCompactionRef>,
+    ),
+    (
+        "chat/ChatCompactionStepDto",
+        round_trip::<zvs_contract::ChatCompactionStepDto>,
+    ),
+    (
+        "chat/ChatRecapStepDto",
+        round_trip::<zvs_contract::ChatRecapStepDto>,
+    ),
+    (
         "cli/CliConnectionDto",
         round_trip::<zvs_contract::CliConnectionDto>,
     ),

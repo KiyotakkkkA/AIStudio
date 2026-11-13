@@ -548,6 +548,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     crate::agentic::register_agentic_nodes(&nodes, agentic.store(), tools.clone())
         .expect("registers the agentic node");
     let subagents = crate::services::SubagentService::new(database.shared(), clock.clone());
+    let assistant = crate::services::AssistantService::new(database.shared(), clock.clone());
     let browser_settings = crate::browser::BrowserSettings::new(settings.clone());
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
         browser: Some(browser_settings.clone()),
@@ -560,6 +561,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         folders: Some(folders.clone()),
         shells: Some(shells.clone()),
         subagents: Some(subagents.clone()),
+        assistant: Some(assistant.clone()),
         clock: clock.clone(),
         ..crate::services::ChatServiceOptions::new(
             database.shared(),
@@ -671,6 +673,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             sites: crate::sites::SiteService::new(crate::sites::SiteServiceOptions::default()),
             exec_policy,
             subagents,
+            assistant,
             browser: crate::browser::BrowserAgent::new(clock.clone()),
             browser_settings,
             browser_sites: crate::browser::BrowserGrants::new(database.shared(), clock.clone()),
@@ -712,6 +715,9 @@ pub fn test_services(system: SystemService) -> TestServices {
             picker: Some(picker.clone()),
             cli: cli.clone(),
             cli_theme: crate::cli::CliThemeFile::new(
+                &workspace.join(crate::platform::paths::CLI_FOLDER),
+            ),
+            cli_preferences: crate::cli::CliPreferencesFile::new(
                 &workspace.join(crate::platform::paths::CLI_FOLDER),
             ),
             cli_connections: crate::cli::CliConnections::new(

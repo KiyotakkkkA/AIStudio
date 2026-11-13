@@ -90,6 +90,7 @@ export const STATUS_LABELS: Readonly<Record<ChatHistoryStatus, string>> = {
   included: "в запросе",
   trimmed: "не помещается",
   skipped: "пропущено: пустой ответ",
+  compacted: "сжато в сводку",
 };
 
 export const ROLE_LABELS = {

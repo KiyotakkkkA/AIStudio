@@ -1,8 +1,8 @@
 use rusqlite::Row;
 use zvs_contract::{
     ChatCitationDto, ChatCommand, ChatEventDto, ChatGoalDto, ChatPluginDto, ChatRoundDto,
-    ChatSettings, ChatToolCallDto, DocumentSelectionDto, MessageRole, OfferedToolDto,
-    RetrievalMode, Timestamp, WebSourceDto,
+    ChatSettings, ChatToolCallDto, CompactionTrigger, DocumentSelectionDto, MessageRole,
+    OfferedToolDto, RetrievalMode, Timestamp, WebSourceDto,
 };
 
 use super::columns::{EnumColumn, json_column, optional_json_column};
@@ -81,13 +81,14 @@ pub struct MessageRow {
     pub pinned: bool,
     pub event: Option<ChatEventDto>,
     pub created_at: Timestamp,
+    pub recap: Option<String>,
 }
 
 impl MessageRow {
     pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
         WHERE message_id = message.id) AS tool_calls, images, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
-        pinned, event, created_at";
+        pinned, event, created_at, recap";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
@@ -115,6 +116,43 @@ impl MessageRow {
             partial: row.get("partial")?,
             pinned: row.get("pinned")?,
             event: optional_json_column(row, "event")?,
+            created_at: row.get("created_at")?,
+            recap: row.get("recap")?,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompactionRow {
+    pub id: String,
+    pub conversation_id: String,
+    pub boundary_message_id: String,
+    pub summary: String,
+    pub messages: i64,
+    pub tokens_before: i64,
+    pub tokens_after: i64,
+    pub provider_id: String,
+    pub model_id: String,
+    pub trigger: CompactionTrigger,
+    pub created_at: Timestamp,
+}
+
+impl CompactionRow {
+    pub const COLUMNS: &str = "id, conversation_id, boundary_message_id, summary, messages, \
+        tokens_before, tokens_after, provider_id, model_id, trigger, created_at";
+
+    pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
+        Ok(Self {
+            id: row.get("id")?,
+            conversation_id: row.get("conversation_id")?,
+            boundary_message_id: row.get("boundary_message_id")?,
+            summary: row.get("summary")?,
+            messages: row.get("messages")?,
+            tokens_before: row.get("tokens_before")?,
+            tokens_after: row.get("tokens_after")?,
+            provider_id: row.get("provider_id")?,
+            model_id: row.get("model_id")?,
+            trigger: row.get::<_, EnumColumn<CompactionTrigger>>("trigger")?.0,
             created_at: row.get("created_at")?,
         })
     }

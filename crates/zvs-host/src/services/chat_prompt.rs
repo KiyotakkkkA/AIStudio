@@ -158,6 +158,28 @@ pub fn history_entries(
         .collect()
 }
 
+pub fn compacted_entries(messages: &[MessageDto]) -> Vec<ChatHistoryEntryDto> {
+    messages
+        .iter()
+        .map(|message| {
+            let text = with_selections(&message.content, &message.selections);
+            ChatHistoryEntryDto {
+                message_id: message.id,
+                role: message.role,
+                status: if sendable(message) {
+                    ChatHistoryStatus::Compacted
+                } else {
+                    ChatHistoryStatus::Skipped
+                },
+                tokens: count(tokens(&text) + MESSAGE_OVERHEAD),
+                text,
+                reasoning_tokens: count(tokens(&message.reasoning)),
+                carried: Vec::new(),
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

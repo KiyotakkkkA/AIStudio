@@ -23,6 +23,8 @@ export * from "./ai.js";
 export * from "./system.js";
 export * from "./storage.js";
 export * from "./chat.js";
+export * from "./compaction.js";
+export * from "./assistant.js";
 export * from "./files.js";
 export * from "./explorer.js";
 export * from "./terminal.js";

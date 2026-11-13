@@ -108,6 +108,22 @@ impl Waker {
     }
 }
 
+impl Waker {
+    pub(crate) fn recap(&self, conversation: &str, message: &str, goal: bool) {
+        let waker = self.clone();
+        let conversation = conversation.to_owned();
+        let message = message.to_owned();
+        let work = async move {
+            if let Some(service) = waker.service() {
+                service.schedule_recap(&conversation, &message, goal);
+            }
+        };
+        if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+            drop(runtime.spawn(work));
+        }
+    }
+}
+
 impl ChatService {
     fn schedule_wake(&self, conversation: &str) {
         let fresh = self

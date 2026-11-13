@@ -129,6 +129,7 @@ fn event_row(conversation: ConversationId, created_at: i64) -> MessageRow {
         pinned: false,
         event: Some(ChatEventDto { shells: Vec::new() }),
         created_at,
+        recap: None,
     }
 }
 

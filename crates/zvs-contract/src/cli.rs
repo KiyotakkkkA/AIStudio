@@ -17,6 +17,7 @@ pub const CLI_LINE_MAX: usize = 8 * 1024 * 1024;
 pub const CLI_PIPE_PREFIX: &str = r"\\.\pipe\zvs-ai-studio-cli-";
 pub const CLI_LAUNCH_ARG: &str = "--cli";
 pub const CLI_THEME_FILE: &str = "theme.json";
+pub const CLI_PREFERENCES_FILE: &str = "preferences.json";
 pub const CLI_STEP_DOMAIN: &str = "cli";
 pub const CLI_IMAGE_MAX: usize = 4096;
 pub const CLI_CONFIRM_SETTING_KEY: &str = "cli.confirmLoosening";
@@ -255,6 +256,28 @@ pub struct CliThemeDto {
 }
 
 no_refinements!(CliThemeDto);
+
+const fn auto_copy_default() -> bool {
+    true
+}
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CliPreferencesDto {
+    #[serde(default = "auto_copy_default")]
+    pub auto_copy: bool,
+}
+
+impl Default for CliPreferencesDto {
+    fn default() -> Self {
+        Self {
+            auto_copy: auto_copy_default(),
+        }
+    }
+}
+
+no_refinements!(CliPreferencesDto);
 
 #[cfg(test)]
 mod tests {

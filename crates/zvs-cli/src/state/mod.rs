@@ -23,6 +23,10 @@ use zvs_contract::{
     WAKE_STEP_DOMAIN, WorkingFolderAccess,
 };
 use zvs_contract::{
+    AssistantPreferencesDto, COMPACTION_STEP_DOMAIN, ChatCompactionStepDto, ChatRecapStepDto,
+    CliPreferencesDto, CompactionPhase, CompactionTrigger, RECAP_STEP_DOMAIN,
+};
+use zvs_contract::{
     CHAT_QUEUE_MAX, ChatQueueDto, ChatQueueStepDto, ChatQueuedMessageDto, QUEUE_STEP_DOMAIN,
 };
 
@@ -255,6 +259,13 @@ pub enum Request {
     Copy(Selection),
     SaveShortcuts(serde_json::Value),
     SaveTheme(CliTheme),
+    Compact {
+        id: ConversationId,
+        instructions: Option<String>,
+    },
+    Assistant,
+    SetAssistant(AssistantPreferencesDto),
+    SavePreferences(CliPreferencesDto),
     Processes(ConversationId),
     ProcessOutput {
         id: BackgroundShellId,
@@ -314,6 +325,10 @@ pub enum Msg {
     ShortcutsSaved(bool),
     ThemeSaved(bool),
     ThemeChanged(CliTheme),
+    CompactStarted(Result<RunHandleDto, AppError>),
+    Assistant(Result<AssistantPreferencesDto, AppError>),
+    PreferencesSaved(bool),
+    PreferencesChanged(CliPreferencesDto),
     Processes(ConversationId, Result<Vec<BackgroundShellDto>, AppError>),
     ProcessOutput(Result<ShellOutputDto, AppError>),
     ProcessKilled(Result<BackgroundShellDto, AppError>),
@@ -372,6 +387,11 @@ pub struct App {
     pub keys: bool,
     pub keymap: Keymap,
     pub theme: CliTheme,
+    pub compacting: bool,
+    pub auto_compacting: bool,
+    pub compacted_notice: bool,
+    pub assistant: Option<AssistantPreferencesDto>,
+    pub auto_copy: bool,
     pub status: Option<(Tone, String)>,
     pub processes: Vec<BackgroundShellDto>,
     pub subagents: Vec<zvs_contract::ChatToolCallDto>,
@@ -454,6 +474,11 @@ impl App {
             keys: false,
             keymap: Keymap::default(),
             theme: CliTheme::default(),
+            compacting: false,
+            auto_compacting: false,
+            compacted_notice: false,
+            assistant: None,
+            auto_copy: true,
             status: None,
             processes: Vec::new(),
             subagents: Vec::new(),
@@ -896,6 +921,48 @@ impl App {
                 self.theme = theme;
                 Vec::new()
             }
+            Msg::CompactStarted(result) => {
+                self.awaiting = false;
+                match result {
+                    Ok(handle) => {
+                        let stream = handle.stream_id;
+                        self.run = Some(handle);
+                        let held = std::mem::take(&mut self.held);
+                        held.into_iter()
+                            .filter(|event| event.stream_id == stream)
+                            .flat_map(|event| self.event(event))
+                            .collect()
+                    }
+                    Err(error) => {
+                        self.compacting = false;
+                        self.held.clear();
+                        self.fail(&error);
+                        Vec::new()
+                    }
+                }
+            }
+            Msg::Assistant(result) => {
+                match result {
+                    Ok(preferences) => {
+                        self.assistant = Some(preferences);
+                        if let Some(overlay) = self.overlay_for(Panel::Config) {
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::PreferencesSaved(saved) => {
+                if !saved {
+                    self.status = Some((Tone::Error, copy::PREFERENCES_SAVE_FAILED.to_owned()));
+                }
+                Vec::new()
+            }
+            Msg::PreferencesChanged(preferences) => {
+                self.auto_copy = preferences.auto_copy;
+                Vec::new()
+            }
             Msg::Copied(copied_opt) => {
                 self.status = Some(match copied_opt {
                     Some(n) => {
@@ -1165,17 +1232,35 @@ impl App {
                         .map(|g| g.plan.clone())
                         .unwrap_or_default();
                     self.goal_stop_armed = false;
+                    let compacted = if std::mem::take(&mut self.compacted_notice) {
+                        detail.compactions.last().cloned()
+                    } else {
+                        None
+                    };
                     self.transcript = Transcript::from_messages(
                         &detail
                             .messages
                             .into_iter()
                             .filter(|message| !message.partial)
                             .collect::<Vec<_>>(),
+                        &detail.compactions,
                     );
                     self.conversation = Some(detail.conversation);
                     self.scroll = 0;
                     self.overlay = None;
-                    self.status = Some((Tone::Success, copy::RESUMED.to_owned()));
+                    self.status = Some(match compacted {
+                        Some(compaction) => (
+                            Tone::Success,
+                            format!(
+                                "{}: {} · {} → {}",
+                                copy::COMPACT_DONE,
+                                crate::format::messages(compaction.messages),
+                                crate::format::tokens(compaction.tokens_before),
+                                crate::format::tokens(compaction.tokens_after),
+                            ),
+                        ),
+                        None => (Tone::Success, copy::RESUMED.to_owned()),
+                    });
                     self.processes.clear();
                     self.clear_queue();
                     let mut requests = vec![
@@ -1211,6 +1296,12 @@ impl App {
                     Vec::new()
                 };
                 match result {
+                    Ok(Some(live)) if live.compacting => {
+                        self.transcript.live = None;
+                        self.compacting = true;
+                        self.started = self.frame;
+                        self.run = Some(live.run);
+                    }
                     Ok(Some(live)) => {
                         let stream = live.run.stream_id;
                         let seen = live.seq;
@@ -1333,6 +1424,9 @@ impl App {
                 }
             }
             Msg::Event(event) => {
+                if self.recap_event(&event) {
+                    return Vec::new();
+                }
                 if let Some(requests) = self.process_event(&event) {
                     return requests;
                 }
@@ -1691,7 +1785,37 @@ impl App {
             {
                 self.goal_step(step);
             }
+            HostEventDraft::Step { step }
+                if step.get("domain").and_then(serde_json::Value::as_str)
+                    == Some(COMPACTION_STEP_DOMAIN) =>
+            {
+                self.compaction_step(step);
+            }
+            HostEventDraft::End { outcome } if self.compacting => {
+                self.compacting = false;
+                self.run = None;
+                self.cancelling = false;
+                match outcome.status {
+                    RunOutcomeStatus::Ok => {
+                        if let Some(id) = self.conversation_id() {
+                            self.compacted_notice = true;
+                            return vec![Request::Load(id)];
+                        }
+                    }
+                    RunOutcomeStatus::Cancelled => {
+                        self.transcript.notice(Tone::Info, copy::CANCELLED);
+                    }
+                    RunOutcomeStatus::Failed => self.transcript.notice(
+                        Tone::Error,
+                        outcome
+                            .message
+                            .clone()
+                            .unwrap_or_else(|| copy::FAILED.to_owned()),
+                    ),
+                }
+            }
             HostEventDraft::End { outcome } => {
+                self.auto_compacting = false;
                 self.transcript.finish();
                 let yielded = outcome.status == RunOutcomeStatus::Ok
                     && self.queue_urgent
@@ -1731,6 +1855,69 @@ impl App {
             body => self.transcript.absorb(body),
         }
         Vec::new()
+    }
+
+    fn compaction_step(&mut self, step: &serde_json::Map<String, serde_json::Value>) {
+        let Ok(progress) = serde_json::from_value::<ChatCompactionStepDto>(
+            serde_json::Value::Object(step.clone()),
+        ) else {
+            return;
+        };
+        if self.conversation_id() != Some(progress.conversation_id)
+            || progress.trigger != CompactionTrigger::Auto
+        {
+            return;
+        }
+        self.auto_compacting = progress.phase == CompactionPhase::Started;
+        if progress.phase == CompactionPhase::Finished {
+            self.transcript.notice(Tone::Info, copy::AUTO_COMPACTED);
+        }
+    }
+
+    fn recap_event(&mut self, event: &HostEvent) -> bool {
+        let HostEventDraft::Step { step } = &event.body else {
+            return false;
+        };
+        if step.get("domain").and_then(serde_json::Value::as_str) != Some(RECAP_STEP_DOMAIN) {
+            return false;
+        }
+        if let Ok(recap) =
+            serde_json::from_value::<ChatRecapStepDto>(serde_json::Value::Object(step.clone()))
+            && self.conversation_id() == Some(recap.conversation_id)
+        {
+            self.transcript.add_recap(&recap.recap);
+        }
+        true
+    }
+
+    fn compact_command(&mut self, argument: &str) -> Vec<Request> {
+        self.palette.reset();
+        let Some(id) = self.conversation_id() else {
+            self.status = Some((Tone::Info, copy::COMPACT_NO_CONVERSATION.to_owned()));
+            return Vec::new();
+        };
+        if self.busy() {
+            self.status = Some((Tone::Info, copy::BUSY.to_owned()));
+            return Vec::new();
+        }
+        let focus = argument.trim();
+        self.awaiting = true;
+        self.compacting = true;
+        self.started = self.frame;
+        self.scroll = 0;
+        vec![Request::Compact {
+            id,
+            instructions: (!focus.is_empty()).then(|| focus.to_owned()),
+        }]
+    }
+
+    fn set_assistant(&mut self, change: impl FnOnce(&mut AssistantPreferencesDto)) -> Vec<Request> {
+        let Some(mut preferences) = self.assistant.clone() else {
+            return Vec::new();
+        };
+        change(&mut preferences);
+        self.assistant = Some(preferences.clone());
+        vec![Request::SetAssistant(preferences)]
     }
 
     fn goal_step(&mut self, step: &serde_json::Map<String, serde_json::Value>) {
@@ -2003,6 +2190,8 @@ impl App {
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
             Command::Theme => return self.open_panel(Panel::Theme),
+            Command::Config => return self.open_panel(Panel::Config),
+            Command::Compact => return self.compact_command(""),
             Command::Subagents => return self.subagents_command(""),
         }
         Vec::new()
@@ -2018,6 +2207,8 @@ impl App {
             effort: self.effort,
             keymap: &self.keymap,
             theme: self.theme,
+            assistant: self.assistant.as_ref(),
+            auto_copy: self.auto_copy,
         }
     }
 
@@ -2094,6 +2285,7 @@ impl App {
             Panel::Skills => vec![Request::Skills],
             Panel::Mcp => vec![Request::Servers],
             Panel::Permissions => vec![Request::Policy],
+            Panel::Config => vec![Request::Assistant],
             Panel::Context => match &self.model {
                 Some(model) => vec![
                     Request::Context {
@@ -2113,6 +2305,9 @@ impl App {
             },
         };
         let mut overlay = Overlay::new(panel);
+        if panel == Panel::Config {
+            overlay.loading = self.assistant.is_none();
+        }
         overlay.select_current(&self.view());
         self.overlay = Some(overlay);
         requests
@@ -2216,6 +2411,16 @@ impl App {
                     format!("{}: {}", copy::THEME_SET, overlay::theme_label(theme)),
                 ));
                 vec![Request::SaveTheme(theme)]
+            }
+            Action::SetAutoCompact(on) => self.set_assistant(|preferences| {
+                preferences.auto_compact = on;
+            }),
+            Action::SetRecaps(on) => self.set_assistant(|preferences| preferences.recaps = on),
+            Action::SetAutoCopy(on) => {
+                self.auto_copy = on;
+                vec![Request::SavePreferences(CliPreferencesDto {
+                    auto_copy: on,
+                })]
             }
             Action::ShowOutput(id) => {
                 let Some(shell) = self.processes.iter().find(|shell| shell.id == id).cloned()
@@ -2624,6 +2829,7 @@ impl App {
                     self.palette.reset();
                     self.goal_command(palette::arguments(&text))
                 }
+                Some(Command::Compact) => self.compact_command(palette::arguments(&text)),
                 Some(command)
                     if command.arg().is_some() && !palette::arguments(&text).is_empty() =>
                 {
@@ -2672,7 +2878,11 @@ impl App {
                     return Vec::new();
                 }
                 self.selection = Some(selection);
-                vec![Request::Copy(selection)]
+                if self.auto_copy {
+                    return vec![Request::Copy(selection)];
+                }
+                self.status = Some((Tone::Info, copy::SELECTION_HINT.to_owned()));
+                Vec::new()
             }
         }
     }
@@ -2704,6 +2914,18 @@ impl App {
         }
         if self.overlay.is_some() && matches!(key, Key::PageUp | Key::PageDown) {
             return self.overlay_key(key);
+        }
+        if !self.auto_copy
+            && let Some(selection) = self.selection
+            && matches!(key, Key::Interrupt | Key::Esc)
+        {
+            self.selection = None;
+            self.status = None;
+            return if key == Key::Interrupt {
+                vec![Request::Copy(selection)]
+            } else {
+                Vec::new()
+            };
         }
         self.selection = None;
         if key != Key::Esc {

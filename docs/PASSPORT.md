@@ -415,6 +415,12 @@ so the rules below treat the console as a less trusted caller than the studio wi
   `chat.queue.remove` and `chat.queue.flush` are allowed. They take only a dialog id and the
   person's own text; a queued message is sent exactly like one from `chat.send` (same graph,
   approvals and policy), and nothing in the queue reaches the model before that.
+  Compaction and settings (2026-11-13): `chat.compact` and `chat.compactions.undo` are allowed
+  for `/compact`; both take only a dialog the console opened and change nothing but that
+  dialog's summary rows. `chat.cancel` also stops that dialog's compaction job. `assistant.get`
+  and `assistant.set` are allowed for `/config`: they switch automatic compaction and recaps
+  and keep the summarizer list the studio set, which `set` validates like the studio's call.
+  `cli.preferences.get` and `.set` stay studio-only; the console reads its own file.
   Attachments (2026-11-03): `vectorStores.list` and `chat.conversations.updateStores` are
   allowed for user-selected store attachments, together with the narrow
   `cli.images.import { id, paths }` channel. Image paths come from an explicit selection
@@ -1033,6 +1039,37 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   - *Model order.* The first listed model that is usable now (`modelSource: preferred`);
     otherwise the dialog's model (`modelSource: dialog`). Account-mode models are allowed and
     always serialise.
+- **Compaction and recaps** (`zvs-host/src/services/chat/compact.rs`). A dialog's earlier
+  messages can be replaced, for the model only, by one summary.
+  - *Preferences.* `AssistantPreferencesDto { autoCompact, recaps, summarizerModels }` lives
+    under the reserved setting key `assistant` (refused by `settings.set`) and is reached
+    through `assistant.get` and `assistant.set`, from the studio and the console. Both
+    switches default to on. The summarizer is the first usable model of the list (no tool
+    support needed), then the dialog's model; a model that fails is skipped for the next one.
+  - *Storage.* `chat_compaction` rows (migration 0044) name a boundary message; the messages
+    themselves are never changed or deleted. The newest compaction whose boundary still exists
+    wins: the model receives `SUMMARY_HEADING` with the summary as one user message, then the
+    messages after the boundary. Deleting the boundary (truncate) cascades the row; a branch
+    copies the rows whose boundary it copies. `chat.compactions.undo` removes only the newest.
+  - *All or nothing.* `chat.compact` refuses a dialog that is busy, runs a goal, or is too
+    short (fewer than two new messages or under 200 tokens), then runs one `chat.compact` node
+    as a `job` run with the dialog as subject; `require_idle` treats it as a turn. The summary
+    is written in one transaction only after it passed every check: not cut off by the output
+    limit, not empty, at most `COMPACT_SUMMARY_MAX` characters, smaller than what it replaces,
+    and the boundary and the previous compaction unchanged. Cancelling, an error or a failed
+    check stores nothing. Long histories are summarised in chunks that fit the summarizer's
+    window, each chunk folding the previous summary in.
+  - *Automatic.* Before a turn, when system prompt, history and request exceed
+    `AUTO_COMPACT_PERCENT` (80) of the window minus the reserved output, the prepare step
+    compacts everything before the request (`trigger: auto`). Between tool-loop rounds the
+    same threshold summarises the earlier messages of the request in memory, keeping the
+    request and the latest round. A failed automatic compaction is logged and the turn falls
+    back to trimming. Both emit `ChatCompactionStepDto` (`started`, `finished`, `failed`).
+  - *Recaps.* After a turn ends `ok`, a turn with tool calls (or a goal turn) starts a
+    `chat.recap` `job` run that writes `MessageDto.recap` (Russian, at most `RECAP_MAX`) and
+    emits `ChatRecapStepDto`. Recaps are display only and never sent to the model.
+  - *Console.* The console keeps its own `preferences.json` (`CliPreferencesDto { autoCopy }`)
+    beside `theme.json`; the studio edits it through `cli.preferences.get` and `.set`.
 - Sidecar runs with the app's privileges but no elevated rights; workspace roots are an
   explicit allow-list checked host-side, not in Rust.
 - **Folder access** (`zvs-host/src/workspace/`, TASK_036_EXTRA_1). A chat may bind one

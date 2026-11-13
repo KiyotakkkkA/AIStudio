@@ -1209,6 +1209,8 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
     let subagents = SubagentService::new(Arc::clone(&database), clock.clone())
         .with_drivers(registry.clone())
         .with_logger(logger.clone());
+    let assistant = zvs_host::services::AssistantService::new(Arc::clone(&database), clock.clone())
+        .with_logger(logger.clone());
     let workers = WorkerSupervisor::new(clock.clone(), logger.clone());
     let integrations = IntegrationService::new(IntegrationServiceOptions {
         clock: clock.clone(),
@@ -1239,6 +1241,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         folders: Some(folders.clone()),
         shells: Some(shells.clone()),
         subagents: Some(subagents.clone()),
+        assistant: Some(assistant.clone()),
         logger: logger.clone(),
         clock: clock.clone(),
         ..ChatServiceOptions::new(Arc::clone(&database), runs.clone(), Arc::clone(&nodes))
@@ -1469,6 +1472,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         sites,
         exec_policy,
         subagents,
+        assistant,
         browser: agent.clone(),
         browser_settings,
         browser_sites: grants,
@@ -1482,6 +1486,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         picker: Some(picker),
         cli: platform::cli_installer(paths.cli_path.clone()),
         cli_theme: zvs_host::cli::CliThemeFile::new(&paths.cli_settings_dir),
+        cli_preferences: zvs_host::cli::CliPreferencesFile::new(&paths.cli_settings_dir),
         cli_connections,
         voice,
     });

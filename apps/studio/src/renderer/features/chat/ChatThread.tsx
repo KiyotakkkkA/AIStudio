@@ -1,7 +1,7 @@
 import ImageAttachments, { ImagePreview } from "./ImageAttachments";
 import { CLOSE_IMAGE } from "./imageCopy";
 import type { ImageAttachmentDto } from "@zvs/shared";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { observer } from "mobx-react-lite";
 import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -26,6 +26,10 @@ import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
+import CompactionMark from "./CompactionMark";
+import RecapBlock from "./RecapBlock";
+import GenerationStatus from "../../ui/molecules/GenerationStatus";
+import { AUTO_COMPACTING, COMPACTING, COMPACTION_STOPPED } from "./compactionCopy";
 import MessageActions from "../../ui/molecules/MessageActions";
 import ChatComposer from "./ChatComposer";
 import type { ExecPolicyBinding } from "../execPolicy/ExecPolicyMenu";
@@ -366,122 +370,136 @@ export default observer(function ChatThread({
                 </p>
               </div>
             )}
-            {store.active?.messages.map((message) =>
-              message.role === "event" ? (
-                <div key={message.id} data-message-id={message.id}>
-                  {message.event !== undefined && <ProcessEventCard event={message.event} />}
-                </div>
-              ) : message.role === "user" ? (
-                <div key={message.id} className="group flex justify-end">
-                  <div className="flex max-w-[78%] flex-col items-end">
-                    <ImageAttachments
-                      images={message.images ?? []}
-                      load={store.loadImage}
-                      className="mb-1.5 justify-end"
-                      onOpen={setPreview}
-                    />
-                    {editingId === message.id ? (
-                      <div className="w-[min(78vw,620px)] space-y-2 rounded-card bg-main-900 p-2.5 shadow-pop">
-                        <TextArea
-                          aria-label="Редактировать сообщение"
-                          value={editingText}
-                          onChange={(event) => setEditingText(event.target.value)}
-                          autoFocus
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button onClick={() => setEditingId(null)}>Отмена</Button>
-                          <Button
-                            tone="primary"
-                            disabled={
-                              (!editingText.trim() && (message.images?.length ?? 0) === 0) ||
-                              store.generating
-                            }
-                            onClick={() => {
-                              void store
-                                .editMessage(message.id, editingText)
-                                .then((edited) => edited && setEditingId(null));
-                            }}
-                          >
-                            Отправить
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {message.commands.length > 0 || message.plugins.length > 0 ? (
-                          <span className="mb-1 flex flex-wrap justify-end gap-x-2 gap-y-0.5 text-[11.5px] text-main-400">
-                            {message.commands.map((command) => (
-                              <span key={command} className="font-mono">
-                                {commandText(command)}
-                              </span>
-                            ))}
-                            {message.plugins.map((plugin) => (
-                              <span
-                                key={plugin.accountId}
-                                className="inline-flex items-center gap-1"
-                              >
-                                <PluginMark kind={plugin.kind} size="xs" />
-                                {pluginChipLabel(plugin)}
-                              </span>
-                            ))}
-                          </span>
-                        ) : null}
-                        {message.content && (
-                          <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
-                            {message.content}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                      <MessageActions
-                        content={message.content}
-                        isUser={message.role === "user"}
-                        onEdit={() => {
-                          setEditingId(message.id);
-                          setEditingText(message.content);
-                        }}
-                        onRefresh={() => void store.refreshMessage(message.id, message.content)}
-                        onDelete={() => void store.deleteMessage(message.id)}
+            {store.active?.messages.map((message) => (
+              <Fragment key={message.id}>
+                {message.role === "event" ? (
+                  <div key={message.id} data-message-id={message.id}>
+                    {message.event !== undefined && <ProcessEventCard event={message.event} />}
+                  </div>
+                ) : message.role === "user" ? (
+                  <div key={message.id} className="group flex justify-end">
+                    <div className="flex max-w-[78%] flex-col items-end">
+                      <ImageAttachments
+                        images={message.images ?? []}
+                        load={store.loadImage}
+                        className="mb-1.5 justify-end"
+                        onOpen={setPreview}
                       />
+                      {editingId === message.id ? (
+                        <div className="w-[min(78vw,620px)] space-y-2 rounded-card bg-main-900 p-2.5 shadow-pop">
+                          <TextArea
+                            aria-label="Редактировать сообщение"
+                            value={editingText}
+                            onChange={(event) => setEditingText(event.target.value)}
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button onClick={() => setEditingId(null)}>Отмена</Button>
+                            <Button
+                              tone="primary"
+                              disabled={
+                                (!editingText.trim() && (message.images?.length ?? 0) === 0) ||
+                                store.generating
+                              }
+                              onClick={() => {
+                                void store
+                                  .editMessage(message.id, editingText)
+                                  .then((edited) => edited && setEditingId(null));
+                              }}
+                            >
+                              Отправить
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {message.commands.length > 0 || message.plugins.length > 0 ? (
+                            <span className="mb-1 flex flex-wrap justify-end gap-x-2 gap-y-0.5 text-[11.5px] text-main-400">
+                              {message.commands.map((command) => (
+                                <span key={command} className="font-mono">
+                                  {commandText(command)}
+                                </span>
+                              ))}
+                              {message.plugins.map((plugin) => (
+                                <span
+                                  key={plugin.accountId}
+                                  className="inline-flex items-center gap-1"
+                                >
+                                  <PluginMark kind={plugin.kind} size="xs" />
+                                  {pluginChipLabel(plugin)}
+                                </span>
+                              ))}
+                            </span>
+                          ) : null}
+                          {message.content && (
+                            <div className="rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
+                              {message.content}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        <MessageActions
+                          content={message.content}
+                          isUser={message.role === "user"}
+                          onEdit={() => {
+                            setEditingId(message.id);
+                            setEditingText(message.content);
+                          }}
+                          onRefresh={() => void store.refreshMessage(message.id, message.content)}
+                          onDelete={() => void store.deleteMessage(message.id)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div key={message.id} data-message-id={message.id} className="scroll-mt-6">
-                  <ChatMessage
-                    messageId={message.id}
-                    durationMs={message.durationMs}
-                    completedAt={message.createdAt + message.durationMs}
-                    content={message.content}
-                    reasoning={message.reasoning}
-                    rounds={message.rounds}
-                    citations={answerCitations(message.citations, message.toolCalls)}
-                    webSources={message.webSources}
-                    selections={answerSelections.get(message.id)}
-                    stores={store.stores}
-                    partial={message.partial}
-                    toolCalls={message.toolCalls}
-                    renderToolItems={(calls) => <ToolCallItems calls={calls} />}
-                    artifacts={
-                      <ChatArtifacts
-                        artifacts={answerArtifacts(message.toolCalls)}
-                        actions={store.artifacts}
-                      />
-                    }
-                    usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
-                    pinned={message.pinned}
-                    onPin={() => void store.pinMessage(message.id, !message.pinned)}
-                    branch={{
-                      label: CREATE_BRANCH,
-                      newDialogLabel: BRANCH_IN_NEW_DIALOG,
-                      disabled: store.generating || store.branching,
-                      onNewDialog: () => void store.branchConversation(message.id),
-                    }}
-                  />
-                </div>
-              ),
-            )}
+                ) : (
+                  <div key={message.id} data-message-id={message.id} className="scroll-mt-6">
+                    <ChatMessage
+                      messageId={message.id}
+                      durationMs={message.durationMs}
+                      completedAt={message.createdAt + message.durationMs}
+                      content={message.content}
+                      reasoning={message.reasoning}
+                      rounds={message.rounds}
+                      citations={answerCitations(message.citations, message.toolCalls)}
+                      webSources={message.webSources}
+                      selections={answerSelections.get(message.id)}
+                      stores={store.stores}
+                      partial={message.partial}
+                      toolCalls={message.toolCalls}
+                      renderToolItems={(calls) => <ToolCallItems calls={calls} />}
+                      artifacts={
+                        <ChatArtifacts
+                          artifacts={answerArtifacts(message.toolCalls)}
+                          actions={store.artifacts}
+                        />
+                      }
+                      usage={`${message.usageEstimated ? "~" : ""}${message.tokensIn} вход. · ${message.tokensOut} выход. · ${(message.durationMs / 1000).toFixed(1)} с`}
+                      pinned={message.pinned}
+                      onPin={() => void store.pinMessage(message.id, !message.pinned)}
+                      branch={{
+                        label: CREATE_BRANCH,
+                        newDialogLabel: BRANCH_IN_NEW_DIALOG,
+                        disabled: store.generating || store.branching,
+                        onNewDialog: () => void store.branchConversation(message.id),
+                      }}
+                    />
+                    {message.recap !== undefined && <RecapBlock recap={message.recap} />}
+                  </div>
+                )}
+                {store.active?.compactions
+                  .filter((compaction) => compaction.boundaryMessageId === message.id)
+                  .map((compaction) => (
+                    <CompactionMark
+                      key={compaction.id}
+                      compaction={compaction}
+                      latest={compaction.id === store.active?.compactions.at(-1)?.id}
+                      disabled={store.generating || store.undoingCompaction}
+                      onUndo={() => void store.undoCompaction(compaction.id)}
+                    />
+                  ))}
+              </Fragment>
+            ))}
             {(store.pendingUserText || store.pendingUserImages.length > 0) && (
               <div className="flex justify-end">
                 <div className="max-w-[78%] animate-zvs-rise rounded-[18px] rounded-br-md bg-main-700 px-4 py-2.5 text-[13.5px] leading-relaxed text-main-50 wrap-break-word whitespace-pre-wrap">
@@ -496,7 +514,14 @@ export default observer(function ChatThread({
                 </div>
               </div>
             )}
-            {(store.generating || store.liveText) && (
+            {store.compacting && (
+              <FadeIn>
+                <div className="flex justify-center">
+                  <GenerationStatus label={COMPACTING} since={store.runStartedAt} />
+                </div>
+              </FadeIn>
+            )}
+            {(store.generating || store.liveText) && !store.compacting && (
               <FadeIn>
                 <ChatMessage
                   content={store.liveText}
@@ -549,7 +574,9 @@ export default observer(function ChatThread({
                 role="status"
                 className="inline-flex rounded-full bg-warn-soft px-3 py-1 text-[12px] text-warn"
               >
-                Генерация остановлена. Частичный ответ сохранён.
+                {store.compactionEnded
+                  ? COMPACTION_STOPPED
+                  : "Генерация остановлена. Частичный ответ сохранён."}
               </p>
             )}
             {store.error && (
@@ -682,6 +709,7 @@ function generationPhase(store: ChatStore): string {
   if (store.liveToolCalls.some((call) => call.status === "awaiting-approval"))
     return "Ожидает подтверждения";
   if (store.questions.length > 0) return "Ожидает ответа";
+  if (store.autoCompacting) return AUTO_COMPACTING;
   const running = store.liveToolCalls.find((call) => call.status === "running");
   if (running) return toolTitle(running.key);
   if (store.liveText) return "Генерация ответа";

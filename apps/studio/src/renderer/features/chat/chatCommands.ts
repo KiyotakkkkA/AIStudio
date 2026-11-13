@@ -1,4 +1,4 @@
-import { mdiFlagOutline, mdiMonitorDashboard, mdiWeb } from "@mdi/js";
+import { mdiArrowCollapseVertical, mdiFlagOutline, mdiMonitorDashboard, mdiWeb } from "@mdi/js";
 import type {
   ChatCommand,
   ChatCommandDto,
@@ -13,6 +13,7 @@ import {
   PLUGIN_LABELS,
   pluginCommand,
 } from "../plugins/pluginPresentation";
+import { COMPACT_ACTION, COMPACT_DESCRIPTION, COMPACT_LABEL } from "./compactionCopy";
 
 export const COMMANDS_LABEL = "Команды и плагины";
 export const ACCOUNTS_LABEL = "Аккаунты плагина";
@@ -33,6 +34,10 @@ export function commandMark(command: ChatCommand): string {
   return COMMAND_MARKS[command];
 }
 
+export type ChatAction = typeof COMPACT_ACTION;
+
+export const ACTION_MARK = mdiArrowCollapseVertical;
+
 export type MenuEntry =
   | {
       readonly type: "command";
@@ -50,6 +55,13 @@ export type MenuEntry =
       readonly accounts: readonly IntegrationAccountDto[];
     }
   | {
+      readonly type: "action";
+      readonly key: string;
+      readonly label: string;
+      readonly description: string;
+      readonly action: ChatAction;
+    }
+  | {
       readonly type: "account";
       readonly key: string;
       readonly label: string;
@@ -65,6 +77,7 @@ export interface MenuInput {
   readonly text: string;
   readonly picking: IntegrationKind | null;
   readonly vision?: boolean;
+  readonly compactable?: boolean;
 }
 
 const VISION_COMMANDS: readonly ChatCommand[] = ["computer-use"];
@@ -108,6 +121,18 @@ export function menuEntries(input: MenuInput): MenuEntry[] {
   }
   const query = slashQuery(input.text);
   if (query === null) return [];
+  const actions: MenuEntry[] =
+    input.compactable === true && COMPACT_ACTION.startsWith(query)
+      ? [
+          {
+            type: "action",
+            key: COMPACT_ACTION,
+            label: COMPACT_LABEL,
+            description: COMPACT_DESCRIPTION,
+            action: COMPACT_ACTION,
+          },
+        ]
+      : [];
   const commands: MenuEntry[] = input.commands
     .filter(
       (item) =>
@@ -143,7 +168,20 @@ export function menuEntries(input: MenuInput): MenuEntry[] {
       ];
     },
   );
-  return [...commands, ...plugins];
+  return [...commands, ...actions, ...plugins];
+}
+
+export interface ParsedAction {
+  readonly action: ChatAction;
+  readonly focus: string;
+}
+
+const ACTION_PATTERN = /^\/(\S+)(?:\s+([\s\S]*))?$/u;
+
+export function parseAction(text: string): ParsedAction | null {
+  const match = ACTION_PATTERN.exec(text.trim());
+  if (match === null || (match[1] ?? "").toLowerCase() !== COMPACT_ACTION) return null;
+  return { action: COMPACT_ACTION, focus: (match[2] ?? "").trim() };
 }
 
 export interface ParsedCommands {

@@ -68,5 +68,15 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, input: SubagentPreferencesDto| async move {
                 services.subagents.set(&input)
             },
+        )
+        .handle(
+            "assistant.get",
+            |services: Arc<Services>, (): ()| async move { services.assistant.get() },
+        )
+        .handle(
+            "assistant.set",
+            |services: Arc<Services>, input: zvs_contract::AssistantPreferencesDto| async move {
+                services.assistant.set(&input)
+            },
         );
 }

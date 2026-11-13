@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 use zvs_contract::{
-    ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto, MessageRole, RunId,
-    SUBAGENT_DOMAIN,
+    ChatCompactionDto, ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto,
+    MessageRole, RunId, SUBAGENT_DOMAIN,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,8 +21,20 @@ pub enum Entry {
     Assistant { text: String, reasoning: String },
     Tool(Box<ChatToolCallDto>),
     Notice { tone: Tone, text: String },
+    Recap(String),
+    Compaction(String),
     Shell(Box<ShellRun>),
     Server(Box<McpServerDetailDto>),
+}
+
+pub fn compaction_text(compaction: &ChatCompactionDto) -> String {
+    format!(
+        "{} · {} · {} → {}",
+        crate::copy::COMPACTION_MARK,
+        crate::format::messages(compaction.messages),
+        crate::format::tokens(compaction.tokens_before),
+        crate::format::tokens(compaction.tokens_after),
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -201,7 +213,7 @@ fn tool_call(step: &serde_json::Map<String, Value>) -> Option<ChatToolCallDto> {
 }
 
 impl Transcript {
-    pub fn from_messages(messages: &[MessageDto]) -> Self {
+    pub fn from_messages(messages: &[MessageDto], compactions: &[ChatCompactionDto]) -> Self {
         let mut transcript = Self::default();
         for message in messages {
             match message.role {
@@ -239,10 +251,42 @@ impl Transcript {
                             reasoning: message.reasoning.clone(),
                         });
                     }
+                    if let Some(recap) = &message.recap {
+                        transcript.entries.push(Entry::Recap(recap.clone()));
+                    }
                 }
+            }
+            for compaction in compactions
+                .iter()
+                .filter(|compaction| compaction.boundary_message_id == message.id)
+            {
+                transcript
+                    .entries
+                    .push(Entry::Compaction(compaction_text(compaction)));
             }
         }
         transcript
+    }
+
+    pub fn add_recap(&mut self, recap: &str) {
+        let last_user = self
+            .entries
+            .iter()
+            .rposition(|entry| matches!(entry, Entry::User(_)));
+        let answered = self
+            .entries
+            .iter()
+            .enumerate()
+            .skip(last_user.map_or(0, |index| index + 1))
+            .any(|(_, entry)| matches!(entry, Entry::Assistant { .. }));
+        let recapped = self
+            .entries
+            .iter()
+            .skip(last_user.map_or(0, |index| index + 1))
+            .any(|entry| matches!(entry, Entry::Recap(_)));
+        if answered && !recapped && self.live.is_none() {
+            self.entries.push(Entry::Recap(recap.to_owned()));
+        }
     }
 
     pub fn push_user(&mut self, text: &str) {

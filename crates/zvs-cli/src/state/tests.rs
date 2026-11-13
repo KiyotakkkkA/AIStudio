@@ -735,6 +735,7 @@ fn resuming_loads_the_conversation_and_reattaches() {
     app.update(Msg::Conversations(Ok(vec![own.clone()])));
     assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::Load(id)]);
     let detail = ConversationDetailDto {
+        compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
     };
@@ -1733,6 +1734,7 @@ fn resuming_a_dialog_with_a_paused_goal_restores_the_footer() {
         ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
     });
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        compactions: Vec::new(),
         conversation: own.clone(),
         messages: Vec::new(),
     })));
@@ -1746,6 +1748,7 @@ fn resuming_a_dialog_with_a_paused_goal_restores_the_footer() {
         ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
     });
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
     })));
@@ -1802,6 +1805,7 @@ fn goal_plan_is_available_from_restored_and_live_goal_data() {
     goal.plan = vec![serde_json::from_value(json!({ "id":"p1", "title":"Проверка", "status":"running", "stepIds":[], "summary":null })).unwrap()];
     own.goal = Some(goal);
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
     })));
@@ -2154,4 +2158,239 @@ fn a_held_change_notice_toggles_the_waiting_state() {
     assert!(app.consent_pending);
     assert!(app.update(notice(false)).is_empty());
     assert!(!app.consent_pending);
+}
+
+const MESSAGES: &str =
+    include_str!("../../../../packages/shared/fixtures/chat/MessageDto.valid.json");
+
+fn compaction_step(seq: u64, trigger: &str, phase: &str) -> Msg {
+    let conversation = conversation();
+    event(
+        seq,
+        json!({
+            "type": "step",
+            "step": {
+                "domain": "compaction",
+                "conversationId": conversation.id,
+                "trigger": trigger,
+                "phase": phase,
+            },
+        }),
+    )
+}
+
+#[test]
+fn compact_runs_as_a_job_then_reloads_the_dialog_and_reports_the_saving() {
+    let mut app = ready();
+    assert!(command(&mut app, "/compact").is_empty());
+    assert_eq!(
+        app.status.as_ref().map(|status| status.1.as_str()),
+        Some(copy::COMPACT_NO_CONVERSATION)
+    );
+    let known = conversation();
+    app.conversation = Some(known.clone());
+    assert_eq!(
+        command(&mut app, "/compact решения по API"),
+        [Request::Compact {
+            id: known.id,
+            instructions: Some("решения по API".to_owned()),
+        }]
+    );
+    assert!(app.compacting && app.busy());
+    assert!(command(&mut app, "/compact").is_empty());
+    assert_eq!(
+        app.status.as_ref().map(|status| status.1.as_str()),
+        Some(copy::BUSY)
+    );
+
+    app.update(compaction_step(1, "manual", "started"));
+    app.update(Msg::CompactStarted(Ok(handle())));
+    assert_eq!(app.update(end("ok")), [Request::Load(known.id)]);
+    assert!(!app.compacting && app.run.is_none());
+
+    let message: zvs_contract::MessageDto = first(MESSAGES);
+    let compaction: zvs_contract::ChatCompactionDto = serde_json::from_value(json!({
+        "id": "0199aa11-9999-7111-8111-111111111111",
+        "boundaryMessageId": message.id,
+        "summary": "Сводка",
+        "messages": 12,
+        "tokensBefore": 48000,
+        "tokensAfter": 1200,
+        "providerId": "p",
+        "modelId": "m",
+        "trigger": "manual",
+        "createdAt": 1,
+    }))
+    .expect("a compaction");
+    app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        conversation: known,
+        messages: vec![message],
+        compactions: vec![compaction],
+    })));
+    let status = app
+        .status
+        .as_ref()
+        .map(|status| status.1.clone())
+        .unwrap_or_default();
+    assert!(status.starts_with(copy::COMPACT_DONE), "{status}");
+    assert!(app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Compaction(text) if text.starts_with(copy::COMPACTION_MARK)
+    )));
+}
+
+#[test]
+fn a_compaction_can_be_stopped_and_a_refused_one_explains_why() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    command(&mut app, "/compact");
+    app.update(Msg::CompactStarted(Err(AppError::new(
+        zvs_contract::AppErrorCode::ValidationFailed,
+        "Диалог слишком короткий для сжатия",
+    ))));
+    assert!(!app.compacting && !app.busy());
+    assert!(app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Notice { text, .. } if text == "Диалог слишком короткий для сжатия"
+    )));
+
+    command(&mut app, "/compact");
+    app.update(Msg::CompactStarted(Ok(handle())));
+    assert_eq!(
+        app.update(Msg::Key(Key::Esc)),
+        [Request::Cancel(handle().id)]
+    );
+    assert!(app.update(end("cancelled")).is_empty());
+    assert!(!app.compacting && !app.busy());
+}
+
+#[test]
+fn an_automatic_compaction_inside_a_turn_changes_the_label_and_leaves_a_note() {
+    let mut app = running();
+    app.update(compaction_step(1, "auto", "started"));
+    assert!(app.auto_compacting);
+    app.update(compaction_step(2, "auto", "finished"));
+    assert!(!app.auto_compacting);
+    assert!(app.transcript.entries.iter().any(|entry| matches!(
+        entry,
+        Entry::Notice { text, .. } if text == copy::AUTO_COMPACTED
+    )));
+}
+
+#[test]
+fn a_recap_lands_under_the_finished_answer_once() {
+    let mut app = running();
+    app.update(event(1, json!({ "type": "token", "delta": "Готово" })));
+    app.update(end("ok"));
+    let conversation = conversation();
+    let recap = |text: &str| {
+        Msg::Event(Box::new(
+            serde_json::from_value(json!({
+                "streamId": "0199aa11-6666-7111-8111-999999999999",
+                "seq": 1,
+                "ts": 1,
+                "type": "step",
+                "step": {
+                    "domain": "recap",
+                    "conversationId": conversation.id,
+                    "messageId": "0199aa11-3333-7111-8111-111111111111",
+                    "recap": text,
+                },
+            }))
+            .expect("event"),
+        ))
+    };
+    app.update(recap("Изменён один файл."));
+    app.update(recap("Повтор."));
+    let recaps: Vec<&str> = app
+        .transcript
+        .entries
+        .iter()
+        .filter_map(|entry| match entry {
+            Entry::Recap(text) => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(recaps, ["Изменён один файл."]);
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Recap(_))
+    ));
+}
+
+#[test]
+fn config_toggles_the_host_preferences_and_the_local_auto_copy() {
+    let mut app = ready();
+    assert_eq!(command(&mut app, "/config"), [Request::Assistant]);
+    assert!(app.overlay.as_ref().is_some_and(|overlay| overlay.loading));
+    let preferences = zvs_contract::AssistantPreferencesDto::default();
+    app.update(Msg::Assistant(Ok(preferences.clone())));
+    assert!(app.overlay.as_ref().is_some_and(|overlay| !overlay.loading));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SetAssistant(
+            zvs_contract::AssistantPreferencesDto {
+                auto_compact: false,
+                ..preferences.clone()
+            }
+        )]
+    );
+    app.update(Msg::Key(Key::Down));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SetAssistant(
+            zvs_contract::AssistantPreferencesDto {
+                auto_compact: false,
+                recaps: false,
+                ..preferences
+            }
+        )]
+    );
+    app.update(Msg::Key(Key::Tab));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        [Request::SavePreferences(zvs_contract::CliPreferencesDto {
+            auto_copy: false
+        })]
+    );
+    assert!(!app.auto_copy);
+    app.update(Msg::PreferencesChanged(zvs_contract::CliPreferencesDto {
+        auto_copy: true,
+    }));
+    assert!(app.auto_copy);
+}
+
+#[test]
+fn without_auto_copy_a_selection_waits_for_ctrl_c_and_esc_drops_it() {
+    let mut app = running();
+    app.update(Msg::Pointer(Pointer::Press(2, 3)));
+    let selection = Selection {
+        anchor: (2, 3),
+        cursor: (9, 4),
+    };
+    assert_eq!(
+        app.update(Msg::Pointer(Pointer::Release(9, 4))),
+        [Request::Copy(selection)]
+    );
+
+    app.auto_copy = false;
+    app.update(Msg::Pointer(Pointer::Press(2, 3)));
+    assert!(app.update(Msg::Pointer(Pointer::Release(9, 4))).is_empty());
+    assert_eq!(app.selection, Some(selection));
+    assert_eq!(
+        app.status.as_ref().map(|status| status.1.as_str()),
+        Some(copy::SELECTION_HINT)
+    );
+    assert_eq!(
+        app.update(Msg::Key(Key::Interrupt)),
+        [Request::Copy(selection)]
+    );
+    assert!(app.exit.is_none());
+    assert_eq!(app.selection, None);
+
+    app.update(Msg::Pointer(Pointer::Press(2, 3)));
+    app.update(Msg::Pointer(Pointer::Release(9, 4)));
+    assert!(app.update(Msg::Key(Key::Esc)).is_empty());
+    assert_eq!(app.selection, None);
+    assert!(app.run.is_some());
 }

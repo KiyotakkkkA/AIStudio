@@ -19,6 +19,7 @@ use crate::copy;
 use crate::keymap_file;
 use crate::launch::{self, Connection};
 use crate::link::{Incoming, Link};
+use crate::preferences_file;
 use crate::shell::{self, ShellControl};
 use crate::state::shortcuts::{Chord, ChordKey};
 use crate::state::transcript::Tone;
@@ -235,6 +236,17 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::Answered(result.map(|_| ()))
         }
         Request::Policy => Msg::Policy(link.call("execPolicy.get", &()).await),
+        Request::Compact { id, instructions } => {
+            let mut input = json!({ "conversationId": id });
+            if let Some(instructions) = instructions {
+                input["instructions"] = json!(instructions);
+            }
+            Msg::CompactStarted(link.call("chat.compact", &input).await)
+        }
+        Request::Assistant => Msg::Assistant(link.call("assistant.get", &()).await),
+        Request::SetAssistant(preferences) => {
+            Msg::Assistant(link.call("assistant.set", &preferences).await)
+        }
         Request::Create { provider, model } => Msg::Created(
             link.call(
                 "chat.conversations.create",
@@ -468,7 +480,8 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         | Request::StopShell
         | Request::Copy(_)
         | Request::SaveShortcuts(_)
-        | Request::SaveTheme(_) => Msg::Tick,
+        | Request::SaveTheme(_)
+        | Request::SavePreferences(_) => Msg::Tick,
         Request::FocusVerification => {
             #[cfg(windows)]
             zvs_pipe::allow_foreground();
@@ -580,6 +593,10 @@ fn dispatch(
                 let saved = theme_file::save(theme);
                 let _ = signals.send(Signal::App(Box::new(Msg::ThemeSaved(saved))));
             }
+            Request::SavePreferences(preferences) => {
+                let saved = preferences_file::save(preferences);
+                let _ = signals.send(Signal::App(Box::new(Msg::PreferencesSaved(saved))));
+            }
             other => remote.push(other),
         }
     }
@@ -595,6 +612,31 @@ fn dispatch(
             let _ = signals.send(Signal::App(Box::new(message)));
         });
     }
+}
+
+fn watch_preferences(signals: mpsc::UnboundedSender<Signal>) {
+    let Some(path) = preferences_file::default_path() else {
+        return;
+    };
+    tokio::spawn(async move {
+        let mut seen = preferences_file::modified(&path);
+        let mut polls = tokio::time::interval(THEME_POLL);
+        loop {
+            polls.tick().await;
+            let current = preferences_file::modified(&path);
+            if current == seen {
+                continue;
+            }
+            seen = current;
+            let preferences = preferences_file::load_from(&path);
+            if signals
+                .send(Signal::App(Box::new(Msg::PreferencesChanged(preferences))))
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
 }
 
 fn watch_theme(signals: mpsc::UnboundedSender<Signal>) {
@@ -682,7 +724,9 @@ async fn session(
     app.viewport = (size.width, size.height);
     app.keymap = keymap_file::load();
     app.theme = theme_file::load();
+    app.auto_copy = preferences_file::load().auto_copy;
     watch_theme(signals.clone());
+    watch_preferences(signals.clone());
     app.resume = resume;
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();

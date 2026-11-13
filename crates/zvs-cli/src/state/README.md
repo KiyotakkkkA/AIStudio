@@ -67,6 +67,18 @@ until the turn ends, then become a regular `Entry::Assistant`.
 output panels the last `OUTPUT_LINES_MAX` (2000), and a running process is polled every
 `OUTPUT_POLL_TICKS` (10 ticks, one second).
 
+**Compaction.** `/compact [focus]` sends `Request::Compact` and holds events like a send.
+`compacting` drives the status line; the job's `end` reloads the dialog (`Request::Load`),
+whose transcript shows `Entry::Compaction` after the boundary message, and the status reports
+the saving. A `compaction` step with `trigger: auto` inside a turn switches the live label and
+leaves a notice. A `recap` step from the recap job adds `Entry::Recap` under the last answer
+once (`Transcript::add_recap`).
+
+**Settings.** `/config` opens `Panel::Config` with two tabs: «Диалоги» toggles the host's
+`autoCompact` and `recaps` (`Request::SetAssistant`), «Общие» toggles the local `auto_copy`
+(`preferences.json`, watched like the theme). With auto-copy off a mouse selection stays on
+screen; Ctrl+C copies it and Esc drops it.
+
 **Keymap.** `Keymap::from_json` starts from the defaults and overlays the file's bindings:
 a known shortcut id with a chord string that parses rebinds it, `null` unbinds it, and
 anything else (unknown id, unparsable chord, other JSON) is skipped, so a hand-edited file

@@ -57,6 +57,10 @@ shared grants and one per owner for dialog grants, so a site rule or a tier row 
 JSON in `detail`. Migration 0043 copies with `INSERT OR IGNORE`, so a duplicate in an old table
 keeps its first row instead of stopping the upgrade.
 
+`chat_compaction` (migration 0044) holds one row per compaction: the boundary message, the
+summary, the counts and the summarizer. Both foreign keys cascade, so removing a dialog or
+truncating through the boundary removes the row. The same migration adds `message.recap`.
+
 ## Errors
 
 Closures passed to `with_connection` and `transaction` return `Result<T, DataError>`, so both

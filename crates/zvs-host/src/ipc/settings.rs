@@ -32,7 +32,10 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "settings.set",
             |services: Arc<Services>, input: SettingsSetInput| async move {
-                if input.key == EXEC_POLICY_KEY || input.key == SUBAGENTS_KEY {
+                if input.key == EXEC_POLICY_KEY
+                    || input.key == SUBAGENTS_KEY
+                    || input.key == crate::services::assistant::ASSISTANT_KEY
+                {
                     return Err(invalid("key", "reserved"));
                 }
                 if (input.key == crate::computer::settings::COMPUTER_ENABLED_KEY

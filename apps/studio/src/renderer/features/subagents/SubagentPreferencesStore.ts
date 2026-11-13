@@ -12,14 +12,7 @@ import {
   type SubagentPreferencesDto,
 } from "@zvs/shared";
 import { SUBAGENT_SAVE_FAILED } from "./subagentCopy";
-
-export interface SubagentModelView {
-  readonly key: string;
-  readonly providerName: string;
-  readonly modelName: string;
-  readonly account: boolean;
-  readonly missing: boolean;
-}
+import { modelViews, type PreferredModelView } from "../preferences/preferredModels";
 
 function sameModel(left: SubagentModelDto, right: SubagentModelDto): boolean {
   return left.providerId === right.providerId && left.modelId === right.modelId;
@@ -78,20 +71,8 @@ export default class SubagentPreferencesStore {
     return this.models.length >= SUBAGENT_MODELS_MAX;
   }
 
-  get views(): SubagentModelView[] {
-    return this.models.map((entry) => {
-      const provider = this.providers.find((item) => item.id === entry.providerId);
-      const model = provider?.models.find(
-        (item) => item.externalId === entry.modelId || item.id === entry.modelId,
-      );
-      return {
-        key: `${entry.providerId}/${entry.modelId}`,
-        providerName: provider?.name ?? entry.providerId,
-        modelName: model === undefined ? entry.modelId : model.displayName || model.externalId,
-        account: provider?.authMode === "account",
-        missing: model === undefined || !model.available,
-      };
-    });
+  get views(): PreferredModelView[] {
+    return modelViews(this.models, this.providers);
   }
 
   get accountListed(): boolean {

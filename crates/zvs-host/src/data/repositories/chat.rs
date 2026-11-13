@@ -6,7 +6,7 @@ use zvs_contract::{
 };
 
 use crate::data::schema::columns::{EnumColumn, json_text};
-use crate::data::schema::{ConversationRow, MessageRow};
+use crate::data::schema::{CompactionRow, ConversationRow, MessageRow};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConversationPatch {
@@ -103,6 +103,7 @@ pub struct MessagePatch {
     pub run_id: Option<Option<String>>,
     pub partial: Option<bool>,
     pub pinned: Option<bool>,
+    pub recap: Option<Option<String>>,
 }
 
 impl MessagePatch {
@@ -155,6 +156,12 @@ impl MessagePatch {
         }
         if let Some(pinned) = self.pinned {
             assignments.push(("pinned", SqlValue::Integer(i64::from(pinned))));
+        }
+        if let Some(recap) = &self.recap {
+            assignments.push((
+                "recap",
+                recap.clone().map_or(SqlValue::Null, SqlValue::Text),
+            ));
         }
         Ok(assignments)
     }
@@ -266,8 +273,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images, recap) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
             )?
             .execute(params![
                 row.id,
@@ -294,6 +301,7 @@ impl<'c> ChatRepository<'c> {
                 row.event.as_ref().map(json_text).transpose()?,
                 row.created_at,
                 json_text(&row.images)?,
+                row.recap,
             ])?;
         let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
         self.put_tool_calls(&row.id, &calls)?;
@@ -366,6 +374,46 @@ impl<'c> ChatRepository<'c> {
             )?
             .execute(params![id, content, reasoning, tokens_out, now])?;
         Ok(())
+    }
+
+    pub fn compactions(&self, conversation_id: &str) -> rusqlite::Result<Vec<CompactionRow>> {
+        self.connection
+            .prepare_cached(&format!(
+                "SELECT {} FROM chat_compaction WHERE conversation_id = ?1 ORDER BY created_at ASC, id ASC",
+                CompactionRow::COLUMNS
+            ))?
+            .query_map([conversation_id], CompactionRow::from_row)?
+            .collect()
+    }
+
+    pub fn add_compaction(&self, row: &CompactionRow) -> rusqlite::Result<()> {
+        self.connection
+            .prepare_cached(
+                "INSERT INTO chat_compaction (id, conversation_id, boundary_message_id, summary, messages, tokens_before, tokens_after, provider_id, model_id, trigger, created_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            )?
+            .execute(params![
+                row.id,
+                row.conversation_id,
+                row.boundary_message_id,
+                row.summary,
+                row.messages,
+                row.tokens_before,
+                row.tokens_after,
+                row.provider_id,
+                row.model_id,
+                row.trigger.as_str(),
+                row.created_at,
+            ])?;
+        Ok(())
+    }
+
+    pub fn remove_compaction(&self, conversation_id: &str, id: &str) -> rusqlite::Result<bool> {
+        let removed = self
+            .connection
+            .prepare_cached("DELETE FROM chat_compaction WHERE conversation_id = ?1 AND id = ?2")?
+            .execute([conversation_id, id])?;
+        Ok(removed > 0)
     }
 
     pub fn truncate_from(&self, conversation_id: &str, message_id: &str) -> rusqlite::Result<()> {
@@ -444,6 +492,7 @@ mod tests {
             pinned: false,
             event: None,
             created_at,
+            recap: None,
         }
     }
 

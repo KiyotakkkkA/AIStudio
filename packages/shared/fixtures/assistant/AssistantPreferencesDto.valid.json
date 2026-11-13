@@ -1,0 +1,27 @@
+[
+  {
+    "name": "defaults",
+    "value": {
+      "autoCompact": true,
+      "recaps": true,
+      "summarizerModels": []
+    }
+  },
+  {
+    "name": "ordered models",
+    "value": {
+      "autoCompact": false,
+      "recaps": false,
+      "summarizerModels": [
+        {
+          "providerId": "0199aa11-1111-7111-8111-111111111111",
+          "modelId": "qwen3:8b"
+        },
+        {
+          "providerId": "0199aa11-1111-7111-8111-111111111112",
+          "modelId": "gpt-oss:20b"
+        }
+      ]
+    }
+  }
+]

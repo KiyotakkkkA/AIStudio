@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod approvals;
+pub mod assistant;
 pub mod chat;
 pub mod chat_ask;
 pub mod chat_carry;
@@ -44,6 +45,7 @@ pub mod vector_stores;
 
 pub use accounts::{AccountBrowser, AccountService, AccountServiceOptions, SharedAccountBrowser};
 pub use approvals::ApprovalService;
+pub use assistant::AssistantService;
 pub use chat::{ChatService, ChatServiceOptions};
 pub use crypto::{
     CryptoBackend, CryptoService, Plaintext, SharedCryptoBackend, UnavailableBackend,
@@ -125,6 +127,7 @@ pub struct Services {
     pub sites: crate::sites::SiteService,
     pub exec_policy: crate::policy::ExecPolicyService,
     pub subagents: SubagentService,
+    pub assistant: AssistantService,
     pub browser: crate::browser::BrowserAgent,
     pub browser_settings: crate::browser::BrowserSettings,
     pub browser_sites: crate::browser::BrowserGrants,
@@ -137,6 +140,7 @@ pub struct Services {
     pub picker: Option<SharedPicker>,
     pub cli: crate::cli::SharedCliInstaller,
     pub cli_theme: crate::cli::CliThemeFile,
+    pub cli_preferences: crate::cli::CliPreferencesFile,
     pub cli_connections: crate::cli::CliConnections,
     pub voice: crate::voice::VoiceService,
 }

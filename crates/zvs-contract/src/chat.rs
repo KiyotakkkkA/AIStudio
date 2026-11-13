@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::compaction::{ChatCompactionDto, check_recap};
 use crate::documents::DOCUMENT_PATH_MAX;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
@@ -662,6 +663,12 @@ pub struct MessageDto {
     pub created_at: Timestamp,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<crate::ImageAttachmentDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub recap: Option<String>,
 }
 
 impl Validate for MessageDto {
@@ -691,6 +698,9 @@ impl Validate for MessageDto {
         check::safe_integer("tokensCached", self.tokens_cached)?;
         check::safe_integer("tokensReasoning", self.tokens_reasoning)?;
         check::safe_integer("durationMs", self.duration_ms)?;
+        if let Some(recap) = &self.recap {
+            check_recap(recap)?;
+        }
         check_int("createdAt", self.created_at)
     }
 }
@@ -701,12 +711,15 @@ pub struct ConversationDetailDto {
     #[serde(flatten)]
     pub conversation: ConversationDto,
     pub messages: Vec<MessageDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compactions: Vec<ChatCompactionDto>,
 }
 
 impl Validate for ConversationDetailDto {
     fn validate(&self) -> Result<(), AppError> {
         self.conversation.validate()?;
-        nested("messages", self.messages.validate())
+        nested("messages", self.messages.validate())?;
+        nested("compactions", self.compactions.validate())
     }
 }
 
@@ -856,6 +869,8 @@ pub struct ChatContextDto {
     pub history_messages: u64,
     pub trimmed: u64,
     pub total: u64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub compacted: u64,
 }
 
 impl Validate for ChatContextDto {
@@ -869,6 +884,7 @@ impl Validate for ChatContextDto {
             ("historyMessages", self.history_messages),
             ("trimmed", self.trimmed),
             ("total", self.total),
+            ("compacted", self.compacted),
         ] {
             check::safe_integer(field, value)?;
         }
@@ -904,6 +920,7 @@ wire_enum!(ChatHistoryStatus {
     Included => "included",
     Trimmed => "trimmed",
     Skipped => "skipped",
+    Compacted => "compacted",
 });
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1201,6 +1218,8 @@ pub struct ChatAttachDto {
     pub tool_calls: Vec<ChatToolCallDto>,
     pub approvals: Vec<ApprovalRequestDto>,
     pub questions: Vec<QuestionRequestDto>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub compacting: bool,
 }
 
 impl Validate for ChatAttachDto {

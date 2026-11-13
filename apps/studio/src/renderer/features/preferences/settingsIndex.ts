@@ -7,6 +7,12 @@ import {
 import type { PreferenceSection } from "../../stores/UiStore";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
 import {
+  AUTO_COMPACT_ROW,
+  RECAPS_ROW,
+  SUMMARIZER_MODELS_ROW,
+  SUMMARIZER_ROW,
+} from "../assistant/assistantCopy";
+import {
   SUBAGENT_CONCURRENCY_ROW,
   SUBAGENT_MODELS_ROW,
   SUBAGENTS_ROW,
@@ -111,6 +117,15 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   ...GENERAL_ROWS.map((row) => ({ id: row.key, section: "general" as const, label: row.label })),
   { id: TOOL_CALLS_ROW.key, section: "general", label: TOOL_CALLS_ROW.label },
   { id: JUDGE_ROW.key, section: "general", label: JUDGE_ROW.label },
+  { id: SUMMARIZER_ROW.key, section: "general", label: SUMMARIZER_ROW.label },
+  {
+    id: SUMMARIZER_MODELS_ROW.key,
+    section: "general",
+    label: SUMMARIZER_MODELS_ROW.label,
+    fallback: SUMMARIZER_ROW.key,
+  },
+  { id: AUTO_COMPACT_ROW.key, section: "general", label: AUTO_COMPACT_ROW.label },
+  { id: RECAPS_ROW.key, section: "general", label: RECAPS_ROW.label },
   { id: SUBAGENTS_ROW.key, section: "general", label: SUBAGENTS_ROW.label },
   {
     id: SUBAGENT_SETTINGS_ROW.key,

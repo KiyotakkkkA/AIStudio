@@ -27,6 +27,10 @@ export type CliTheme = z.infer<typeof CliTheme>;
 export const CliThemeDto = z.object({ theme: CliTheme });
 export type CliThemeDto = z.infer<typeof CliThemeDto>;
 
+export const CLI_PREFERENCES_FILE = "preferences.json";
+export const CliPreferencesDto = z.object({ autoCopy: z.boolean().default(true) });
+export type CliPreferencesDto = z.infer<typeof CliPreferencesDto>;
+
 export const CliChangeDto = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("mode"), from: ExecMode, to: ExecMode }),
   z.object({ kind: z.literal("judge") }),

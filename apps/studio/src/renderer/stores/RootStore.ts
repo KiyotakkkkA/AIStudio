@@ -30,6 +30,7 @@ import MemoryStore from "../features/memory/MemoryStore";
 import ProfileStore from "../features/preferences/ProfileStore";
 import ExecPolicyStore from "../features/execPolicy/ExecPolicyStore";
 import SubagentPreferencesStore from "../features/subagents/SubagentPreferencesStore";
+import AssistantPreferencesStore from "../features/assistant/AssistantPreferencesStore";
 import VoiceStore from "../features/voice/VoiceStore";
 import BrowserSettingsStore from "../features/browser/BrowserSettingsStore";
 import BrowserSitesStore from "../features/browser/BrowserSitesStore";
@@ -72,6 +73,7 @@ export class RootStore {
   readonly profile: ProfileStore;
   readonly execPolicy: ExecPolicyStore;
   readonly subagents: SubagentPreferencesStore;
+  readonly assistant: AssistantPreferencesStore;
   readonly voice: VoiceStore;
   readonly browserSettings: BrowserSettingsStore;
   readonly browserSites: BrowserSitesStore;
@@ -113,6 +115,7 @@ export class RootStore {
     this.profile = new ProfileStore(environment.ipc);
     this.execPolicy = new ExecPolicyStore(environment.ipc);
     this.subagents = new SubagentPreferencesStore(environment.ipc);
+    this.assistant = new AssistantPreferencesStore(environment.ipc);
     this.voice = new VoiceStore(environment.ipc);
     this.browserSettings = new BrowserSettingsStore(environment.ipc);
     this.browserSites = new BrowserSitesStore(environment.ipc);
@@ -173,6 +176,7 @@ export class RootStore {
         profile: false,
         execPolicy: false,
         subagents: false,
+        assistant: false,
         voice: false,
       },
       { autoBind: true },

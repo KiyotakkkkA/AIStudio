@@ -6,8 +6,6 @@ import {
   mdiBellOutline,
   mdiBrain,
   mdiChevronDown,
-  mdiChevronUp,
-  mdiClose,
   mdiCogOutline,
   mdiConsole,
   mdiDevices,
@@ -42,6 +40,8 @@ import {
   CLI_COMMAND,
   CLI_APPEARANCE_TITLE,
   CLI_ACCESS_TITLE,
+  CLI_AUTO_COPY_ROW,
+  CLI_GENERAL_TITLE,
   CLI_CONFIRM_ROW,
   CLI_CONNECTIONS_EMPTY,
   CLI_CONNECTIONS_HINT,
@@ -116,23 +116,26 @@ import ComponentsTab from "../toolchain/ComponentsTab";
 import HostCheck from "../diagnostics/HostCheck";
 import { SUBAGENT_CONCURRENCY_MAX, SUBAGENT_CONCURRENCY_MIN } from "@zvs/shared";
 import ModelFields, { availableModelOptions } from "../chat/ModelFields";
+import PreferredModelList from "./PreferredModelList";
+import {
+  ASSISTANT_SECTION_TITLE,
+  AUTO_COMPACT_ROW,
+  RECAPS_ROW,
+  SUMMARIZER_MODEL_LABEL,
+  SUMMARIZER_MODELS_EMPTY,
+  SUMMARIZER_MODELS_ROW,
+  SUMMARIZER_PROVIDER_LABEL,
+  SUMMARIZER_ROW,
+} from "../assistant/assistantCopy";
 import {
   SUBAGENT_ACCOUNT_NOTE,
-  SUBAGENT_ADD,
   SUBAGENT_CONCURRENCY_ROW,
-  SUBAGENT_DOWN,
-  SUBAGENT_MISSING_MODEL,
-  SUBAGENT_MODEL,
   SUBAGENT_MODEL_LABEL,
   SUBAGENT_MODELS_EMPTY,
   SUBAGENT_MODELS_ROW,
   SUBAGENT_NO_PROVIDERS,
-  SUBAGENT_NONE,
-  SUBAGENT_PROVIDER,
   SUBAGENT_PROVIDER_LABEL,
-  SUBAGENT_REMOVE,
   SUBAGENT_SETTINGS_ROW,
-  SUBAGENT_UP,
   SUBAGENTS_ROW,
 } from "../subagents/subagentCopy";
 import {
@@ -482,94 +485,18 @@ const CONCURRENCY_OPTIONS = Array.from(
 
 const SubagentSettings = observer(function SubagentSettings() {
   const { subagents } = useStore();
-  const empty = subagents.loaded && subagents.providers.length === 0;
   return (
     <PreferenceContainer title={SUBAGENT_SETTINGS_ROW.label}>
-      <SettingRow
-        id={SUBAGENT_MODELS_ROW.key}
-        label={SUBAGENT_MODELS_ROW.label}
-        hint={SUBAGENT_MODELS_ROW.hint}
-        error={subagents.error ?? undefined}
-        stacked
-        footer={
-          empty ? (
-            <p className="m-0 text-[12px] text-main-500">{SUBAGENT_NO_PROVIDERS}</p>
-          ) : undefined
-        }
-      >
-        {subagents.views.length === 0 ? (
-          <p className="m-0 text-[12px] text-main-400">{SUBAGENT_MODELS_EMPTY}</p>
-        ) : (
-          <ol className="m-0 flex list-none flex-col gap-1 p-0">
-            {subagents.views.map((view, index) => (
-              <li
-                key={view.key}
-                className="flex min-w-0 items-center gap-2 rounded-control border border-line bg-main-800 px-2.5 py-1.5"
-              >
-                <span className="w-4 flex-none font-mono text-[11.5px] text-main-500">
-                  {index + 1}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-main-100">
-                  {view.modelName}
-                  <span className="text-main-500"> · {view.providerName}</span>
-                </span>
-                {view.missing ? <Chip>{SUBAGENT_MISSING_MODEL}</Chip> : null}
-                <IconButton
-                  path={mdiChevronUp}
-                  label={SUBAGENT_UP}
-                  size="sm"
-                  disabled={index === 0}
-                  onClick={() => void subagents.move(index, -1)}
-                />
-                <IconButton
-                  path={mdiChevronDown}
-                  label={SUBAGENT_DOWN}
-                  size="sm"
-                  disabled={index === subagents.views.length - 1}
-                  onClick={() => void subagents.move(index, 1)}
-                />
-                <IconButton
-                  path={mdiClose}
-                  label={SUBAGENT_REMOVE}
-                  size="sm"
-                  onClick={() => void subagents.remove(index)}
-                />
-              </li>
-            ))}
-          </ol>
-        )}
-        {subagents.full ? null : (
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="grid min-w-0 flex-1 grid-cols-2 gap-3 max-sm:grid-cols-1">
-              <ModelFields
-                providerTitle={SUBAGENT_PROVIDER}
-                providerLabel={SUBAGENT_PROVIDER_LABEL}
-                providerValue={subagents.draftProviderId ?? ""}
-                providerOptions={subagents.providers.map((provider) => ({
-                  value: provider.id,
-                  label: provider.name,
-                }))}
-                providerDisabled={subagents.providers.length === 0}
-                onProviderChange={subagents.selectDraftProvider}
-                modelTitle={SUBAGENT_MODEL}
-                modelLabel={SUBAGENT_MODEL_LABEL}
-                modelValue={subagents.draftModelId ?? ""}
-                modelOptions={availableModelOptions(subagents.draftProvider)}
-                modelDisabled={subagents.draftProvider === undefined}
-                onModelChange={subagents.setDraftModel}
-                placeholder={SUBAGENT_NONE}
-              />
-            </div>
-            <Button
-              tone="ghost"
-              disabled={!subagents.canAdd}
-              onClick={() => void subagents.addDraft()}
-            >
-              {SUBAGENT_ADD}
-            </Button>
-          </div>
-        )}
-      </SettingRow>
+      <PreferredModelList
+        list={subagents}
+        copy={{
+          row: SUBAGENT_MODELS_ROW,
+          empty: SUBAGENT_MODELS_EMPTY,
+          noProviders: SUBAGENT_NO_PROVIDERS,
+          providerLabel: SUBAGENT_PROVIDER_LABEL,
+          modelLabel: SUBAGENT_MODEL_LABEL,
+        }}
+      />
       <SettingRow
         id={SUBAGENT_CONCURRENCY_ROW.key}
         label={SUBAGENT_CONCURRENCY_ROW.label}
@@ -627,15 +554,92 @@ const SubagentsRow = observer(function SubagentsRow({
   );
 });
 
+const AssistantSwitchRow = observer(function AssistantSwitchRow({
+  row,
+  checked,
+  onChange,
+}: {
+  readonly row: { readonly key: string; readonly label: string; readonly hint: string };
+  readonly checked: boolean;
+  readonly onChange: (value: boolean) => void;
+}) {
+  const { assistant } = useStore();
+  return (
+    <SettingRow id={row.key} label={row.label} hint={row.hint}>
+      <Toggle
+        label={checked ? TOGGLE_ON : TOGGLE_OFF}
+        checked={checked}
+        disabled={!assistant.loaded}
+        onChange={onChange}
+      />
+    </SettingRow>
+  );
+});
+
+const AssistantRows = observer(function AssistantRows({
+  onManage,
+}: {
+  readonly onManage: () => void;
+}) {
+  const { assistant } = useStore();
+  return (
+    <>
+      <SettingRow
+        id={SUMMARIZER_ROW.key}
+        label={SUMMARIZER_ROW.label}
+        hint={SUMMARIZER_ROW.hint}
+        error={assistant.error ?? undefined}
+      >
+        <Button tone="primary" size="sm" onClick={onManage}>
+          <Icon path={mdiTune} />
+          {SETTINGS_MANAGE}
+        </Button>
+      </SettingRow>
+      <AssistantSwitchRow
+        row={AUTO_COMPACT_ROW}
+        checked={assistant.autoCompact}
+        onChange={(value) => void assistant.setAutoCompact(value)}
+      />
+      <AssistantSwitchRow
+        row={RECAPS_ROW}
+        checked={assistant.recaps}
+        onChange={(value) => void assistant.setRecaps(value)}
+      />
+    </>
+  );
+});
+
 const GeneralSection = observer(function GeneralSection() {
-  const [page, setPage] = useState<"main" | "judge" | "subagents">("main");
-  const { appSettings, profile, execPolicy, subagents } = useStore();
+  const [page, setPage] = useState<"main" | "judge" | "subagents" | "summarizer">("main");
+  const { appSettings, profile, execPolicy, subagents, assistant } = useStore();
   useEffect(() => {
     void appSettings.load();
     void profile.load();
     void execPolicy.load();
     void subagents.load();
-  }, [appSettings, profile, execPolicy, subagents]);
+    void assistant.load();
+  }, [appSettings, profile, execPolicy, subagents, assistant]);
+  if (page === "summarizer")
+    return (
+      <SettingsSubPage
+        title={SUMMARIZER_ROW.label}
+        hint={SUMMARIZER_ROW.hint}
+        onBack={() => setPage("main")}
+      >
+        <PreferenceContainer title={SUMMARIZER_ROW.label}>
+          <PreferredModelList
+            list={assistant}
+            copy={{
+              row: SUMMARIZER_MODELS_ROW,
+              empty: SUMMARIZER_MODELS_EMPTY,
+              noProviders: SUBAGENT_NO_PROVIDERS,
+              providerLabel: SUMMARIZER_PROVIDER_LABEL,
+              modelLabel: SUMMARIZER_MODEL_LABEL,
+            }}
+          />
+        </PreferenceContainer>
+      </SettingsSubPage>
+    );
   if (page === "subagents")
     return (
       <SettingsSubPage
@@ -666,7 +670,7 @@ const GeneralSection = observer(function GeneralSection() {
           <ToggleSettingRow key={row.key} row={row} />
         ))}
       </PreferenceContainer>
-      <PreferenceContainer title="Выполнение действий">
+      <PreferenceContainer title={ASSISTANT_SECTION_TITLE}>
         <ToolCallsRow />
         <SettingRow id={JUDGE_ROW.key} label={JUDGE_ROW.label} hint={JUDGE_ROW.hint}>
           <Button tone="primary" size="sm" onClick={() => setPage("judge")}>
@@ -674,6 +678,7 @@ const GeneralSection = observer(function GeneralSection() {
             {SETTINGS_MANAGE}
           </Button>
         </SettingRow>
+        <AssistantRows onManage={() => setPage("summarizer")} />
       </PreferenceContainer>
       <PreferenceContainer title="Делегирование задач">
         <SubagentsRow onManage={() => setPage("subagents")} />
@@ -882,6 +887,21 @@ const CliSection = observer(function CliSection() {
           stacked
         >
           <CliThemes />
+        </SettingRow>
+      </PreferenceContainer>
+      <PreferenceContainer title={CLI_GENERAL_TITLE}>
+        <SettingRow
+          id={CLI_AUTO_COPY_ROW.key}
+          label={CLI_AUTO_COPY_ROW.label}
+          hint={CLI_AUTO_COPY_ROW.hint}
+          error={cli.preferencesError ?? undefined}
+        >
+          <Toggle
+            label={cli.autoCopy === true ? TOGGLE_ON : TOGGLE_OFF}
+            checked={cli.autoCopy === true}
+            disabled={cli.autoCopy === null}
+            onChange={(value) => void cli.setAutoCopy(value)}
+          />
         </SettingRow>
       </PreferenceContainer>
       <PreferenceContainer title={CLI_ACCESS_TITLE}>

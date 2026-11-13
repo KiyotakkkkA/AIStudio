@@ -1,8 +1,9 @@
 use zvs_contract::{
-    AccountFamily, BackgroundShellDto, BackgroundShellId, BackgroundShellStatus, ChatContextDto,
-    CliTheme, ConversationDto, ConversationId, ExecJudgeDto, ExecMode, ExecPolicyDto,
-    McpOAuthState, McpServerDto, McpServerId, McpServerStatus, ModelCapability, ProviderDto,
-    ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus, ThinkingEffort,
+    AccountFamily, AssistantPreferencesDto, BackgroundShellDto, BackgroundShellId,
+    BackgroundShellStatus, ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto,
+    ExecMode, ExecPolicyDto, McpOAuthState, McpServerDto, McpServerId, McpServerStatus,
+    ModelCapability, ProviderDto, ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus,
+    ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -27,6 +28,7 @@ pub enum Panel {
     Permissions,
     Shortcuts,
     Theme,
+    Config,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,6 +58,9 @@ pub enum Action {
     ShowOutput(BackgroundShellId),
     ShowSubagent(String),
     StopSubagent(zvs_contract::RunId),
+    SetAutoCompact(bool),
+    SetRecaps(bool),
+    SetAutoCopy(bool),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -273,6 +278,8 @@ pub struct View<'a> {
     pub effort: ThinkingEffort,
     pub keymap: &'a Keymap,
     pub theme: CliTheme,
+    pub assistant: Option<&'a AssistantPreferencesDto>,
+    pub auto_copy: bool,
 }
 
 pub const MODES: [ExecMode; 4] = [
@@ -837,6 +844,49 @@ fn connect_rows(view: &View<'_>) -> Vec<Row> {
         .collect()
 }
 
+fn switch_row(key: &str, title: &str, hint: &str, on: bool, action: Action) -> Row {
+    Row::new(key, if on { "●" } else { "○" }, title)
+        .meta(if on {
+            copy::CONFIG_ON
+        } else {
+            copy::CONFIG_OFF
+        })
+        .tone(if on { Tone::Accent } else { Tone::Plain })
+        .detail([hint.to_owned()])
+        .action(action)
+}
+
+fn config_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
+    if overlay.tab == 1 {
+        return vec![switch_row(
+            "autoCopy",
+            copy::CONFIG_AUTO_COPY,
+            copy::CONFIG_AUTO_COPY_HINT,
+            view.auto_copy,
+            Action::SetAutoCopy(!view.auto_copy),
+        )];
+    }
+    let Some(assistant) = view.assistant else {
+        return Vec::new();
+    };
+    vec![
+        switch_row(
+            "autoCompact",
+            copy::CONFIG_AUTO_COMPACT,
+            copy::CONFIG_AUTO_COMPACT_HINT,
+            assistant.auto_compact,
+            Action::SetAutoCompact(!assistant.auto_compact),
+        ),
+        switch_row(
+            "recaps",
+            copy::CONFIG_RECAPS,
+            copy::CONFIG_RECAPS_HINT,
+            assistant.recaps,
+            Action::SetRecaps(!assistant.recaps),
+        ),
+    ]
+}
+
 fn shortcut_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
     SHORTCUTS
         .iter()
@@ -913,6 +963,7 @@ impl Overlay {
             Panel::Permissions => copy::PERMISSIONS_TITLE,
             Panel::Shortcuts => copy::SHORTCUTS_TITLE,
             Panel::Theme => copy::THEME_TITLE,
+            Panel::Config => copy::CONFIG_TITLE,
         }
     }
 
@@ -931,6 +982,7 @@ impl Overlay {
             Panel::Permissions => "◉",
             Panel::Shortcuts => "⌨",
             Panel::Theme => "◑",
+            Panel::Config => "⚒",
         }
     }
 
@@ -950,6 +1002,7 @@ impl Overlay {
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
             Panel::Processes => fixed(&[copy::TAB_RUNNING, copy::TAB_ALL]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
+            Panel::Config => fixed(&[copy::TAB_CONVERSATIONS, copy::TAB_GENERAL]),
             Panel::Connect
             | Panel::Effort
             | Panel::Shortcuts
@@ -1002,6 +1055,7 @@ impl Overlay {
             Panel::Permissions => permission_rows(self, view),
             Panel::Shortcuts => shortcut_rows(self, view),
             Panel::Theme => theme_rows(view),
+            Panel::Config => config_rows(self, view),
         };
         let query = self.filter.text().trim().to_lowercase();
         rows.into_iter().filter(|row| row.matches(&query)).collect()
@@ -1097,7 +1151,57 @@ mod tests {
             effort: ThinkingEffort::Auto,
             keymap: &KEYMAP,
             theme: CliTheme::Ember,
+            assistant: None,
+            auto_copy: true,
         }
+    }
+
+    #[test]
+    fn config_switches_flip_the_current_value_on_each_tab() {
+        let providers = providers();
+        let preferences = AssistantPreferencesDto {
+            auto_compact: true,
+            recaps: false,
+            summarizer_models: Vec::new(),
+        };
+        let mut overlay = Overlay::new(Panel::Config);
+        let bare = view(&providers);
+        assert_eq!(
+            overlay.tabs(&bare),
+            [copy::TAB_CONVERSATIONS, copy::TAB_GENERAL]
+        );
+        assert!(overlay.rows(&bare).is_empty());
+
+        let loaded = View {
+            assistant: Some(&preferences),
+            ..view(&providers)
+        };
+        let rows = overlay.rows(&loaded);
+        let shown: Vec<(&str, &str, Option<Action>)> = rows
+            .iter()
+            .map(|row| (row.title.as_str(), row.meta.as_str(), row.action.clone()))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                (
+                    copy::CONFIG_AUTO_COMPACT,
+                    copy::CONFIG_ON,
+                    Some(Action::SetAutoCompact(false))
+                ),
+                (
+                    copy::CONFIG_RECAPS,
+                    copy::CONFIG_OFF,
+                    Some(Action::SetRecaps(true))
+                ),
+            ]
+        );
+
+        overlay.next_tab(2, true);
+        let rows = overlay.rows(&loaded);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].title, copy::CONFIG_AUTO_COPY);
+        assert_eq!(rows[0].action, Some(Action::SetAutoCopy(false)));
     }
 
     #[test]

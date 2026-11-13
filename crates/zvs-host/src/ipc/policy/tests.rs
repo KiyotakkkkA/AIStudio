@@ -12,10 +12,14 @@ use crate::services::SystemService;
 use crate::testing::test_services;
 
 const CONSOLE_CHANNELS: &[&str] = &[
+    "assistant.get",
+    "assistant.set",
     "chat.answer",
     "chat.attach",
     "chat.bindFolder",
     "chat.cancel",
+    "chat.compact",
+    "chat.compactions.undo",
     "chat.context",
     "chat.conversations.create",
     "chat.conversations.get",

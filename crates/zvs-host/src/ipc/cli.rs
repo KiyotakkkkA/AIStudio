@@ -74,6 +74,18 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "cli.preferences.get",
+            |services: Arc<Services>, (): ()| async move {
+                Ok::<_, AppError>(services.cli_preferences.get())
+            },
+        )
+        .handle(
+            "cli.preferences.set",
+            |services: Arc<Services>, input: zvs_contract::CliPreferencesDto| async move {
+                services.cli_preferences.set(input)
+            },
+        )
+        .handle(
             "cli.connections.list",
             |services: Arc<Services>, (): ()| async move {
                 Ok::<_, AppError>(services.cli_connections.list())

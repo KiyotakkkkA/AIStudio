@@ -21,6 +21,7 @@ import { QuestionRequestDto } from "./questions.js";
 import { Timestamp } from "./primitives/time.js";
 import { AgenticPlanStepDto } from "./agentic.js";
 import { EndedShellDto, SHELLS_TOTAL_MAX } from "./shells.js";
+import { ChatCompactionDto, Recap } from "./compaction.js";
 
 export const ChatSettings = z.object({
   temperature: z.number().min(0).max(2).optional(),
@@ -337,6 +338,7 @@ export const MessageDto = z
     pinned: z.boolean().default(false),
     event: ChatEventDto.optional(),
     createdAt: z.number().int(),
+    recap: Recap.optional(),
   })
   .refine((message) => (message.role === "event") === (message.event !== undefined), {
     path: ["event"],
@@ -352,6 +354,7 @@ export const ChatWakeStepDto = z.object({
 export type ChatWakeStepDto = z.infer<typeof ChatWakeStepDto>;
 export const ConversationDetailDto = ConversationFields.extend({
   messages: z.array(MessageDto),
+  compactions: z.array(ChatCompactionDto).default([]),
 }).refine(folderAccessMatches, { path: ["workingFolderAccess"] });
 export type ConversationDetailDto = z.infer<typeof ConversationDetailDto>;
 export const ChatSendInput = z
@@ -426,6 +429,7 @@ export const ChatContextDto = z.object({
   historyMessages: z.number().int().nonnegative(),
   trimmed: z.number().int().nonnegative(),
   total: z.number().int().nonnegative(),
+  compacted: z.number().int().nonnegative().default(0),
 });
 export type ChatContextDto = z.infer<typeof ChatContextDto>;
 export const CHAT_PROMPT_SECTIONS = [
@@ -448,7 +452,7 @@ export const CHAT_PROMPT_SECTIONS = [
 ] as const;
 export const ChatPromptSection = z.enum(CHAT_PROMPT_SECTIONS);
 export type ChatPromptSection = z.infer<typeof ChatPromptSection>;
-export const ChatHistoryStatus = z.enum(["included", "trimmed", "skipped"]);
+export const ChatHistoryStatus = z.enum(["included", "trimmed", "skipped", "compacted"]);
 export type ChatHistoryStatus = z.infer<typeof ChatHistoryStatus>;
 export const ChatPromptSectionDto = z.object({
   key: ChatPromptSection,
@@ -521,5 +525,6 @@ export const ChatAttachDto = z.object({
   toolCalls: z.array(ChatToolCallDto),
   approvals: z.array(ApprovalRequestDto),
   questions: z.array(QuestionRequestDto),
+  compacting: z.boolean().default(false),
 });
 export type ChatAttachDto = z.infer<typeof ChatAttachDto>;

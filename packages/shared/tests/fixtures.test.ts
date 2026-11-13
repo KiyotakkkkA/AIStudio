@@ -28,6 +28,8 @@ import * as browserExtensions from "../src/browserExtensions.js";
 import * as browserLibrary from "../src/browserLibrary.js";
 import * as browserSites from "../src/browserSites.js";
 import * as subagents from "../src/subagents.js";
+import * as assistant from "../src/assistant.js";
+import * as compaction from "../src/compaction.js";
 import * as cli from "../src/cli.js";
 import * as voice from "../src/voice.js";
 import * as storage from "../src/storage.js";
@@ -366,6 +368,13 @@ const schemas: Record<string, z.ZodType> = {
   "cli/CliSessionDto": cli.CliSessionDto,
   "cli/CliInstallDto": cli.CliInstallDto,
   "cli/CliThemeDto": cli.CliThemeDto,
+  "cli/CliPreferencesDto": cli.CliPreferencesDto,
+  "assistant/AssistantPreferencesDto": assistant.AssistantPreferencesDto,
+  "chat/ChatCompactionDto": compaction.ChatCompactionDto,
+  "chat/ChatCompactInput": compaction.ChatCompactInput,
+  "chat/ChatCompactionRef": compaction.ChatCompactionRef,
+  "chat/ChatCompactionStepDto": compaction.ChatCompactionStepDto,
+  "chat/ChatRecapStepDto": compaction.ChatRecapStepDto,
   "cli/CliConnectionDto": cli.CliConnectionDto,
   "cli/CliConnectionRef": cli.CliConnectionRef,
   "cli/CliConsentDto": cli.CliConsentDto,

@@ -124,6 +124,8 @@ import {
   UserRulesDto,
 } from "../execPolicy.js";
 import { CliSubagentCancelInput, SubagentPreferencesDto } from "../subagents.js";
+import { AssistantPreferencesDto } from "../assistant.js";
+import { ChatCompactInput, ChatCompactionRef } from "../compaction.js";
 import {
   CliConnectionDto,
   CliConnectionRef,
@@ -132,6 +134,7 @@ import {
   CliInstallDto,
   CliOpenInput,
   CliSessionDto,
+  CliPreferencesDto,
   CliThemeDto,
 } from "../cli.js";
 import {
@@ -360,6 +363,8 @@ export const contract = defineContract({
   "chat.send": { input: ChatSendInput, output: RunHandleDto },
   "chat.attach": { input: ChatAttachInput, output: ChatAttachDto.nullable() },
   "chat.cancel": { input: RunIdInput, output: z.void() },
+  "chat.compact": { input: ChatCompactInput, output: RunHandleDto },
+  "chat.compactions.undo": { input: ChatCompactionRef, output: ConversationDetailDto },
   "chat.goal.continue": { input: ChatGoalInput, output: RunHandleDto },
   "chat.goal.stop": { input: ChatGoalInput, output: ConversationDto },
   "chat.queue.list": { input: ChatQueueInput, output: ChatQueueDto },
@@ -676,6 +681,8 @@ export const contract = defineContract({
   "execPolicy.confirmPack": { input: ConfirmRulePackInput, output: UserRulesDto },
   "subagents.get": { input: z.void(), output: SubagentPreferencesDto },
   "subagents.set": { input: SubagentPreferencesDto, output: SubagentPreferencesDto },
+  "assistant.get": { input: z.void(), output: AssistantPreferencesDto },
+  "assistant.set": { input: AssistantPreferencesDto, output: AssistantPreferencesDto },
   "cli.open": { input: CliOpenInput, output: CliSessionDto },
   "cli.accounts.link": { input: AccountLinkInput, output: AccountLinkResult },
   "cli.accounts.cancelLink": {
@@ -690,6 +697,8 @@ export const contract = defineContract({
   "cli.uninstall": { input: z.void(), output: CliInstallDto },
   "cli.theme.get": { input: z.void(), output: CliThemeDto },
   "cli.theme.set": { input: CliThemeDto, output: CliThemeDto },
+  "cli.preferences.get": { input: z.void(), output: CliPreferencesDto },
+  "cli.preferences.set": { input: CliPreferencesDto, output: CliPreferencesDto },
   "cli.connections.list": { input: z.void(), output: z.array(CliConnectionDto) },
   "cli.connections.disconnect": { input: CliConnectionRef, output: z.void() },
   "cli.consents.list": { input: z.void(), output: z.array(CliConsentDto) },

@@ -25,6 +25,7 @@ use zvs_contract::{
     merge_graph_neighbors, model_tool_support, resolve_tool_mode,
 };
 
+use super::assistant::AssistantService;
 use super::chat_ask::{ASK_MALFORMED, ASK_TOOL, answers_text, ask_request, ask_section, ask_tool};
 use super::chat_carry::{
     Carried, CarryShape, SourceLookup, carry_into_with_images, cited_citations,
@@ -35,15 +36,16 @@ use super::chat_goal::{
     settled,
 };
 use super::chat_history::{
-    RelatedSource, RetrievedSource, attribute, estimate_tokens, measure_context, tokens,
-    window_chat_history, with_selections,
+    MESSAGE_OVERHEAD, RelatedSource, RetrievedSource, attribute, estimate_tokens, measure_context,
+    tokens, window_chat_history, with_selections,
 };
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
 use super::chat_plugins::{ChatPlugins, active_plugins, plugin_note, resolve_plugins};
 use super::chat_prompt::{
-    PromptParts, history_entries, in_tool_block, model_history, sendable_messages,
+    PromptParts, compacted_entries, history_entries, in_tool_block, model_history,
+    sendable_messages,
 };
 use super::chat_reply::{
     ReplyBuffers, ReplyChunk, TOOL_CALL_DOMAIN, append_round, apply_tool_call,
@@ -75,7 +77,7 @@ use crate::access::Admitted;
 use crate::background::{BACKGROUND_TOOLS, BackgroundShells, status_line};
 use crate::commands::PROCESS_TOOLS;
 use crate::data::repositories::{ConversationPatch, MessagePatch, ProviderFilter, RunPatch};
-use crate::data::schema::{ConversationRow, FolderGrantRow, MemoryRow, MessageRow};
+use crate::data::schema::{CompactionRow, ConversationRow, FolderGrantRow, MemoryRow, MessageRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::{ChatMessage, GenerateRequest, TextDelta, ToolCall, TurnUsage};
@@ -179,6 +181,7 @@ pub struct ChatServiceOptions {
     pub folders: Option<FolderAccessService>,
     pub shells: Option<BackgroundShells>,
     pub subagents: Option<SubagentService>,
+    pub assistant: Option<AssistantService>,
     pub logger: SharedLogger,
     pub clock: SharedClock,
     pub wake_delay: std::time::Duration,
@@ -199,6 +202,7 @@ impl ChatServiceOptions {
             folders: None,
             shells: None,
             subagents: None,
+            assistant: None,
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
             wake_delay: WAKE_DELAY,
@@ -226,6 +230,8 @@ struct Inner {
     shells: Option<BackgroundShells>,
     memory: MemoryService,
     subagents: SubagentService,
+    assistant: AssistantService,
+    compactions: Mutex<HashMap<String, Option<RunId>>>,
     runs: WeakRunService,
     logger: SharedLogger,
     clock: SharedClock,
@@ -395,6 +401,7 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         pinned: row.pinned,
         event: row.event,
         created_at: row.created_at,
+        recap: row.recap,
     })
 }
 
@@ -500,11 +507,12 @@ impl Inner {
     }
 
     fn get(&self, id: &str) -> Result<ConversationDetailDto, AppError> {
-        let (row, messages, grants) = self.read(|repositories| {
+        let (row, messages, grants, compactions) = self.read(|repositories| {
             Ok((
                 repositories.chat.get(id)?,
                 repositories.chat.messages(id)?,
                 repositories.folder_grants.list()?,
+                repositories.chat.compactions(id)?,
             ))
         })?;
         let row =
@@ -515,6 +523,7 @@ impl Inner {
                 .into_iter()
                 .map(message_dto)
                 .collect::<Result<_, _>>()?,
+            compactions: compaction_dtos(compactions),
         })
     }
 
@@ -589,6 +598,9 @@ impl Inner {
     }
 
     fn require_idle(&self, id: &str) -> Result<(), AppError> {
+        if self.compacting(id).is_some() {
+            return Err(AppError::new(AppErrorCode::Conflict, COMPACTING));
+        }
         let active = self.read(|repositories| Ok(repositories.runs.unfinished()?))?;
         if active
             .iter()
@@ -1170,7 +1182,7 @@ struct Preview {
     parts: PromptParts,
     offered: Vec<OfferedTool>,
     deferred: Vec<OfferedTool>,
-    messages: Vec<MessageDto>,
+    view: CompactedView,
     shape: CarryShape,
     lookup: SourceLookup,
 }
@@ -1245,9 +1257,9 @@ impl Preview {
     fn measure(&self) -> (ChatContextDto, usize, HashMap<MessageId, Carried>) {
         let system_text = self.system_text();
         let system_part = self.parts.compose_where(|section| !in_tool_block(section));
-        let sent = sendable_messages(&self.messages);
+        let sent = sendable_messages(&self.view.messages);
         let mut carried = HashMap::new();
-        let mut history = model_history(&self.messages);
+        let mut history = model_history(&self.view.messages);
         if !self.images_supported {
             crate::images::text_references(&mut history);
         }
@@ -1287,6 +1299,7 @@ impl Preview {
             history_messages: usage.history_messages as u64,
             trimmed: usage.trimmed as u64,
             total: count(usage.system + usage.tools + usage.history),
+            compacted: self.view.compacted(),
         };
         (context, usage.trimmed, carried)
     }
@@ -1324,6 +1337,64 @@ impl Inner {
 }
 
 impl PrepareNode {
+    async fn auto_compact(
+        &self,
+        context: &StepContext,
+        input: &ChatPrepareInput,
+        position: usize,
+    ) -> Result<Option<CompactedView>, AppError> {
+        let inner = &self.0;
+        let Some(conversation) = ConversationId::parse(&input.conversation_id) else {
+            return Ok(None);
+        };
+        compact::step(
+            context,
+            conversation,
+            zvs_contract::CompactionTrigger::Auto,
+            zvs_contract::CompactionPhase::Started,
+        );
+        let outcome = inner
+            .compact_conversation(
+                context,
+                &input.conversation_id,
+                Some(&input.user_id),
+                zvs_contract::CompactionTrigger::Auto,
+                None,
+            )
+            .await;
+        if context.is_cancelled() {
+            context.check_cancelled()?;
+        }
+        let phase = if outcome.is_ok() {
+            zvs_contract::CompactionPhase::Finished
+        } else {
+            zvs_contract::CompactionPhase::Failed
+        };
+        compact::step(
+            context,
+            conversation,
+            zvs_contract::CompactionTrigger::Auto,
+            phase,
+        );
+        if let Err(error) = outcome {
+            inner.log(
+                LogLevel::Warn,
+                compact::COMPACTION_FAILED_LOG,
+                &[
+                    ("conversationId", json!(input.conversation_id)),
+                    ("error", json!(error.message)),
+                ],
+            );
+            return Ok(None);
+        }
+        let detail = inner.get(&input.conversation_id)?;
+        let end = position.min(detail.messages.len());
+        Ok(Some(compacted_view(
+            &detail.messages[..end],
+            &detail.compactions,
+        )))
+    }
+
     async fn search_up_front(
         &self,
         context: &StepContext,
@@ -1596,7 +1667,11 @@ impl PlainNode for PrepareNode {
         {
             context.emit(HostEventDraft::Step { step })?;
         }
-        let mut history = model_history(&conversation.messages[..position]);
+        let mut view = compacted_view(
+            &conversation.messages[..position],
+            &conversation.compactions,
+        );
+        let mut history = model_history(&view.messages);
         let images_supported = inner.supports_images(&input.provider_id)?;
         if !images_supported {
             crate::images::text_references(&mut history);
@@ -1791,6 +1866,21 @@ impl PlainNode for PrepareNode {
         if !images_supported {
             crate::images::text_references(std::slice::from_mut(&mut current));
         }
+        let used = tokens(&system)
+            + MESSAGE_OVERHEAD * 2
+            + tokens(&current.content)
+            + history_tokens(&view.messages);
+        if position > 0
+            && inner.assistant.preferences().auto_compact
+            && over_threshold(used, model.context_window - model.max_output_tokens)
+            && let Some(fresh) = self.auto_compact(context, &input, position).await?
+        {
+            view = fresh;
+            history = model_history(&view.messages);
+            if !images_supported {
+                crate::images::text_references(&mut history);
+            }
+        }
         let mut prepared = window_chat_history(
             &system,
             &history,
@@ -1800,7 +1890,7 @@ impl PlainNode for PrepareNode {
             &sources,
             &related,
         )?;
-        let sent = sendable_messages(&conversation.messages[..position]);
+        let sent = sendable_messages(&view.messages);
         let lookup = source_lookup(inner, context.services.vector_stores.as_ref(), &sent).await;
         carry_into_with_images(
             &mut prepared,
@@ -1879,6 +1969,7 @@ impl PlainNode for PrepareNode {
             pinned: false,
             event: None,
             created_at: now,
+            recap: None,
         };
         inner.read(|repositories| Ok(repositories.chat.add_message(&row)?))?;
         Ok(ChatGenerateRequest {
@@ -2513,6 +2604,12 @@ impl GenerateChatNode {
             memory: Mutex::new(memory),
             skills: Mutex::new(SkillTurn::with_requires(&active_requires)),
         };
+        let compactor = ConversationId::parse(&conversation_id).map(|id| ChatCompactor {
+            inner: &self.0,
+            conversation_id: id,
+            provider_id: base.provider_id.clone(),
+            model_id: base.model.clone(),
+        });
         let mut out = LoopTranscript::default();
         let outcome = ToolLoop {
             driver,
@@ -2527,6 +2624,7 @@ impl GenerateChatNode {
             context_budget: knowledge.context_budget,
             host: &host,
             hook,
+            compactor: compactor.as_ref().map(|compactor| compactor as _),
         }
         .run(context, &calls, &mut out)
         .await;
@@ -2771,7 +2869,12 @@ impl ChatService {
         let subagents = options.subagents.unwrap_or_else(|| {
             SubagentService::new(Arc::clone(&options.database), options.clock.clone())
         });
+        let assistant = options.assistant.unwrap_or_else(|| {
+            AssistantService::new(Arc::clone(&options.database), options.clock.clone())
+        });
         let inner = Arc::new(Inner {
+            assistant,
+            compactions: Mutex::new(HashMap::new()),
             images: options.images,
             browser: options.browser,
             database: options.database,
@@ -2800,6 +2903,8 @@ impl ChatService {
         options
             .registry
             .register(SubagentNode(Arc::clone(&inner)))?;
+        options.registry.register(CompactNode(Arc::clone(&inner)))?;
+        options.registry.register(RecapNode(Arc::clone(&inner)))?;
         let service = Self {
             inner,
             runs: options.runs,
@@ -3103,9 +3208,12 @@ impl ChatService {
                 return Ok(None);
             };
             let created = repositories.chat.create(&row)?;
+            let mut copied: HashMap<String, String> = HashMap::new();
             for source in &messages[..=end] {
+                let copy_id = new_id().hyphenated().to_string();
+                copied.insert(source.id.clone(), copy_id.clone());
                 repositories.chat.add_message(&MessageRow {
-                    id: new_id().hyphenated().to_string(),
+                    id: copy_id,
                     conversation_id: branch_id.clone(),
                     tool_calls: source
                         .tool_calls
@@ -3114,6 +3222,16 @@ impl ChatService {
                         .collect(),
                     ..source.clone()
                 })?;
+            }
+            for compaction in repositories.chat.compactions(&id)? {
+                if let Some(boundary) = copied.get(&compaction.boundary_message_id) {
+                    repositories.chat.add_compaction(&CompactionRow {
+                        id: new_id().hyphenated().to_string(),
+                        conversation_id: branch_id.clone(),
+                        boundary_message_id: boundary.clone(),
+                        ..compaction
+                    })?;
+                }
             }
             for memory in repositories.memory.list_conversation(&id)? {
                 repositories.memory.create(&MemoryRow {
@@ -3175,6 +3293,7 @@ impl ChatService {
             pinned: false,
             event: None,
             created_at: now,
+            recap: None,
         };
         let saved = self.inner.read(|repositories| {
             let saved = repositories.chat.add_message(&row)?;
@@ -3421,6 +3540,7 @@ impl ChatService {
                 pinned: false,
                 event: None,
                 created_at: self.inner.now(),
+                recap: None,
             })
             .collect();
         let user_id = new_id().hyphenated().to_string();
@@ -3535,11 +3655,13 @@ impl ChatService {
             pinned: false,
             event,
             created_at: now,
+            recap: None,
         };
         let announced = (user.id.clone(), user.content.clone());
         let inner = Arc::clone(&self.inner);
         let waker = Waker::of(self);
         let observed = conversation_id.clone();
+        let goal_turn = goal.is_some() || input.commands.contains(&ChatCommand::Goal);
         let observer: RunObserver = Arc::new(move |event: &HostEvent| {
             if let Err(error) = inner.record(&assistant_id, event) {
                 inner.log(
@@ -3550,6 +3672,9 @@ impl ChatService {
             }
             if let HostEventDraft::End { outcome } = &event.body {
                 waker.turn_ended(&observed, outcome.status);
+                if outcome.status == RunOutcomeStatus::Ok {
+                    waker.recap(&observed, &assistant_id, goal_turn);
+                }
             }
         });
         let (handle, subscription) = self.runs.start_with(
@@ -3763,20 +3888,24 @@ impl ChatService {
             deferred: deferred_section(&deferred, &offered),
             goal,
         };
+        let view = conversation.as_ref().map_or_else(
+            || compacted_view(&messages, &[]),
+            |detail| compacted_view(&messages, &detail.compactions),
+        );
         let lookup = source_lookup(
             &self.inner,
             self.runs.services().vector_stores.as_ref(),
-            &sendable_messages(&messages),
+            &sendable_messages(&view.messages),
         )
         .await;
         Ok(Preview {
+            view,
             images_supported,
             model,
             parts,
             shape: carry_shape(tool_mode, &offered),
             offered,
             deferred,
-            messages,
             lookup,
         })
     }
@@ -3825,7 +3954,10 @@ impl ChatService {
                 .iter()
                 .map(|tool| tool.key.clone())
                 .collect(),
-            history: history_entries(&preview.messages, trimmed, &carried),
+            history: compacted_entries(&preview.view.covered)
+                .into_iter()
+                .chain(history_entries(&preview.view.messages, trimmed, &carried))
+                .collect(),
         })
     }
 
@@ -3951,11 +4083,19 @@ impl ChatService {
 
     pub fn attach(&self, id: &ConversationId) -> Result<Option<ChatAttachDto>, AppError> {
         let subject = id.to_string();
+        let compaction = self
+            .inner
+            .compacting(&subject)
+            .flatten()
+            .map(|run| run.to_string());
         let Some(row) = self
             .inner
             .read(|repositories| Ok(repositories.runs.unfinished()?))?
             .into_iter()
-            .find(|run| run.kind == RunKind::Chat && run.subject_id.as_deref() == Some(&subject))
+            .find(|run| {
+                run.subject_id.as_deref() == Some(&subject)
+                    && (run.kind == RunKind::Chat || compaction.as_deref() == Some(run.id.as_str()))
+            })
         else {
             return Ok(None);
         };
@@ -3974,6 +4114,7 @@ impl ChatService {
             tool_calls: Vec::new(),
             approvals: Vec::new(),
             questions: self.runs.questions().pending(&row.id),
+            compacting: compaction.as_deref() == Some(row.id.as_str()),
         };
         for event in self.runs.record(&row.id)? {
             attached.seq = Some(attached.seq.map_or(event.seq, |seq| seq.max(event.seq)));
@@ -4031,7 +4172,13 @@ impl ChatService {
     }
 
     pub async fn cancel(&self, id: &RunId) -> Result<(), AppError> {
-        if self.runs.get(id)?.kind != RunKind::Chat {
+        let run = self.runs.get(id)?;
+        let compaction = run.kind == RunKind::Job
+            && run
+                .subject_id
+                .as_deref()
+                .is_some_and(|subject| self.inner.compacting(subject).flatten() == Some(*id));
+        if run.kind != RunKind::Chat && !compaction {
             return Err(AppError::new(
                 AppErrorCode::ValidationFailed,
                 NOT_A_CHAT_RUN,
@@ -4041,9 +4188,19 @@ impl ChatService {
     }
 }
 
+pub(crate) mod compact;
 pub(crate) mod queue;
 pub(crate) mod subagent;
 pub(crate) mod wake;
+
+pub use compact::{
+    COMPACT_FAILED, COMPACT_NO_MODEL, COMPACT_NOT_SMALLER, COMPACT_RUN_TITLE, COMPACT_TOO_SHORT,
+    COMPACTING, COMPACTION_NOT_FOUND, COMPACTION_NOT_LATEST, RECAP_RUN_TITLE, SUMMARY_HEADING,
+};
+use compact::{
+    ChatCompactor, CompactNode, CompactedView, RecapNode, compacted_view, compaction_dtos,
+    history_tokens, over_threshold,
+};
 
 pub use queue::{QUEUE_FULL, QUEUE_MESSAGE_NOT_FOUND, QUEUE_YIELDED};
 

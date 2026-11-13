@@ -1,3 +1,4 @@
+mod compact;
 mod images;
 mod knowledge;
 mod memory;
@@ -356,6 +357,13 @@ impl Harness {
                 ..zvs_contract::SubagentPreferencesDto::default()
             })
             .expect("starts without subagents");
+        crate::services::AssistantService::new(Arc::clone(&database), Arc::new(SystemClock))
+            .set(&zvs_contract::AssistantPreferencesDto {
+                auto_compact: false,
+                recaps: false,
+                summarizer_models: Vec::new(),
+            })
+            .expect("starts without compaction and recaps");
         let (provider_id, model_id) = database
             .with_connection(|connection| {
                 let repositories = Repositories::new(connection);

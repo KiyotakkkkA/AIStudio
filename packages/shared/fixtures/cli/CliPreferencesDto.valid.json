@@ -1,0 +1,14 @@
+[
+  {
+    "name": "auto copy on",
+    "value": {
+      "autoCopy": true
+    }
+  },
+  {
+    "name": "auto copy off",
+    "value": {
+      "autoCopy": false
+    }
+  }
+]

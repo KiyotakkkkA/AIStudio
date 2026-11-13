@@ -83,6 +83,7 @@ function stats(patch: Partial<ChatStatsDto["context"]> = {}): ChatStatsDto {
       historyMessages: 2,
       trimmed: 0,
       total: 4_800,
+      compacted: 0,
       ...patch,
     },
     tokenizer: "o200k_base",

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "wrong domain",
+    "value": {
+      "domain": "queue",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "trigger": "auto",
+      "phase": "started"
+    }
+  },
+  {
+    "name": "unknown phase",
+    "value": {
+      "domain": "compaction",
+      "conversationId": "0199aa11-2222-7111-8111-111111111111",
+      "trigger": "auto",
+      "phase": "paused"
+    }
+  }
+]

@@ -217,6 +217,18 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "chat.compact",
+            |services: Arc<Services>, input: zvs_contract::ChatCompactInput| async move {
+                services.chat.compact(&input)
+            },
+        )
+        .handle(
+            "chat.compactions.undo",
+            |services: Arc<Services>, input: zvs_contract::ChatCompactionRef| async move {
+                services.chat.undo_compaction(&input)
+            },
+        )
+        .handle(
             "chat.goal.continue",
             |services: Arc<Services>, input: ChatGoalInput| async move {
                 services.chat.continue_goal(&input.conversation_id)

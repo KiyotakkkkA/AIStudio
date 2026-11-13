@@ -39,7 +39,7 @@ pub use app_grant::AppGrantRow;
 pub use browser_download::BrowserDownloadRow;
 pub use browser_library::{BrowserBookmarkRow, BrowserHistoryRow};
 pub use browser_site_rule::BrowserSiteRuleRow;
-pub use chat::{ConversationRow, MessageRow};
+pub use chat::{CompactionRow, ConversationRow, MessageRow};
 pub use columns::EnumColumn;
 pub use document::DocumentRow;
 pub use download::DownloadRow;

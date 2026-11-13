@@ -805,6 +805,34 @@ fn assistant(text: &str, thought: &str, expanded: bool, width: usize) -> Vec<Lin
     lines
 }
 
+fn recap(text: &str, width: usize) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::from(Span::styled(
+        format!("  ≡ {}", copy::RECAP_LABEL),
+        theme::muted().add_modifier(Modifier::BOLD),
+    ))];
+    for paragraph in text.lines().filter(|line| !line.trim().is_empty()) {
+        for piece in wrap(paragraph.trim(), width.saturating_sub(6).max(8)) {
+            lines.push(Line::from(vec![
+                Span::styled("    ", theme::muted()),
+                Span::styled(piece, theme::muted()),
+            ]));
+        }
+    }
+    lines
+}
+
+fn compaction_mark(text: &str, width: usize) -> Vec<Line<'static>> {
+    let room = width.saturating_sub(4).max(8);
+    let label = format!(" {text} ");
+    let used = label.chars().count().min(room);
+    let side = room.saturating_sub(used) / 2;
+    vec![Line::from(vec![
+        Span::styled(format!("  {}", "─".repeat(side)), theme::faint()),
+        Span::styled(label, theme::muted()),
+        Span::styled("─".repeat(room.saturating_sub(used + side)), theme::faint()),
+    ])]
+}
+
 fn notice(tone: Tone, text: &str, width: usize) -> Vec<Line<'static>> {
     let (icon, color) = match tone {
         Tone::Info => ("ⓘ", theme::colors().muted),
@@ -871,6 +899,8 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             }
             Entry::Tool(call) => tool(call, expanded, app.frame, width),
             Entry::Notice { tone, text } => notice(*tone, text, width),
+            Entry::Recap(text) => recap(text, width),
+            Entry::Compaction(text) => compaction_mark(text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
             Entry::Server(detail) => server_card(detail, expanded, &toggle, width),
         });
@@ -903,8 +933,23 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
         let seconds = app.frame.saturating_sub(app.started) / TICKS_PER_SECOND;
         let label = if app.cancelling {
             copy::CANCELLING
+        } else if app.auto_compacting {
+            copy::COMPACTING
         } else {
             copy::WORKING
+        };
+        lines.push(Line::default());
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {} ", spinner(app.frame)), theme::accent()),
+            Span::styled(label, theme::accent().add_modifier(Modifier::ITALIC)),
+            Span::styled(format!(" · {seconds} с · Esc"), theme::faint()),
+        ]));
+    } else if app.compacting {
+        let seconds = app.frame.saturating_sub(app.started) / TICKS_PER_SECOND;
+        let label = if app.cancelling {
+            copy::CANCELLING
+        } else {
+            copy::COMPACTING
         };
         lines.push(Line::default());
         lines.push(Line::from(vec![

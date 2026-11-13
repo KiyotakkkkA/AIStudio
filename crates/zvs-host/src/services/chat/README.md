@@ -12,6 +12,7 @@ pieces split out of `chat.rs`: the message queue, ended-process wake-ups, and su
 | `chat/queue.rs`                                                    | Messages queued while a turn runs: add, edit, remove, flush                                  |
 | `chat/wake.rs`                                                     | Continuing the conversation when a `notify` background process ends                          |
 | `chat/subagent.rs`                                                 | Delegated runs (`agent.delegate`): presets, budgets, report back                             |
+| `chat/compact.rs`                                                  | Compaction (`/compact`, automatic), the summarizer, recaps, the `chat.compact/recap` nodes   |
 | `chat_prompt.rs`                                                   | `PromptParts`: the system prompt assembled from dialog, profile, memory, knowledge, tools, … |
 | `chat_history.rs`                                                  | `window_chat_history`: fits sources and history into the context window                      |
 | `chat_carry.rs`                                                    | Carrying earlier answers' tool results, sources and reasoning into later turns               |
@@ -50,6 +51,33 @@ send ─► store user message + run row (one transaction)
    recovery marks the turn `interrupted` and never repeats it.
 5. **Persist.** Final content, reasoning, tool calls, citations and usage; the conversation
    title is derived after the first answer.
+
+## Compaction and recaps (`chat/compact.rs`)
+
+- **View.** `compacted_view(messages, compactions)` replaces every message up to the newest
+  compaction's boundary with one user message (`SUMMARY_HEADING` + the summary). The prepare
+  step, the context meter and the stats page all read history through it; the stats page
+  lists the covered messages as `compacted`.
+- **Manual.** `ChatService::compact` checks the dialog (idle, no running goal, at least two new
+  messages and 200 tokens), marks it compacting in memory (so `require_idle`, `attach` and
+  `cancel` treat the job like a turn) and starts a `job` run with one `chat.compact` node.
+- **Summarizer.** `Inner::summarizers` lists the usable models of the preference, then the
+  dialog's model. `with_summarizer` tries them in order and stops on cancellation. Input is
+  rendered as `User:`/`Assistant:` entries with tool calls clipped; history longer than the
+  summarizer's window is folded chunk by chunk into a rolling summary. A reply cut off by the
+  output limit, an empty one, an oversized one or one that does not shrink the history is a
+  failure.
+- **Commit.** `compact_conversation` writes the `chat_compaction` row in one transaction after
+  re-checking that the boundary message exists and the newest compaction did not change; the
+  cancellation token is checked right before it. Nothing else is written, so a stopped or
+  failed compaction leaves the dialog as it was.
+- **Automatic.** `PrepareNode::auto_compact` compacts everything before the request when the
+  estimate passes 80 % of the budget; failures are logged and trimming takes over.
+  `ChatCompactor` (a `LoopCompactor`) does the same inside the tool loop, in memory only, and
+  keeps the request and the latest assistant round with its tool results.
+- **Recaps.** The turn observer calls `Waker::recap` on an `ok` end; `schedule_recap` starts a
+  `chat.recap` `job` run for an assistant message with tool calls (or a goal turn) when the
+  preference is on. The node writes `message.recap` once and emits `ChatRecapStepDto`.
 
 ## Context window (`window_chat_history`)
 

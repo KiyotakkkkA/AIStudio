@@ -9,6 +9,7 @@ use zvs_contract::{
     WebSourceDto, log_line,
 };
 
+use super::chat::compact::over_threshold;
 use super::chat::subagent::concurrent_delegate;
 use super::chat::{
     BUDGET_EXHAUSTED, GenerateChatNode, KNOWLEDGE_COMPACTED, QUEUE_YIELDED, RoundOutput,
@@ -111,6 +112,23 @@ pub(crate) trait RoundHook: Send + Sync {
     }
 }
 
+#[async_trait]
+pub(crate) trait LoopCompactor: Send + Sync {
+    fn enabled(&self) -> bool;
+
+    async fn compact(&self, context: &StepContext, messages: &[ChatMessage]) -> Option<String>;
+}
+
+pub(crate) fn loop_split(messages: &[ChatMessage], head: usize) -> Option<usize> {
+    if head == 0 || head > messages.len() {
+        return None;
+    }
+    let keep = (head..messages.len()).rev().find(|index| {
+        messages[*index].role == ChatRole::Assistant && !messages[*index].tool_calls.is_empty()
+    })?;
+    (head - 1 > 0 || keep > head).then_some(keep)
+}
+
 pub(crate) struct ChatTurn;
 
 impl RoundHook for ChatTurn {}
@@ -165,6 +183,7 @@ pub(crate) struct ToolLoop<'a> {
     pub(crate) context_budget: i64,
     pub(crate) host: &'a dyn LoopHost,
     pub(crate) hook: &'a dyn RoundHook,
+    pub(crate) compactor: Option<&'a dyn LoopCompactor>,
 }
 
 pub(crate) struct Compactable {
@@ -320,6 +339,7 @@ impl ToolLoop<'_> {
             context_budget,
             host,
             hook,
+            compactor,
         } = self;
         if let Some((_, _, supported)) = host.image_loader() {
             crate::images::configure_tools(&mut offered, supported);
@@ -334,6 +354,7 @@ impl ToolLoop<'_> {
         }
         let mut specs = tool_specs(&offered);
         let mut messages = template.messages.clone();
+        let mut head = messages.len();
         let mut compactable: Vec<Compactable> = Vec::new();
         let loading: Mutex<Vec<String>> = Mutex::new(Vec::new());
         let mut executed = 0;
@@ -357,6 +378,31 @@ impl ToolLoop<'_> {
             let overhead = tokens(template.system.as_deref().unwrap_or_default())
                 + tokens(&tool_specs_json(&offered));
             let room = context_budget.saturating_sub(overhead);
+            if round > 0
+                && let Some(compactor) = compactor.filter(|compactor| compactor.enabled())
+                && over_threshold(messages_cost(&messages), room)
+                && let Some(keep) = loop_split(&messages, head)
+            {
+                let request = head - 1;
+                let earlier: Vec<ChatMessage> = messages[..request]
+                    .iter()
+                    .chain(&messages[head..keep])
+                    .cloned()
+                    .collect();
+                if let Some(summary) = compactor.compact(context, &earlier).await {
+                    context.check_cancelled()?;
+                    let mut rebuilt = Vec::with_capacity(messages.len() - keep + 2);
+                    rebuilt.push(ChatMessage::user(summary));
+                    rebuilt.push(messages[request].clone());
+                    rebuilt.extend(messages[keep..].iter().cloned());
+                    compactable.retain(|entry| entry.index >= keep);
+                    for entry in &mut compactable {
+                        entry.index = entry.index - keep + 2;
+                    }
+                    messages = rebuilt;
+                    head = 2;
+                }
+            }
             let compacted = compact_knowledge(&mut messages, &mut compactable, round, room);
             if compacted > 0 {
                 context.emit(HostEventDraft::Log {
@@ -604,5 +650,31 @@ mod tests {
         assert_eq!(messages[0].content, skill);
         assert_eq!(messages[1].content, SHED_RESULT);
         assert_eq!(messages[2].content, SHED_RESULT);
+    }
+
+    fn called(id: &str) -> ChatMessage {
+        ChatMessage::assistant(String::new()).with_tool_calls(vec![ToolCall {
+            id: id.to_owned(),
+            name: "fs__read".to_owned(),
+            arguments: "{}".to_owned(),
+        }])
+    }
+
+    #[test]
+    fn the_loop_keeps_the_request_and_the_latest_round_when_it_compacts() {
+        let messages = vec![
+            ChatMessage::user("earlier"),
+            ChatMessage::assistant("earlier answer"),
+            ChatMessage::user("request"),
+            called("1"),
+            ChatMessage::tool("1", "first"),
+            called("2"),
+            ChatMessage::tool("2", "second"),
+        ];
+        assert_eq!(loop_split(&messages, 3), Some(5));
+        assert_eq!(loop_split(&messages[..5], 3), Some(3));
+        assert_eq!(loop_split(&messages[2..5], 1), None);
+        assert_eq!(loop_split(&messages[..3], 3), None);
+        assert_eq!(loop_split(&messages, 0), None);
     }
 }

@@ -764,6 +764,7 @@ impl PlainNode for SubagentNode {
             context_budget: input.context_budget,
             host: &host,
             hook: &hook,
+            compactor: None,
         }
         .run(context, &calls, &mut out)
         .await?;

@@ -497,3 +497,28 @@ pub const STORE_KIND: &str = "хранилище";
 
 pub const GOAL_STEP_QUEUED: &str = "ожидает";
 pub const GOAL_STEP_DONE: &str = "завершён";
+
+pub const CMD_COMPACT: &str = "Сжать диалог: [указания для сводки]";
+pub const CMD_CONFIG: &str = "Настройки";
+pub const COMPACTING: &str = "Сжатие диалога";
+pub const COMPACT_NO_CONVERSATION: &str = "Нет диалога для сжатия";
+pub const COMPACT_DONE: &str = "Диалог сжат";
+pub const AUTO_COMPACTED: &str = "Контекст сжат автоматически";
+pub const COMPACTION_MARK: &str = "Предыдущие сообщения сжаты";
+pub const RECAP_LABEL: &str = "Итог";
+pub const CONFIG_TITLE: &str = "Настройки";
+pub const TAB_CONVERSATIONS: &str = "Диалоги";
+pub const TAB_GENERAL: &str = "Общие";
+pub const CONFIG_AUTO_COMPACT: &str = "Автоматическое сжатие";
+pub const CONFIG_AUTO_COMPACT_HINT: &str =
+    "Сжатие диалога при заполнении более 80 % доступного контекста";
+pub const CONFIG_RECAPS: &str = "Краткие итоги";
+pub const CONFIG_RECAPS_HINT: &str =
+    "Краткие итоги запросов с вызовами инструментов или в режиме цели";
+pub const CONFIG_AUTO_COPY: &str = "Автоматическое копирование выделенного текста";
+pub const CONFIG_AUTO_COPY_HINT: &str =
+    "Копирование выделенного мышью текста при отпускании кнопки";
+pub const CONFIG_ON: &str = "Включено";
+pub const CONFIG_OFF: &str = "Выключено";
+pub const SELECTION_HINT: &str = "Ctrl+C — копировать выделение, Esc — снять выделение";
+pub const PREFERENCES_SAVE_FAILED: &str = "Не удалось сохранить настройки консольной версии";

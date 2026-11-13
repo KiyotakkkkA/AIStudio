@@ -1,0 +1,72 @@
+[
+  {
+    "name": "duplicate model",
+    "value": {
+      "autoCompact": true,
+      "recaps": true,
+      "summarizerModels": [
+        {
+          "providerId": "0199aa11-1111-7111-8111-111111111111",
+          "modelId": "a"
+        },
+        {
+          "providerId": "0199aa11-1111-7111-8111-111111111111",
+          "modelId": "a"
+        }
+      ]
+    }
+  },
+  {
+    "name": "too many models",
+    "value": {
+      "autoCompact": true,
+      "recaps": true,
+      "summarizerModels": [
+        {
+          "providerId": "p",
+          "modelId": "a"
+        },
+        {
+          "providerId": "p",
+          "modelId": "b"
+        },
+        {
+          "providerId": "p",
+          "modelId": "c"
+        },
+        {
+          "providerId": "p",
+          "modelId": "d"
+        },
+        {
+          "providerId": "p",
+          "modelId": "e"
+        },
+        {
+          "providerId": "p",
+          "modelId": "f"
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty model id",
+    "value": {
+      "autoCompact": true,
+      "recaps": true,
+      "summarizerModels": [
+        {
+          "providerId": "p",
+          "modelId": ""
+        }
+      ]
+    }
+  },
+  {
+    "name": "missing toggle",
+    "value": {
+      "recaps": true,
+      "summarizerModels": []
+    }
+  }
+]

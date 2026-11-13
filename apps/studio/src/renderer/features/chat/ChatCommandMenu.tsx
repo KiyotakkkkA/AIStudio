@@ -3,7 +3,13 @@ import Icon from "../../ui/atoms/Icon";
 import PluginMark from "../plugins/PluginMark";
 import { accountMark } from "../plugins/signInTypes";
 import type ChatStore from "./ChatStore";
-import { ACCOUNTS_LABEL, COMMANDS_LABEL, commandMark, type MenuEntry } from "./chatCommands";
+import {
+  ACCOUNTS_LABEL,
+  ACTION_MARK,
+  COMMANDS_LABEL,
+  commandMark,
+  type MenuEntry,
+} from "./chatCommands";
 
 export const COMMAND_MENU_ID = "chat-command-menu";
 
@@ -12,13 +18,16 @@ export function commandOptionId(index: number): string {
 }
 
 function EntryMark({ entry }: { readonly entry: MenuEntry }) {
-  if (entry.type === "command") {
+  if (entry.type === "command" || entry.type === "action") {
     return (
       <span
         aria-hidden="true"
         className="flex size-4.5 flex-none items-center justify-center text-main-400"
       >
-        <Icon path={commandMark(entry.command)} size={14} />
+        <Icon
+          path={entry.type === "command" ? commandMark(entry.command) : ACTION_MARK}
+          size={14}
+        />
       </span>
     );
   }

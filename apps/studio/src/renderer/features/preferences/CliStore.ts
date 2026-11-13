@@ -3,6 +3,8 @@ import type { IpcClient } from "@zvs/ipc";
 import type { CliInstallDto, CliTheme, Contract } from "@zvs/shared";
 import {
   CLI_NEW_TERMINAL,
+  CLI_PREFERENCES_LOAD_FAILED,
+  CLI_PREFERENCES_SAVE_FAILED,
   CLI_REMOVED,
   CLI_STATUS_FAILED,
   CLI_THEME_LOAD_FAILED,
@@ -17,15 +19,18 @@ export default class CliStore {
   notice: string | null = null;
   theme: CliTheme | null = null;
   themeError: string | null = null;
+  autoCopy: boolean | null = null;
+  preferencesError: string | null = null;
   private themeRequest = 0;
+  private preferencesRequest = 0;
 
   constructor(
     private readonly ipc: IpcClient<Contract>,
     private readonly onInstalled: () => Promise<void> = async () => {},
   ) {
-    makeAutoObservable<CliStore, "ipc" | "onInstalled" | "themeRequest">(
+    makeAutoObservable<CliStore, "ipc" | "onInstalled" | "themeRequest" | "preferencesRequest">(
       this,
-      { ipc: false, onInstalled: false, themeRequest: false },
+      { ipc: false, onInstalled: false, themeRequest: false, preferencesRequest: false },
       { autoBind: true },
     );
   }
@@ -39,7 +44,42 @@ export default class CliStore {
   }
 
   async load() {
-    await Promise.all([this.loadStatus(), this.loadTheme()]);
+    await Promise.all([this.loadStatus(), this.loadTheme(), this.loadPreferences()]);
+  }
+
+  async setAutoCopy(autoCopy: boolean) {
+    if (autoCopy === this.autoCopy) return;
+    const previous = this.autoCopy;
+    const request = ++this.preferencesRequest;
+    this.autoCopy = autoCopy;
+    this.preferencesError = null;
+    try {
+      const saved = await this.ipc.call("cli.preferences.set", { autoCopy });
+      runInAction(() => {
+        if (request === this.preferencesRequest) this.autoCopy = saved.autoCopy;
+      });
+    } catch {
+      runInAction(() => {
+        if (request !== this.preferencesRequest) return;
+        this.autoCopy = previous;
+        this.preferencesError = CLI_PREFERENCES_SAVE_FAILED;
+      });
+    }
+  }
+
+  private async loadPreferences() {
+    const request = this.preferencesRequest;
+    try {
+      const { autoCopy } = await this.ipc.call("cli.preferences.get", undefined);
+      runInAction(() => {
+        if (request === this.preferencesRequest) this.autoCopy = autoCopy;
+      });
+    } catch {
+      runInAction(() => {
+        if (request === this.preferencesRequest)
+          this.preferencesError = CLI_PREFERENCES_LOAD_FAILED;
+      });
+    }
   }
 
   async setTheme(theme: CliTheme) {

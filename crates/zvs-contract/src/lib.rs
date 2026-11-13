@@ -3,6 +3,7 @@ pub mod accounts;
 pub mod agentic;
 pub mod ai;
 pub mod artifacts;
+pub mod assistant;
 pub mod browser;
 pub mod browser_data;
 pub mod browser_extensions;
@@ -12,6 +13,7 @@ pub mod browser_sites;
 pub mod channels;
 pub mod chat;
 pub mod cli;
+pub mod compaction;
 pub mod computer;
 pub mod documents;
 pub mod downloads;
@@ -87,6 +89,10 @@ pub use artifacts::{
     GalleryItemDto, GalleryKind, GalleryListDto, GalleryThumbnailDto, InstalledBrowserDto,
     OpenArtifactInBrowserInput,
 };
+pub use assistant::{
+    AUTO_COMPACT_PERCENT, AssistantPreferencesDto, SUMMARIZER_MODEL_ID_MAX, SUMMARIZER_MODELS_MAX,
+    SummarizerModelDto,
+};
 pub use browser::{
     BrowserActionState, BrowserAgentAction, BrowserAgentApproval, BrowserAgentState,
     BrowserAgentStatus, BrowserAppearance, BrowserAuthorisation, BrowserBookmarkLink,
@@ -130,10 +136,16 @@ pub use chat::{
 };
 pub use cli::{
     CLI_COMMAND, CLI_CONFIRM_SETTING_KEY, CLI_IMAGE_MAX, CLI_LAUNCH_ARG, CLI_LINE_MAX,
-    CLI_PIPE_PREFIX, CLI_PROTOCOL_VERSION, CLI_STEP_DOMAIN, CLI_THEME_FILE, CliChangeDto,
-    CliClientMessage, CliConnectionDto, CliConnectionRef, CliConsentAnswerInput, CliConsentDto,
-    CliInstallDto, CliNotice, CliOpenInput, CliServerMessage, CliSessionDto, CliTheme, CliThemeDto,
-    cli_pipe_name,
+    CLI_PIPE_PREFIX, CLI_PREFERENCES_FILE, CLI_PROTOCOL_VERSION, CLI_STEP_DOMAIN, CLI_THEME_FILE,
+    CliChangeDto, CliClientMessage, CliConnectionDto, CliConnectionRef, CliConsentAnswerInput,
+    CliConsentDto, CliInstallDto, CliNotice, CliOpenInput, CliPreferencesDto, CliServerMessage,
+    CliSessionDto, CliTheme, CliThemeDto, cli_pipe_name,
+};
+pub use compaction::{
+    COMPACT_INSTRUCTIONS_MAX, COMPACT_MODEL_ID_MAX, COMPACT_SUMMARY_MAX, COMPACTION_STEP_DOMAIN,
+    ChatCompactInput, ChatCompactionDto, ChatCompactionRef, ChatCompactionStepDto,
+    ChatRecapStepDto, CompactionPhase, CompactionTrigger, RECAP_MAX, RECAP_STEP_DOMAIN,
+    check_recap,
 };
 pub use computer::{
     APPS_APPROVAL_KIND, AddAppGrantInput, AnswerAppRequestInput, AppGrantDto, AppGrantRef,

@@ -1,6 +1,10 @@
 import { makeAutoObservable, reaction, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import {
+  ChatCompactionStepDto,
+  ChatRecapStepDto,
+  COMPACTION_STEP_DOMAIN,
+  RECAP_STEP_DOMAIN,
   ChatWakeStepDto,
   IMAGES_MAX,
   type ImageAttachmentDto,
@@ -71,7 +75,13 @@ import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
 import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
-import { menuEntries, parseCommands, withoutSlashToken, type MenuEntry } from "./chatCommands";
+import {
+  menuEntries,
+  parseAction,
+  parseCommands,
+  withoutSlashToken,
+  type MenuEntry,
+} from "./chatCommands";
 import GoalStore from "./GoalStore";
 import QueueStore from "./QueueStore";
 import SubagentSteps, { subagentLabel, type SubagentLabel } from "./SubagentSteps";
@@ -130,6 +140,10 @@ export default class ChatStore {
   artifactTarget: { messageId: MessageId; artifactId: string; nonce: number } | null = null;
   loading = false;
   sending = false;
+  compacting = false;
+  autoCompacting = false;
+  compactionEnded = false;
+  undoingCompaction = false;
   pickingImages = false;
   private retryImages: ImageAttachmentDto[] = [];
   branching = false;
@@ -569,7 +583,81 @@ export default class ChatStore {
       text: this.composer.text,
       picking: this.pickingPlugin,
       vision: this.supportsImages,
+      compactable: this.canCompact,
     });
+  }
+  get canCompact(): boolean {
+    return (
+      this.available &&
+      !this.loading &&
+      !this.generating &&
+      !this.goals.active &&
+      this.active !== null &&
+      this.active.messages.length >= 2
+    );
+  }
+  async compact(focus = "") {
+    const id = this.active?.id;
+    if (id === undefined || !this.canCompact) return;
+    this.sending = true;
+    this.compacting = true;
+    this.compactionEnded = false;
+    this.error = null;
+    this.outcome = null;
+    this.runStartedAt = Date.now();
+    try {
+      const run = await this.ipc.call(
+        "chat.compact",
+        focus.length > 0 ? { conversationId: id, instructions: focus } : { conversationId: id },
+      );
+      runInAction(() => {
+        this.run = run;
+        this.lastSeq = -1;
+        this.sending = false;
+        this.composer.setText("");
+        if (this.mounted) this.subscribe();
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+        this.sending = false;
+        this.compacting = false;
+        this.runStartedAt = null;
+      });
+    }
+  }
+  async undoCompaction(compactionId: string) {
+    const id = this.active?.id;
+    if (id === undefined || this.generating || this.undoingCompaction) return;
+    this.undoingCompaction = true;
+    try {
+      const detail = await this.ipc.call("chat.compactions.undo", {
+        conversationId: id,
+        compactionId,
+      });
+      runInAction(() => {
+        if (this.active?.id === id) this.active = detail;
+      });
+    } catch (error) {
+      runInAction(() => {
+        this.error = errorCopy(error);
+      });
+    } finally {
+      runInAction(() => {
+        this.undoingCompaction = false;
+      });
+    }
+  }
+  private applyRecap(recap: ChatRecapStepDto) {
+    const active = this.active;
+    if (active === null || active.id !== recap.conversationId) return;
+    if (!active.messages.some((message) => message.id === recap.messageId)) return;
+    this.active = {
+      ...active,
+      messages: active.messages.map((message) =>
+        message.id === recap.messageId ? { ...message, recap: recap.recap } : message,
+      ),
+    };
   }
   get attachedPlugins(): IntegrationAccountDto[] {
     return this.composer.plugins.flatMap((id) => {
@@ -597,6 +685,10 @@ export default class ChatStore {
       return;
     }
     this.composer.setText(withoutSlashToken(this.composer.text));
+    if (entry.type === "action") {
+      void this.compact();
+      return;
+    }
     if (entry.type === "command") {
       this.composer.addCommand(entry.command);
       return;
@@ -986,6 +1078,7 @@ export default class ChatStore {
             this.contextInput,
             this.active?.goal?.status ?? null,
             this.active?.messages.length ?? 0,
+            this.active?.compactions.length ?? 0,
             this.active?.updatedAt ?? 0,
             this.generating,
             this.memoryTool(),
@@ -1220,6 +1313,11 @@ export default class ChatStore {
   }
 
   async send() {
+    const action = parseAction(this.composer.text);
+    if (action !== null && this.composer.commands.length === 0) {
+      if (this.canCompact) await this.compact(action.focus);
+      return;
+    }
     if (this.goalCommand && this.composer.text.trim().length === 0) {
       this.goalEmpty = true;
       return;
@@ -1307,7 +1405,7 @@ export default class ChatStore {
       retrievalMode: this.composer.retrievalMode,
     });
     runInAction(() => {
-      this.active = { ...conversation, messages: [] };
+      this.active = { ...conversation, messages: [], compactions: [] };
       this.remember(conversation.id);
       this.conversations.unshift(conversation);
     });
@@ -1648,6 +1746,8 @@ export default class ChatStore {
     this.questions = live.questions.map((request) => ({ request, busy: false }));
     this.outcome = null;
     this.stopping = false;
+    this.compacting = live.compacting;
+    this.autoCompacting = false;
     if (this.active)
       this.active = {
         ...this.active,
@@ -1658,6 +1758,11 @@ export default class ChatStore {
   }
 
   private observeWake(event: RoutedEvent) {
+    if (event.type === "step" && event.step.domain === RECAP_STEP_DOMAIN) {
+      const recap = ChatRecapStepDto.safeParse(event.step);
+      if (recap.success) this.applyRecap(recap.data);
+      return;
+    }
     if (event.type === "step" && event.step.domain === QUEUE_STEP_DOMAIN) {
       this.queue.apply(event.step);
       return;
@@ -1779,6 +1884,11 @@ export default class ChatStore {
       }
     }
     if (event.type === "step" && event.step.domain === "goal") this.goals.apply(event.step);
+    if (event.type === "step" && event.step.domain === COMPACTION_STEP_DOMAIN) {
+      const step = ChatCompactionStepDto.safeParse(event.step);
+      if (step.success && step.data.trigger === "auto")
+        this.autoCompacting = step.data.phase === "started";
+    }
     if (event.type === "step" && event.step.domain === "subagent") this.subagents.apply(event.step);
     if (event.type === "step" && event.step.domain === "tool-call") {
       const index = event.step.index;
@@ -1834,6 +1944,9 @@ export default class ChatStore {
 
   private end(outcome: RunOutcomeDto | null) {
     this.flush();
+    this.compactionEnded = this.compacting;
+    this.compacting = false;
+    this.autoCompacting = false;
     this.outcome = outcome?.status ?? null;
     if (outcome?.status === "failed") this.error = outcome.message ?? GENERATION_FAILED;
     this.unsubscribe?.();
