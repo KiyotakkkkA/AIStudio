@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use crate::shell::ShellState;
@@ -24,14 +24,17 @@ const RECOVERY_QUIT: &str = "/recovery/quit";
 const BOOT_PAGE: &str = "boot/index.html";
 const BOOT_REPORT_INTERVAL: Duration = Duration::from_millis(200);
 
-static SHELL_PROFILE: OnceLock<PathBuf> = OnceLock::new();
+static SHELL_PROFILE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 pub fn set_shell_profile(dir: PathBuf) {
-    let _ = SHELL_PROFILE.set(dir);
+    *SHELL_PROFILE.lock().unwrap_or_else(PoisonError::into_inner) = Some(dir);
 }
 
 pub fn shell_profile() -> Option<PathBuf> {
-    SHELL_PROFILE.get().cloned()
+    SHELL_PROFILE
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone()
 }
 
 struct Tracked<'a, R: Runtime> {

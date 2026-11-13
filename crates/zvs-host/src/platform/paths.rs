@@ -51,6 +51,7 @@ pub struct StudioPaths {
     pub temp_downloads_dir: PathBuf,
     pub staging_dir: PathBuf,
     pub runs_dir: PathBuf,
+    pub boot_profile_dir: PathBuf,
     pub logs_dir: PathBuf,
     pub streams_dir: PathBuf,
     pub backups_dir: PathBuf,
@@ -129,6 +130,7 @@ impl StudioPaths {
             temp_downloads_dir: temp.join("downloads"),
             staging_dir: temp.join("staging"),
             runs_dir: temp.join("runs"),
+            boot_profile_dir: temp.join("boot"),
             temp_dir: temp,
             streams_dir: logs.join("streams"),
             logs_dir: logs,
@@ -445,6 +447,8 @@ mod tests {
             root.join("temp").join("downloads")
         );
         assert_eq!(paths.runs_dir, root.join("temp").join("runs"));
+        assert_eq!(paths.boot_profile_dir, root.join("temp").join("boot"));
+        assert!(!paths.boot_profile_dir.starts_with(&paths.profiles_dir));
         assert_eq!(paths.streams_dir, root.join("logs").join("streams"));
         assert_eq!(paths.backups_dir, root.join("backups"));
         assert_eq!(paths.resources_dir, env.resource_dir);

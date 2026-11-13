@@ -98,7 +98,8 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 ├── temp/
 │   ├── downloads/<download-id>/
 │   ├── staging/
-│   └── runs/<run-id>/
+│   ├── runs/<run-id>/
+│   └── boot/
 ├── logs/
 │   └── streams/
 └── backups/
@@ -137,11 +138,12 @@ that store no files yet are added when they need them.
 | `assets/environments/computer` | The computer-use sidecar scripts and their environment.                                                                         |
 | `assets/extensions`            | Unpacked browser extensions; turning one off moves it from `enabled` to `disabled`.                                             |
 | `indexes/vectors`              | LanceDB vector stores. Rebuilding may need unavailable sources, time or paid requests.                                          |
-| `profiles/shell`               | WebView2 profile shared by the studio, recovery, boot, computer and browser-chrome webviews.                                    |
+| `profiles/shell`               | WebView2 profile shared by the studio, recovery, computer and browser-chrome webviews.                                          |
 | `profiles/browser/work`        | The integrated browser's work profile with the user's site sessions.                                                            |
 | `cache`                        | Files that can be deleted without loss: document representations, thumbnails, favicons, the capture profile, package caches.    |
 | `temp/downloads`               | Downloads in progress, one folder per download id, with resumable `.part` files.                                                |
 | `temp/runs`                    | Working folders of script runs without a conversation folder. Kept results are copied into the conversation's `outputs`.        |
+| `temp/boot`                    | WebView2 profile of the migration progress window, kept apart from `profiles/shell`, which the migration fills.                 |
 | `logs`                         | Rotated `studio.jsonl` files and dated stream logs under `logs/streams`.                                                        |
 | `backups`                      | Database snapshots taken before database migrations. A database snapshot is not a complete backup of user files.                |
 

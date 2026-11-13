@@ -232,18 +232,22 @@ fn boot_failure(
 
 fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let (paths, legacy) = resolve_paths(app)?;
-    window::set_shell_profile(paths.shell_profile_dir.clone());
     let boot = StateBoot::new(&paths.root, legacy.as_ref());
     let decision = match boot.inspect() {
         Ok(decision) => decision,
         Err(error) => {
+            window::set_shell_profile(paths.boot_profile_dir.clone());
             window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
             return Ok(());
         }
     };
     match decision {
-        BootDecision::Migrate(_) => migrate_then_launch(app, paths, legacy, decision),
+        BootDecision::Migrate(_) => {
+            window::set_shell_profile(paths.boot_profile_dir.clone());
+            migrate_then_launch(app, paths, legacy, decision)
+        }
         _ => {
+            window::set_shell_profile(paths.shell_profile_dir.clone());
             if let Err(error) = boot.run(&decision, SystemClock.now(), &|_| {}) {
                 window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
                 return Ok(());
@@ -281,10 +285,13 @@ fn migrate_then_launch(
             let handle = app.clone();
             let _ = app.run_on_main_thread(move || {
                 let failure = match outcome {
-                    Ok(()) => launch(&handle, paths).err().map(|error| MigrationFailed {
-                        message: error.to_string(),
-                        backups_dir: PathBuf::new(),
-                    }),
+                    Ok(()) => {
+                        window::set_shell_profile(paths.shell_profile_dir.clone());
+                        launch(&handle, paths).err().map(|error| MigrationFailed {
+                            message: error.to_string(),
+                            backups_dir: PathBuf::new(),
+                        })
+                    }
                     Err(error) => Some(boot_failure(&error, &paths, legacy.as_ref())),
                 };
                 if let Some(failure) = failure {
