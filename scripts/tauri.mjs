@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
 import { readAppEnv } from "./app-env.mjs";
+import { DEV_APP_VAR, takeDevApp } from "./dev-app.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const protocName = process.platform === "win32" ? "protoc.exe" : "protoc";
@@ -14,7 +15,11 @@ if (!process.env.PROTOC && localProtoc !== undefined) process.env.PROTOC = local
 
 const [command, ...passed] = process.argv.slice(2);
 if (command !== "dev" && command !== "build") throw new Error("Usage: tauri.mjs <dev|build> [...]");
-const rest = passed.filter((argument) => argument !== "--");
+const { app, rest } = takeDevApp(passed.filter((argument) => argument !== "--"));
+if (app !== undefined) {
+  if (command !== "dev") throw new Error("--app is available only with dev");
+  process.env[DEV_APP_VAR] = app;
+}
 const release = command === "build" && !rest.includes("--debug");
 const features = rest.flatMap((argument, index) => {
   if (argument.startsWith("--features=")) return argument.slice("--features=".length).split(",");

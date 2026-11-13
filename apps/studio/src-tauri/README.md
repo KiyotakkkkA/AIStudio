@@ -58,9 +58,10 @@ everything together in one composition root, `lib.rs::compose`.
 | `computer_command`, `computer_subscribe`, `computer_pointer` | the computer UI |
 
 Every command first checks `webview.label()` against the window it belongs to, so a page
-loaded in the built-in browser can never reach the host IPC. `ipc_call` handles two
-shell-only channels itself (`browser.mount`, `browser.hide`, which need window bounds) and
-passes everything else to `IpcServer::dispatch`, which validates input and returns the
+loaded in the built-in browser can never reach the host IPC. `ipc_call` handles the
+shell-only channels itself (`browser.mount`, `browser.hide`, which need window bounds, and
+`window.state`, `window.minimize`, `window.toggleMaximize`, `window.close`, `window.drag`,
+which drive the frameless studio window from its title bar) and passes everything else to `IpcServer::dispatch`, which validates input and returns the
 `{ ok, data | error }` envelope (PASSPORT §7). Events go to the renderer over a Tauri
 `Channel`.
 

@@ -22,6 +22,7 @@ pub const BOOT: &str = "boot";
 const RECOVERY_PAGE: &str = "recovery/index.html";
 const RECOVERY_QUIT: &str = "/recovery/quit";
 const BOOT_PAGE: &str = "boot/index.html";
+pub const BROWSER_ONLY_PAGE: &str = "index.html#/standalone/browser";
 const BOOT_REPORT_INTERVAL: Duration = Duration::from_millis(200);
 
 static SHELL_PROFILE: Mutex<Option<PathBuf>> = Mutex::new(None);
@@ -78,10 +79,11 @@ pub fn create_studio<R: Runtime>(
     app: &AppHandle<R>,
     state: WindowState,
     hidden: bool,
+    page: Option<&str>,
     shell: Arc<ShellState>,
     persist: impl Fn(WindowState) + Send + Sync + 'static,
 ) -> tauri::Result<()> {
-    let config = app
+    let mut config = app
         .config()
         .app
         .windows
@@ -89,6 +91,10 @@ pub fn create_studio<R: Runtime>(
         .find(|window| window.label == STUDIO)
         .cloned()
         .ok_or(tauri::Error::WindowNotFound)?;
+    if let Some(page) = page {
+        config.url = WebviewUrl::App(page.into());
+        config.decorations = true;
+    }
     let origin = app_origin(app, config.use_https_scheme);
     let shown = Arc::new(AtomicBool::new(hidden));
 
@@ -118,6 +124,9 @@ pub fn create_studio<R: Runtime>(
         })
         .build()?;
     window.set_background_color(Some(canvas_color(window.theme().unwrap_or(Theme::Light))))?;
+    if page.is_none() {
+        crate::studio_chrome::install(app);
+    }
 
     let normal = Arc::new(Mutex::new(
         normal_bounds(&window).unwrap_or_else(|| state.bounds.into()),
@@ -125,6 +134,9 @@ pub fn create_studio<R: Runtime>(
     let tracked = window.clone();
     window.on_window_event(move |event| match event {
         WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+            if matches!(event, WindowEvent::Resized(_)) {
+                crate::studio_chrome::refresh(tracked.app_handle());
+            }
             let window = tracked.clone();
             let normal = Arc::clone(&normal);
             tauri::async_runtime::spawn(async move {
@@ -135,6 +147,9 @@ pub fn create_studio<R: Runtime>(
                     }
                 });
             });
+        }
+        WindowEvent::ThemeChanged(_) | WindowEvent::Focused(_) => {
+            crate::studio_chrome::refresh(tracked.app_handle());
         }
         WindowEvent::CloseRequested { api, .. } => {
             let normal = *normal.lock().unwrap_or_else(PoisonError::into_inner);
@@ -189,14 +204,14 @@ pub fn create_recovery<R: Runtime>(
     Ok(())
 }
 
-pub fn create_boot<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+pub fn create_boot<R: Runtime>(app: &AppHandle<R>, closable: bool) -> tauri::Result<()> {
     let origin = app_origin(app, false);
     let mut builder = WebviewWindowBuilder::new(app, BOOT, WebviewUrl::App(BOOT_PAGE.into()))
         .title("ZVS AI Studio")
         .inner_size(520.0, 220.0)
         .resizable(false)
         .maximizable(false)
-        .closable(false)
+        .closable(closable)
         .on_navigation(move |url| {
             origin
                 .as_ref()

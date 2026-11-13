@@ -2,7 +2,7 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { createHashRouter, Navigate, type RouteObject } from "react-router-dom";
 import AppFrame from "./AppFrame";
 import RouteFallback from "./RouteFallback";
-import { DEFAULT_ROUTE, ROUTES } from "./routes";
+import { DEFAULT_ROUTE, ROUTES, STANDALONE_BROWSER_ROUTE } from "./routes";
 
 const SecretsPage = lazy(() => import("../pages/SecretsPage"));
 const ProvidersPage = lazy(() => import("../pages/ProvidersPage"));
@@ -21,6 +21,7 @@ const RunsPage = lazy(() => import("../pages/RunsPage"));
 const PermissionsPage = lazy(() => import("../pages/PermissionsPage"));
 const SettingsPage = lazy(() => import("../pages/SettingsPage"));
 const BrowserPage = lazy(() => import("../pages/BrowserPage"));
+const StandaloneBrowserPage = lazy(() => import("../pages/StandaloneBrowserPage"));
 
 const page = (path: string, Component: ComponentType): RouteObject => ({
   path,
@@ -32,6 +33,7 @@ const page = (path: string, Component: ComponentType): RouteObject => ({
 });
 
 const routes: RouteObject[] = [
+  page(STANDALONE_BROWSER_ROUTE, StandaloneBrowserPage),
   {
     path: "/",
     element: <AppFrame />,

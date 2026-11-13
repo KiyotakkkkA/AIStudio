@@ -20,6 +20,8 @@ export const ROUTES = {
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];
 
+export const STANDALONE_BROWSER_ROUTE = "/standalone/browser";
+
 export const DEFAULT_ROUTE: RoutePath = ROUTES.secrets;
 
 const KNOWN = new Set<string>(Object.values(ROUTES));

@@ -1,0 +1,11 @@
+export const TITLE_BAR_BACK = "Назад";
+export const TITLE_BAR_FORWARD = "Вперёд";
+export const TITLE_BAR_COLLAPSE_RAIL = "Свернуть панель навигации";
+export const TITLE_BAR_EXPAND_RAIL = "Развернуть панель навигации";
+export const TITLE_BAR_HELP = "Помощь";
+export const TITLE_BAR_LOGS = "Запуски и логи";
+export const TITLE_BAR_ABOUT = "О системе";
+export const WINDOW_MINIMIZE = "Свернуть";
+export const WINDOW_MAXIMIZE = "Развернуть";
+export const WINDOW_RESTORE = "Свернуть в окно";
+export const WINDOW_CLOSE = "Закрыть";

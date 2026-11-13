@@ -245,10 +245,10 @@ test("isolated browser, navigation, cookie management and restart persistence", 
   await expect
     .poll(() => reported<Size>("/", "size"))
     .toEqual({ width: panel.width, height: panel.height - 176, visible: "visible" });
-  await studio.locator("aside").getByRole("button", { name: "Свернуть панель навигации" }).click();
+  await studio.locator("header").getByRole("button", { name: "Свернуть панель навигации" }).click();
   await expect.poll(() => reported<Size>("/", "size")?.width).toBe(panel.width + 180);
   await studio
-    .locator("aside")
+    .locator("header")
     .getByRole("button", { name: "Развернуть панель навигации" })
     .click();
   await expect.poll(() => reported<Size>("/", "size")?.width).toBe(panel.width);

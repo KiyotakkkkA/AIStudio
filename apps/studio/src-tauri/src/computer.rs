@@ -125,6 +125,10 @@ impl ComputerShell {
         shell
     }
 
+    pub fn preview(&self) {
+        self.post(Work::Change(ComputerChange::Started));
+    }
+
     fn post(&self, work: Work) {
         let _ = lock(&self.0.work).send(work);
     }

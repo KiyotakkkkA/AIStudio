@@ -10,6 +10,7 @@
   },
   "include": [
     "src/renderer/**/*.ts",
+    "src/renderer/**/*.json",
     "src/renderer/**/*.tsx",
     "src/computer-ui/**/*.ts",
     "src/computer-ui/**/*.tsx",

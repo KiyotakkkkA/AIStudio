@@ -2,10 +2,12 @@ pub mod browser;
 mod cli;
 mod commands;
 mod computer;
+mod dev_app;
 mod e2e;
 mod picker;
 mod platform;
 mod shell;
+mod studio_chrome;
 mod theme;
 mod toast;
 mod window;
@@ -119,6 +121,7 @@ use crate::browser::{
     WorkspaceProfile, gateway_sessions, workspace_url_opener,
 };
 use crate::commands::Host;
+use crate::dev_app::DevApp;
 use crate::picker::DialogPicker;
 use crate::shell::{ShellState, TauriShell};
 use crate::theme::TauriTheme;
@@ -232,6 +235,21 @@ fn boot_failure(
 
 fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let (paths, legacy) = resolve_paths(app)?;
+    match DevApp::current() {
+        DevApp::Boot => {
+            window::set_shell_profile(paths.boot_profile_dir.clone());
+            window::create_boot(app, true)?;
+            dev_app::play_boot_preview(app.clone())?;
+            return Ok(());
+        }
+        DevApp::Recovery => {
+            window::set_shell_profile(paths.boot_profile_dir.clone());
+            let failure = boot_failure(&dev_app::recovery_preview(), &paths, legacy.as_ref());
+            window::create_recovery(app, &failure)?;
+            return Ok(());
+        }
+        DevApp::Studio | DevApp::Browser | DevApp::Computer => {}
+    }
     let boot = StateBoot::new(&paths.root, legacy.as_ref());
     let decision = match boot.inspect() {
         Ok(decision) => decision,
@@ -271,7 +289,7 @@ fn migrate_then_launch(
     legacy: Option<LegacySources>,
     decision: BootDecision,
 ) -> Result<(), Box<dyn Error>> {
-    window::create_boot(app)?;
+    window::create_boot(app, false)?;
     let app = app.clone();
     std::thread::Builder::new()
         .name("state-migration".to_owned())
@@ -319,13 +337,19 @@ fn launch(app: &AppHandle, paths: StudioPaths) -> Result<(), Box<dyn Error>> {
             let gateway = browser.gateway;
             #[cfg(feature = "e2e")]
             probe_gateway(Arc::clone(&gateway), logger.clone());
+            let launched = DevApp::current();
+            let overlay = browser.computer.clone();
             app.manage(browser.workspace);
             app.manage(browser.computer);
             app.manage(Arc::clone(&gateway));
             app.manage(browser.events);
             app.manage(host);
             app.manage(lifecycle);
-            window::create_studio(app, window, hidden, shell, move |state| {
+            let page = match launched {
+                DevApp::Browser => Some(window::BROWSER_ONLY_PAGE),
+                _ => None,
+            };
+            let persist = move |state: WindowState| {
                 let stored = serde_json::to_value(state)
                     .map_err(|error| error.to_string())
                     .and_then(|value| {
@@ -342,7 +366,12 @@ fn launch(app: &AppHandle, paths: StudioPaths) -> Result<(), Box<dyn Error>> {
                         &[("error", json!(error))],
                     );
                 }
-            })?;
+            };
+            if launched == DevApp::Computer {
+                overlay.preview();
+            } else {
+                window::create_studio(app, window, hidden, page, shell, persist)?;
+            }
             if let Ok(stored) = zoom_services.settings.get(FONT_SIZE_SETTING_KEY) {
                 apply_interface_zoom(
                     stored.map(|setting| setting.value).as_ref(),

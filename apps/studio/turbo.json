@@ -8,7 +8,7 @@
       "dependsOn": ["^build", "lint"]
     },
     "dev": {
-      "passThroughEnv": ["PROTOC"]
+      "passThroughEnv": ["PROTOC", "ZVS_DEV_APP"]
     },
     "package": {
       "passThroughEnv": ["PROTOC"]

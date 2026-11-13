@@ -43,6 +43,7 @@ impl<R: Runtime> TauriTheme<R> {
 impl<R: Runtime> ThemePort for TauriTheme<R> {
     fn apply(&self, source: ThemeSource) {
         self.0.set_theme(tauri_theme(source));
+        crate::studio_chrome::set_theme(&self.0, source);
         if let Some(workspace) = self.workspace() {
             workspace.set_theme(browser_theme(source));
         }
@@ -50,6 +51,7 @@ impl<R: Runtime> ThemePort for TauriTheme<R> {
     }
 
     fn palette(&self, mode: PaletteMode, id: &str) {
+        crate::studio_chrome::set_palette(&self.0, mode, id);
         if let Some(workspace) = self.workspace() {
             workspace.set_palette(mode, id);
         }

@@ -8,7 +8,7 @@
     "node": ">=26 <27"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node scripts/dev.mjs",
     "build": "turbo run build",
     "package": "turbo run package",
     "contract:channels": "node scripts/contract-channels.mjs",

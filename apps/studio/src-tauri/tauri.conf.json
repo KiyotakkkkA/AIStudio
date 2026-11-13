@@ -22,6 +22,7 @@
         "minWidth": 1100,
         "minHeight": 700,
         "maximized": true,
+        "decorations": false,
         "visible": false
       }
     ],

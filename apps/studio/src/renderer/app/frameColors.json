@@ -1,0 +1,70 @@
+{
+  "dark": {
+    "zvs-dark": {
+      "frame": "#0f0d0b",
+      "ink": "#f7f1e8"
+    },
+    "basic-grey": {
+      "frame": "#111111",
+      "ink": "#ffffff"
+    },
+    "github-dark": {
+      "frame": "#010409",
+      "ink": "#f0f6fc"
+    },
+    "one-dark": {
+      "frame": "#21252b",
+      "ink": "#d7dae0"
+    },
+    "dracula": {
+      "frame": "#191a21",
+      "ink": "#ffffff"
+    },
+    "nord": {
+      "frame": "#242933",
+      "ink": "#eceff4"
+    },
+    "catppuccin-mocha": {
+      "frame": "#11111b",
+      "ink": "#e2e8fb"
+    },
+    "tokyo-night": {
+      "frame": "#16161e",
+      "ink": "#dfe3f7"
+    },
+    "gruvbox-dark": {
+      "frame": "#1d2021",
+      "ink": "#fbf1c7"
+    }
+  },
+  "light": {
+    "zvs-light": {
+      "frame": "#ece6dd",
+      "ink": "#1e1915"
+    },
+    "basic-white": {
+      "frame": "#f2f2f2",
+      "ink": "#0a0a0a"
+    },
+    "github-light": {
+      "frame": "#e9edf1",
+      "ink": "#0d1117"
+    },
+    "one-light": {
+      "frame": "#e5e5e6",
+      "ink": "#202227"
+    },
+    "catppuccin-latte": {
+      "frame": "#dce0e8",
+      "ink": "#303246"
+    },
+    "solarized-light": {
+      "frame": "#eee8d5",
+      "ink": "#073642"
+    },
+    "gruvbox-light": {
+      "frame": "#ebdbb2",
+      "ink": "#282828"
+    }
+  }
+}

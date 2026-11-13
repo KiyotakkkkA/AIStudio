@@ -12,6 +12,7 @@ import { ConversationId, HostEvent, NAVIGATION_STEP_DOMAIN } from "@zvs/shared";
 import { ROUTES } from "./routes";
 import { FxContext } from "../ui/motion/fx";
 import CliConsentModal from "../features/preferences/CliConsentModal";
+import StudioTitleBar from "./StudioTitleBar";
 
 function AppFrame() {
   const { ui, chat, appSettings, browserSettings, cliAccess } = useStore();
@@ -88,6 +89,14 @@ function AppFrame() {
     <FxContext value={fx}>
       <MotionConfig reducedMotion={ui.motion === "none" ? "always" : "never"}>
         <AppShell
+          header={
+            <StudioTitleBar
+              railCollapsed={ui.railCollapsed}
+              onToggleRail={ui.toggleRail}
+              onAbout={() => ui.openPreferences("about")}
+              onLogs={() => navigation.go(ROUTES.runs)}
+            />
+          }
           rail={
             <NavRail
               groups={visibleNavGroups(browserSettings.enabled)}
@@ -97,7 +106,6 @@ function AppFrame() {
               themePicker={ui.railThemePicker}
               isActive={isActive}
               onSelect={select}
-              onToggleCollapse={ui.toggleRail}
               onThemeChange={ui.setTheme}
             />
           }

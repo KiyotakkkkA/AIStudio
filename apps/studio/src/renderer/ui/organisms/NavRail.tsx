@@ -1,8 +1,7 @@
-import { mdiDockLeft, mdiMonitor, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
+import { mdiMonitor, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
-import IconButton from "../atoms/buttons/IconButton";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
 
@@ -20,11 +19,8 @@ export interface NavRailProps {
   readonly themePicker: boolean;
   readonly isActive: (item: NavItemModel) => boolean;
   readonly onSelect: (item: NavItemModel) => void;
-  readonly onToggleCollapse: () => void;
   readonly onThemeChange: (theme: RailTheme) => void;
 }
-
-const RAIL_ICON_TONE = "text-main-500 hover:bg-main-900/70 hover:text-main-100";
 
 export default function NavRail({
   groups,
@@ -34,7 +30,6 @@ export default function NavRail({
   themePicker,
   isActive,
   onSelect,
-  onToggleCollapse,
   onThemeChange,
 }: NavRailProps) {
   return (
@@ -50,19 +45,9 @@ export default function NavRail({
       >
         <AppLogo size={32} className="drop-shadow-[0_2px_6px_rgb(180_80_20/0.25)]" />
         {collapsed ? null : (
-          <>
-            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
-              ZVS AI Studio
-            </span>
-            <IconButton
-              label="Свернуть панель навигации"
-              tooltip="bottom-center"
-              path={mdiDockLeft}
-              iconSize={16}
-              toneClassName={RAIL_ICON_TONE}
-              onClick={onToggleCollapse}
-            />
-          </>
+          <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
+            ZVS AI Studio
+          </span>
         )}
       </div>
 
@@ -144,18 +129,6 @@ export default function NavRail({
             </>
           )}
         </div>
-
-        {collapsed ? (
-          <IconButton
-            label="Развернуть панель навигации"
-            tooltip="right-center"
-            path={mdiDockLeft}
-            iconSize={16}
-            toneClassName={RAIL_ICON_TONE}
-            className="rotate-180"
-            onClick={onToggleCollapse}
-          />
-        ) : null}
       </div>
     </aside>
   );

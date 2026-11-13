@@ -19,6 +19,7 @@ with `#![allow(unsafe_code)]` (the only other opt-in in the shell is one functio
 | `Toaster` (shell)    | `toast::WindowsToaster`       | WinRT toast notifications with an app id, icon and activation callback                          |
 | browser site hooks   | `webview2.rs`                 | WebView2 COM: navigation filtering, load failures, cookies, history, request sightings, corners |
 | computer-use overlay | `overlay.rs`                  | Capture-excluded, non-activating overlay windows; pointer state; Shift+Esc stop key             |
+| Studio caption       | `chrome.rs`                   | Native caption icon suppression and palette-matched DWM caption colors (Windows 11+)            |
 | installed browsers   | `browsers.rs`                 | `SOFTWARE\Clients\StartMenuInternet` under HKCU and HKLM                                        |
 
 ## Notes per adapter

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use tauri::ipc::Channel;
-use tauri::{Manager, Runtime, State, Webview};
+use tauri::{Manager, Runtime, State, Webview, Window};
 use zvs_contract::{
     BrowserBounds, BrowserCommand, BrowserState, ComputerCommand, ComputerPointer, ComputerState,
     HostEvent, parse,
@@ -17,6 +17,11 @@ use crate::window::STUDIO;
 
 pub const BROWSER_MOUNT: &str = "browser.mount";
 pub const BROWSER_HIDE: &str = "browser.hide";
+pub const WINDOW_STATE: &str = "window.state";
+pub const WINDOW_MINIMIZE: &str = "window.minimize";
+pub const WINDOW_TOGGLE_MAXIMIZE: &str = "window.toggleMaximize";
+pub const WINDOW_CLOSE: &str = "window.close";
+pub const WINDOW_DRAG: &str = "window.drag";
 const INVALID_BOUNDS: &str = "Invalid browser bounds";
 const INVALID_COMMAND: &str = "Invalid browser command";
 const NO_WORKSPACE: &str = "The browser workspace is unavailable";
@@ -82,6 +87,64 @@ async fn browser_channel<R: Runtime>(
     Some(result.map(|()| Value::Null))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WindowAction {
+    State,
+    Minimize,
+    ToggleMaximize,
+    Close,
+    Drag,
+}
+
+impl WindowAction {
+    fn parse(channel: &str) -> Option<Self> {
+        match channel {
+            WINDOW_STATE => Some(Self::State),
+            WINDOW_MINIMIZE => Some(Self::Minimize),
+            WINDOW_TOGGLE_MAXIMIZE => Some(Self::ToggleMaximize),
+            WINDOW_CLOSE => Some(Self::Close),
+            WINDOW_DRAG => Some(Self::Drag),
+            _ => None,
+        }
+    }
+}
+
+fn apply_window<R: Runtime>(window: &Window<R>, action: WindowAction) -> tauri::Result<Value> {
+    let maximized = window.is_maximized()?;
+    let maximized = match action {
+        WindowAction::State => maximized,
+        WindowAction::Minimize => {
+            window.minimize()?;
+            maximized
+        }
+        WindowAction::ToggleMaximize => {
+            if maximized {
+                window.unmaximize()?;
+            } else {
+                window.maximize()?;
+            }
+            !maximized
+        }
+        WindowAction::Close => {
+            window.close()?;
+            maximized
+        }
+        WindowAction::Drag => {
+            window.start_dragging()?;
+            maximized
+        }
+    };
+    Ok(json!({ "maximized": maximized }))
+}
+
+fn window_channel<R: Runtime>(
+    webview: &Webview<R>,
+    channel: &str,
+) -> Option<Result<Value, String>> {
+    let action = WindowAction::parse(channel)?;
+    Some(apply_window(&webview.window(), action).map_err(|error| error.to_string()))
+}
+
 #[tauri::command]
 pub async fn ipc_call<R: Runtime>(
     webview: Webview<R>,
@@ -92,6 +155,9 @@ pub async fn ipc_call<R: Runtime>(
     ensure(webview.label(), STUDIO)?;
     let payload = payload.unwrap_or(Value::Null);
     if let Some(result) = browser_channel(&webview, &channel, payload.clone()).await {
+        return result;
+    }
+    if let Some(result) = window_channel(&webview, &channel) {
         return result;
     }
     Ok(host
@@ -189,6 +255,23 @@ mod tests {
         let refused = ensure(BROWSER_UI, STUDIO).expect_err("refused");
         assert!(refused.contains(BROWSER_UI));
         assert!(ensure("browser-site-0", STUDIO).is_err());
+    }
+
+    #[test]
+    fn only_the_window_channels_are_served_by_the_shell() {
+        assert_eq!(WindowAction::parse(WINDOW_STATE), Some(WindowAction::State));
+        assert_eq!(
+            WindowAction::parse(WINDOW_MINIMIZE),
+            Some(WindowAction::Minimize)
+        );
+        assert_eq!(
+            WindowAction::parse(WINDOW_TOGGLE_MAXIMIZE),
+            Some(WindowAction::ToggleMaximize)
+        );
+        assert_eq!(WindowAction::parse(WINDOW_CLOSE), Some(WindowAction::Close));
+        assert_eq!(WindowAction::parse(WINDOW_DRAG), Some(WindowAction::Drag));
+        assert_eq!(WindowAction::parse("window.fullscreen"), None);
+        assert_eq!(WindowAction::parse(BROWSER_MOUNT), None);
     }
 
     #[test]

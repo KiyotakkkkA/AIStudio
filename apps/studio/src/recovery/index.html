@@ -10,12 +10,46 @@
     <title>Восстановление</title>
   </head>
   <body>
-    <h1>Не удалось обновить данные</h1>
-    <p>Приложение не было запущено, чтобы избержать необратимых повреждений.</p>
-    <code id="message"></code>
-    <p>Расположение данных:</p>
-    <code id="backups"></code>
-    <a class="quit" href="quit">Выйти</a>
+    <div class="shell">
+      <main aria-labelledby="recovery-title">
+        <section class="intro">
+          <div class="state-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 3 4.5 6v5.5c0 4.3 3.2 7.7 7.5 9.5 4.3-1.8 7.5-5.2 7.5-9.5V6L12 3Z" />
+              <path d="M12 8v5m0 3v.1" />
+            </svg>
+          </div>
+          <div>
+            <p class="eyebrow">Запуск приостановлен</p>
+            <h1 id="recovery-title">Не удалось обновить данные</h1>
+            <p class="description">Запуск остановлен, чтобы избежать повреждения данных.</p>
+          </div>
+        </section>
+        <div class="diagnostics">
+          <section class="detail failure" aria-labelledby="reason-title">
+            <h2 id="reason-title">
+              <span class="status-dot" aria-hidden="true"></span>Причина остановки
+            </h2>
+            <p id="message" class="message"></p>
+          </section>
+          <section class="detail location" aria-labelledby="location-title">
+            <h2 id="location-title">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3V7Z" />
+              </svg>
+              Расположение данных
+            </h2>
+            <code id="backups"></code>
+          </section>
+        </div>
+      </main>
+      <footer class="shell-footer">
+        <a class="quit" href="quit"
+          >Закрыть приложение<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M14 8l4 4-4 4m-8-4h12" /></svg
+        ></a>
+      </footer>
+    </div>
     <script type="module" src="/recovery/main.ts"></script>
   </body>
 </html>
