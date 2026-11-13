@@ -95,7 +95,7 @@ mod tests {
             json!("CONFLICT")
         );
 
-        let install_path = host.downloads_dir().join("runtimes").join("llama-cpp-cpu");
+        let install_path = host.assets_dir().join("runtimes").join("llama-cpp-cpu");
         std::fs::create_dir_all(&install_path).expect("creates");
         host.settings
             .set(

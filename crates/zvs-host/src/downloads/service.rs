@@ -25,7 +25,7 @@ use crate::kernel::RunObserver;
 use crate::platform::clock::SharedClock;
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger};
-use crate::platform::paths::download_target_path;
+use crate::platform::paths::{StoredPaths, download_target_path};
 use crate::services::{RunService, SettingService};
 
 pub const DOWNLOAD_JOB: &str = "job.download";
@@ -34,6 +34,7 @@ pub const CONCURRENCY_KEY: &str = "downloads.concurrency";
 pub const DEFAULT_CONCURRENCY: usize = 2;
 pub const FREE_SPACE_MARGIN_BYTES: u64 = 1024 * 1024 * 1024;
 pub const DEFAULT_PERSIST_INTERVAL: Duration = Duration::from_secs(1);
+pub const STAGED_EXPIRY: Duration = Duration::from_secs(14 * 24 * 60 * 60);
 pub const SERVICE_STOPPED: &str = "Сервис загрузок остановлен";
 pub const ALREADY_QUEUED: &str = "Элемент уже находится в очереди загрузки";
 pub const NOT_RUNNING: &str = "Загрузка не выполняется";
@@ -46,6 +47,7 @@ pub const DOWNLOAD_NOT_FOUND: &str = "Загрузка не найдена";
 pub const RUN_ENDED_EMPTY: &str = "Запуск завершился без результата";
 pub const UNEXPECTED_RESULT: &str = "Загрузка вернула неожиданный результат";
 pub const NO_PATH: &str = "В результате загрузки отсутствует путь к файлу";
+pub const PUBLISH_FAILED: &str = "Не удалось перенести загруженный файл в каталог установки";
 
 pub const fn priority_by_kind(kind: DownloadItemKind) -> u64 {
     match kind {
@@ -124,7 +126,9 @@ pub struct DownloadServiceOptions {
     pub disk: DiskService,
     pub catalogue: CatalogueService,
     pub settings: Option<SettingService>,
-    pub downloads_dir: PathBuf,
+    pub assets_dir: PathBuf,
+    pub staging_dir: Option<PathBuf>,
+    pub stored: StoredPaths,
     pub logger: SharedLogger,
     pub clock: SharedClock,
     pub concurrency: Option<usize>,
@@ -137,7 +141,7 @@ impl DownloadServiceOptions {
         jobs: SharedSidecarJobs,
         disk: DiskService,
         catalogue: CatalogueService,
-        downloads_dir: PathBuf,
+        assets_dir: PathBuf,
         logger: SharedLogger,
         clock: SharedClock,
     ) -> Self {
@@ -147,7 +151,9 @@ impl DownloadServiceOptions {
             disk,
             catalogue,
             settings: None,
-            downloads_dir,
+            assets_dir,
+            staging_dir: None,
+            stored: StoredPaths::default(),
             logger,
             clock,
             concurrency: None,
@@ -191,6 +197,24 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 fn conflict(message: &str) -> AppError {
     AppError::new(AppErrorCode::Conflict, message)
+}
+
+fn publish_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if std::fs::rename(from, to).is_ok() {
+        return Ok(());
+    }
+    let staged = PathBuf::from(format!("{}{PART_SUFFIX}", to.to_string_lossy()));
+    std::fs::copy(from, &staged)?;
+    let copied = std::fs::metadata(&staged)?.len();
+    if copied != std::fs::metadata(from)?.len() {
+        let _ = std::fs::remove_file(&staged);
+        return Err(std::io::Error::other("the published copy is incomplete"));
+    }
+    std::fs::rename(&staged, to)?;
+    std::fs::remove_file(from)
 }
 
 fn part_path(target: &str) -> PathBuf {
@@ -316,8 +340,91 @@ impl DownloadService {
         self.inner.options.catalogue.clone()
     }
 
-    pub fn downloads_dir(&self) -> &Path {
-        &self.inner.options.downloads_dir
+    pub fn assets_dir(&self) -> &Path {
+        &self.inner.options.assets_dir
+    }
+
+    fn target(&self, row: &DownloadRow) -> String {
+        self.inner.options.stored.decode_text(&row.target_path)
+    }
+
+    fn staged_folder(&self, id: &str) -> Option<PathBuf> {
+        self.inner
+            .options
+            .staging_dir
+            .as_ref()
+            .map(|staging| staging.join(id))
+    }
+
+    fn staged_for(&self, id: &str, target: &str) -> String {
+        match (self.staged_folder(id), Path::new(target).file_name()) {
+            (Some(folder), Some(name)) => folder.join(name).to_string_lossy().into_owned(),
+            _ => target.to_owned(),
+        }
+    }
+
+    fn staged(&self, row: &DownloadRow) -> String {
+        self.staged_for(&row.id, &self.target(row))
+    }
+
+    fn discard_staged(&self, row: &DownloadRow) {
+        discard(&self.staged(row));
+        if let Some(folder) = self.staged_folder(&row.id) {
+            let _ = std::fs::remove_dir_all(folder);
+        }
+    }
+
+    fn publish(&self, row: &DownloadRow, staged: &str, target: &str) -> Result<(), AppError> {
+        if staged != target && Path::new(staged).exists() {
+            publish_file(Path::new(staged), Path::new(target)).map_err(|error| {
+                AppError::new(AppErrorCode::NativeError, PUBLISH_FAILED)
+                    .with_detail("error", error.to_string())
+            })?;
+        }
+        if let Some(folder) = self.staged_folder(&row.id) {
+            let _ = std::fs::remove_dir_all(folder);
+        }
+        Ok(())
+    }
+
+    fn sweep_staging(&self, rows: &[DownloadRow]) -> usize {
+        let Some(staging) = &self.inner.options.staging_dir else {
+            return 0;
+        };
+        let Ok(entries) = std::fs::read_dir(staging) else {
+            return 0;
+        };
+        let now = std::time::SystemTime::now();
+        let mut removed = 0;
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let resumable = rows.iter().any(|row| {
+                row.id == name
+                    && matches!(
+                        row.status,
+                        DownloadStatus::Queued
+                            | DownloadStatus::Running
+                            | DownloadStatus::Paused
+                            | DownloadStatus::Failed
+                    )
+            });
+            let expired = entry
+                .metadata()
+                .and_then(|metadata| metadata.modified())
+                .ok()
+                .and_then(|modified| now.duration_since(modified).ok())
+                .is_some_and(|age| age > STAGED_EXPIRY);
+            if !resumable || expired {
+                let path = entry.path();
+                let gone = if path.is_dir() {
+                    std::fs::remove_dir_all(&path)
+                } else {
+                    std::fs::remove_file(&path)
+                };
+                removed += usize::from(gone.is_ok());
+            }
+        }
+        removed
     }
 
     pub fn attach_installer(&self, installer: SharedDownloadInstaller) {
@@ -578,7 +685,7 @@ impl DownloadService {
             return Err(conflict(ALREADY_QUEUED));
         }
         let target_path = download_target_path(
-            &self.inner.options.downloads_dir,
+            &self.inner.options.assets_dir,
             item.kind.as_str(),
             &item.file_name,
         )
@@ -586,25 +693,30 @@ impl DownloadService {
         if let Some(parent) = target_path.parent() {
             Self::require_writable(parent)?;
         }
+        let id = new_id().hyphenated().to_string();
         let target = target_path.to_string_lossy().into_owned();
-        let on_disk = partial(&target);
+        let staged = self.staged_for(&id, &target);
+        if let Some(parent) = Path::new(&staged).parent() {
+            Self::require_writable(parent)?;
+        }
+        let on_disk = partial(&staged);
         if let Some(blocked) = Self::precondition(&item, self.free_bytes().await, false, on_disk) {
             return Err(conflict(&blocked));
         }
         let at = self.now();
         let draft = DownloadRow {
-            id: new_id().hyphenated().to_string(),
+            id,
             item_kind: item.kind,
             item_ref: item.item_ref.clone(),
             display_name: item.display_name.clone(),
             version: item.version.clone(),
             size_bytes: item.size_bytes,
-            bytes_done: partial(&target),
+            bytes_done: on_disk,
             status: DownloadStatus::Queued,
             priority: input
                 .priority
                 .unwrap_or_else(|| priority_by_kind(item.kind)),
-            target_path: target,
+            target_path: self.inner.options.stored.encode(&target_path),
             url: item.url.clone(),
             checksum_algorithm: item.checksum.as_ref().map(|checksum| checksum.algorithm),
             checksum_value: item
@@ -707,7 +819,7 @@ impl DownloadService {
             self.abort(&row).await?;
             return self.get(id);
         }
-        discard(&row.target_path);
+        self.discard_staged(&row);
         let cancelled = self.settle(id, DownloadStatus::Cancelled)?;
         self.pump();
         Ok(cancelled)
@@ -718,9 +830,9 @@ impl DownloadService {
         if !row.status.is_terminal() && row.status != DownloadStatus::Paused {
             return Err(conflict(CANCEL_FIRST));
         }
-        discard(&row.target_path);
+        self.discard_staged(&row);
         if row.status == DownloadStatus::Succeeded {
-            remove_file(&row.target_path);
+            remove_file(&self.target(&row));
         }
         self.repository(|downloads| downloads.remove(id))?;
         self.forget(id);
@@ -738,8 +850,8 @@ impl DownloadService {
             if !row.status.is_terminal() && row.status != DownloadStatus::Paused {
                 self.cancel(&row.id).await?;
             }
-            discard(&row.target_path);
-            remove_file(&row.target_path);
+            self.discard_staged(row);
+            remove_file(&self.target(row));
             self.repository(|downloads| downloads.remove(&row.id))?;
             self.forget(&row.id);
         }
@@ -780,9 +892,11 @@ impl DownloadService {
         on_progress: Option<DownloadProgressSink>,
     ) -> Result<DownloadReportDto, AppError> {
         let checksum = checksum_of(row);
+        let target = self.target(row);
+        let staged = self.staged(row);
         let mut params = json!({
             "url": row.url,
-            "targetPath": row.target_path,
+            "targetPath": staged,
             "sizeBytes": if row.size_bytes > 0 { json!(row.size_bytes) } else { Value::Null },
         });
         if let Some(checksum) = &checksum {
@@ -815,10 +929,16 @@ impl DownloadService {
                 },
             )
             .await?;
-        let (bytes, resumed_from, path, reported_checksum) = read_report(&result)?;
+        let (bytes, resumed_from, _, reported_checksum) = read_report(&result)?;
+        let landed = DownloadRow {
+            target_path: staged.clone(),
+            ..row.clone()
+        };
         for installer in self.installers() {
-            installer.install(row).await?;
+            installer.install(&landed).await?;
         }
+        self.publish(row, &staged, &target)?;
+        let path = target;
         let at = self.now();
         self.update(
             &row.id,
@@ -857,6 +977,14 @@ impl DownloadService {
 
     pub fn recover(&self) -> Result<usize, AppError> {
         let at = self.now();
+        let swept = self.sweep_staging(&self.repository(|downloads| downloads.list())?);
+        if swept > 0 {
+            self.log(
+                LogLevel::Info,
+                "Removed stale staged downloads",
+                &[("count", json!(swept))],
+            );
+        }
         let interrupted = self.repository(|downloads| downloads.running())?;
         for row in &interrupted {
             self.update(
@@ -1051,7 +1179,7 @@ impl DownloadService {
         let written = if error.code == AppErrorCode::RunCancelled {
             let intent = self.intent(&row.id);
             if intent == Some(Intent::Cancel) {
-                discard(&row.target_path);
+                self.discard_staged(row);
             }
             let cancelled = intent == Some(Intent::Cancel);
             self.update(
@@ -1062,7 +1190,7 @@ impl DownloadService {
                     } else {
                         DownloadStatus::Paused
                     }),
-                    bytes_done: Some(partial(&row.target_path)),
+                    bytes_done: Some(partial(&self.staged(row))),
                     finished_at: Some(cancelled.then_some(at)),
                     updated_at: Some(at),
                     ..DownloadPatch::default()
@@ -1074,7 +1202,7 @@ impl DownloadService {
                 &DownloadPatch {
                     status: Some(DownloadStatus::Failed),
                     error: Some(Some(js_slice(&error.message, 2000).to_owned())),
-                    bytes_done: Some(partial(&row.target_path)),
+                    bytes_done: Some(partial(&self.staged(row))),
                     finished_at: Some(Some(at)),
                     updated_at: Some(at),
                     ..DownloadPatch::default()
@@ -1164,7 +1292,7 @@ impl DownloadService {
             bytes_done,
             status: row.status,
             priority: row.priority,
-            target_path: row.target_path.clone(),
+            target_path: self.target(row),
             url: row.url.clone(),
             checksum: checksum_of(row),
             version: row.version.clone(),

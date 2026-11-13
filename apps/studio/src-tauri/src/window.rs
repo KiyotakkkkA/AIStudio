@@ -1,5 +1,7 @@
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
+use std::time::{Duration, Instant};
 
 use crate::shell::ShellState;
 use tauri::webview::{NewWindowResponse, PageLoadEvent};
@@ -8,6 +10,7 @@ use tauri::{
     AppHandle, Manager, Runtime, Theme, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent,
 };
+use zvs_host::boot::BootProgress;
 use zvs_host::data::MigrationFailed;
 use zvs_host::platform::window_state::{
     NormalBounds, WindowLike, WindowState, capture_window_state,
@@ -15,8 +18,21 @@ use zvs_host::platform::window_state::{
 
 pub const STUDIO: &str = "studio";
 pub const RECOVERY: &str = "recovery";
+pub const BOOT: &str = "boot";
 const RECOVERY_PAGE: &str = "recovery/index.html";
 const RECOVERY_QUIT: &str = "/recovery/quit";
+const BOOT_PAGE: &str = "boot/index.html";
+const BOOT_REPORT_INTERVAL: Duration = Duration::from_millis(200);
+
+static SHELL_PROFILE: OnceLock<PathBuf> = OnceLock::new();
+
+pub fn set_shell_profile(dir: PathBuf) {
+    let _ = SHELL_PROFILE.set(dir);
+}
+
+pub fn shell_profile() -> Option<PathBuf> {
+    SHELL_PROFILE.get().cloned()
+}
 
 struct Tracked<'a, R: Runtime> {
     window: &'a WebviewWindow<R>,
@@ -82,7 +98,7 @@ pub fn create_studio<R: Runtime>(
     if let Some(args) = crate::e2e::browser_args() {
         builder = builder.additional_browser_args(&args);
     }
-    if let Some(dir) = crate::e2e::webview_dir() {
+    if let Some(dir) = shell_profile() {
         builder = builder.data_directory(dir);
     }
     let window = builder
@@ -147,7 +163,7 @@ pub fn create_recovery<R: Runtime>(
 ) -> tauri::Result<()> {
     let origin = app_origin(app, false);
     let handle = app.clone();
-    let window =
+    let mut builder =
         WebviewWindowBuilder::new(app, RECOVERY, WebviewUrl::App(recovery_url(failure).into()))
             .title("ZVS AI Studio — восстановление")
             .inner_size(720.0, 480.0)
@@ -161,10 +177,81 @@ pub fn create_recovery<R: Runtime>(
                 }
                 allowed
             })
-            .on_new_window(|_, _| NewWindowResponse::Deny)
-            .build()?;
+            .on_new_window(|_, _| NewWindowResponse::Deny);
+    if let Some(dir) = shell_profile() {
+        builder = builder.data_directory(dir);
+    }
+    let window = builder.build()?;
     window.set_background_color(Some(canvas_color(window.theme().unwrap_or(Theme::Light))))?;
     Ok(())
+}
+
+pub fn create_boot<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    let origin = app_origin(app, false);
+    let mut builder = WebviewWindowBuilder::new(app, BOOT, WebviewUrl::App(BOOT_PAGE.into()))
+        .title("ZVS AI Studio")
+        .inner_size(520.0, 220.0)
+        .resizable(false)
+        .maximizable(false)
+        .closable(false)
+        .on_navigation(move |url| {
+            origin
+                .as_ref()
+                .is_some_and(|origin| same_origin(url, origin))
+        })
+        .on_new_window(|_, _| NewWindowResponse::Deny);
+    if let Some(dir) = shell_profile() {
+        builder = builder.data_directory(dir);
+    }
+    let window = builder.build()?;
+    window.set_background_color(Some(canvas_color(window.theme().unwrap_or(Theme::Light))))?;
+    Ok(())
+}
+
+pub fn close_boot<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(window) = app.get_webview_window(BOOT) {
+        let _ = window.destroy();
+    }
+}
+
+pub fn boot_script(progress: &BootProgress) -> String {
+    let payload = serde_json::json!({
+        "step": progress.step,
+        "steps": progress.steps,
+        "label": progress.label,
+        "done": progress.done,
+        "total": progress.total,
+    });
+    format!("window.bootProgress && window.bootProgress({payload});")
+}
+
+pub struct BootReporter<R: Runtime> {
+    app: AppHandle<R>,
+    last: Mutex<Option<Instant>>,
+}
+
+impl<R: Runtime> BootReporter<R> {
+    pub fn new(app: AppHandle<R>) -> Self {
+        Self {
+            app,
+            last: Mutex::new(None),
+        }
+    }
+
+    pub fn report(&self, progress: BootProgress) {
+        let finished = progress.done >= progress.total;
+        {
+            let mut last = self.last.lock().unwrap_or_else(PoisonError::into_inner);
+            let due = last.is_none_or(|at| at.elapsed() >= BOOT_REPORT_INTERVAL);
+            if !due && !finished {
+                return;
+            }
+            *last = Some(Instant::now());
+        }
+        if let Some(window) = self.app.get_webview_window(BOOT) {
+            let _ = window.eval(boot_script(&progress));
+        }
+    }
 }
 
 pub fn focus_studio<R: Runtime>(app: &AppHandle<R>) {

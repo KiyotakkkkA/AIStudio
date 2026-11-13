@@ -19,7 +19,7 @@ use crate::platform::clock::{Clock, FakeClock, SharedClock};
 use crate::platform::disk::FreeSpace;
 use crate::platform::events::EventBus;
 use crate::platform::logger::silent_logger;
-use crate::platform::paths::download_target_path;
+use crate::platform::paths::{StoredPaths, StoredRoot, download_target_path};
 use crate::services::{RunService, RunServiceOptions};
 use crate::testing::{
     FakeDownloadJobs, TemporaryDatabase, TemporaryDirectory, sha256_hex, temporary_database,
@@ -101,7 +101,8 @@ struct Fixture {
     provider: Arc<FakeProvider>,
     probe: Arc<FakeProbe>,
     clock: Arc<FakeClock>,
-    downloads_dir: PathBuf,
+    assets_dir: PathBuf,
+    staging_dir: PathBuf,
     vectors_dir: PathBuf,
     workspace: TemporaryDirectory,
     database: TemporaryDatabase,
@@ -109,9 +110,18 @@ struct Fixture {
 
 impl Fixture {
     fn new(concurrency: usize) -> Self {
+        Self::build(concurrency, false)
+    }
+
+    fn staged(concurrency: usize) -> Self {
+        Self::build(concurrency, true)
+    }
+
+    fn build(concurrency: usize, staged: bool) -> Self {
         let database = temporary_database();
         let workspace = temporary_directory("studio-downloads-");
-        let downloads_dir = workspace.join("downloads");
+        let assets_dir = workspace.join("downloads");
+        let staging_dir = workspace.join("temp").join("downloads");
         let vectors_dir = workspace.join("vectors");
         std::fs::create_dir_all(&vectors_dir).expect("creates the vectors folder");
         let clock = Arc::new(FakeClock::default());
@@ -130,7 +140,7 @@ impl Fixture {
             probe: probe.clone(),
             ttl: Duration::ZERO,
             ..DiskServiceOptions::new(
-                downloads_dir.clone(),
+                assets_dir.clone(),
                 vectors_dir.clone(),
                 workspace.path().to_path_buf(),
                 shared_clock.clone(),
@@ -144,12 +154,18 @@ impl Fixture {
         let downloads = DownloadService::new(DownloadServiceOptions {
             concurrency: Some(concurrency),
             persist_interval: Duration::ZERO,
+            staging_dir: staged.then(|| staging_dir.clone()),
+            stored: if staged {
+                StoredPaths::new(vec![(StoredRoot::Assets, assets_dir.clone())])
+            } else {
+                StoredPaths::default()
+            },
             ..DownloadServiceOptions::new(
                 database.shared(),
                 jobs.clone(),
                 disk,
                 catalogue,
-                downloads_dir.clone(),
+                assets_dir.clone(),
                 silent_logger(),
                 shared_clock.clone(),
             )
@@ -173,11 +189,25 @@ impl Fixture {
             provider,
             probe,
             clock,
-            downloads_dir,
+            assets_dir,
+            staging_dir,
             vectors_dir,
             workspace,
             database,
         }
+    }
+
+    fn stored_target(&self, id: &str) -> String {
+        self.database
+            .shared()
+            .with_connection(|connection| {
+                Ok(Repositories::new(connection)
+                    .downloads
+                    .find_by_id(id)?
+                    .expect("the row")
+                    .target_path)
+            })
+            .expect("reads")
     }
 
     fn set_items(&self, items: Vec<CatalogueItem>) {
@@ -197,7 +227,7 @@ impl Fixture {
     }
 
     fn target_of(&self, entry: &CatalogueItem) -> PathBuf {
-        download_target_path(&self.downloads_dir, entry.kind.as_str(), &entry.file_name)
+        download_target_path(&self.assets_dir, entry.kind.as_str(), &entry.file_name)
             .expect("a safe target")
     }
 
@@ -269,6 +299,70 @@ async fn a_download_lands_at_its_target_and_shows_up_as_a_run_on_the_tasks_page(
         Some(id(&started).as_str())
     );
     assert_eq!(page.counts.by_kind.get(&RunKind::Download), Some(&1));
+    fixture.dispose().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_staged_download_is_published_into_assets_and_recorded_relative_to_the_root() {
+    let fixture = Fixture::staged(2);
+    fixture.jobs.serve("https://example.test/alpha", BODY, None);
+
+    let started = fixture.start("curated:model:alpha").await.expect("starts");
+    let finished = fixture.settle(&id(&started)).await;
+
+    assert_eq!(finished.status, DownloadStatus::Succeeded);
+    let target = fixture.target_of(&fixture.alpha());
+    assert_eq!(finished.target_path, target.to_string_lossy());
+    assert_eq!(std::fs::read(&target).expect("published"), BODY);
+    assert!(!part(&target).exists());
+    assert_eq!(
+        fixture.stored_target(&id(&started)),
+        "assets:models/alpha.bin"
+    );
+    let attempts = fixture.jobs.attempts();
+    assert_eq!(
+        Path::new(&attempts[0].target_path),
+        fixture.staging_dir.join(id(&started)).join("alpha.bin")
+    );
+    assert!(!fixture.staging_dir.join(id(&started)).exists());
+    fixture.dispose().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_staged_partial_stays_in_temp_until_cancelled_and_stale_folders_are_swept() {
+    let fixture = Fixture::staged(2);
+    fixture
+        .jobs
+        .serve("https://example.test/alpha", BODY, Some(6));
+    fixture.jobs.hold("https://example.test/alpha");
+    let started = fixture.start("curated:model:alpha").await.expect("starts");
+    fixture.jobs.started(1).await;
+    let paused = fixture
+        .downloads
+        .pause(&id(&started))
+        .await
+        .expect("pauses");
+    fixture.jobs.release("https://example.test/alpha");
+    assert_eq!(paused.status, DownloadStatus::Paused);
+    let staged = fixture.staging_dir.join(id(&started));
+    assert!(part(&staged.join("alpha.bin")).exists());
+    let target = fixture.target_of(&fixture.alpha());
+    assert!(!target.exists() && !part(&target).exists());
+
+    let stale = fixture.staging_dir.join("stale-download");
+    std::fs::create_dir_all(&stale).expect("creates");
+    std::fs::write(stale.join("x.part"), b"x").expect("writes");
+    fixture.downloads.recover().expect("recovers");
+    assert!(!stale.exists());
+    assert!(staged.exists());
+
+    let cancelled = fixture
+        .downloads
+        .cancel(&id(&started))
+        .await
+        .expect("cancels");
+    assert_eq!(cancelled.status, DownloadStatus::Cancelled);
+    assert!(!staged.exists());
     fixture.dispose().await;
 }
 
@@ -635,8 +729,8 @@ async fn the_catalogue_reports_a_queued_item_as_in_flight() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn disk_accounting_totals_each_category_and_leaves_the_rest_as_other() {
     let fixture = Fixture::new(2);
-    let models = fixture.downloads_dir.join("models");
-    let mcp = fixture.downloads_dir.join("mcp");
+    let models = fixture.assets_dir.join("models");
+    let mcp = fixture.assets_dir.join("packages").join("mcp");
     std::fs::create_dir_all(&models).expect("creates");
     std::fs::create_dir_all(&mcp).expect("creates");
     std::fs::write(models.join("a.bin"), "x".repeat(300)).expect("writes");
@@ -659,7 +753,7 @@ async fn disk_accounting_totals_each_category_and_leaves_the_rest_as_other() {
     assert_eq!(bytes(DiskCategory::Other), Some(70));
     assert_eq!(usage.free_bytes, 100 * GIB);
     assert_eq!(usage.used_bytes, 900 * GIB);
-    assert_eq!(usage.root, fixture.downloads_dir.to_string_lossy());
+    assert_eq!(usage.root, fixture.assets_dir.to_string_lossy());
 
     std::fs::write(models.join("c.bin"), "x".repeat(10)).expect("writes");
     let cached = fixture.downloads.disk(false).await;

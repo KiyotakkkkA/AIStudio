@@ -82,7 +82,7 @@ pub const fn download_kind(kind: DownloadItemKind) -> DownloadKind {
 
 #[derive(Clone)]
 pub struct DiskServiceOptions {
-    pub downloads_dir: PathBuf,
+    pub assets_dir: PathBuf,
     pub vector_stores_dir: PathBuf,
     pub user_data_dir: PathBuf,
     pub probe: SharedDiskProbe,
@@ -92,13 +92,13 @@ pub struct DiskServiceOptions {
 
 impl DiskServiceOptions {
     pub fn new(
-        downloads_dir: PathBuf,
+        assets_dir: PathBuf,
         vector_stores_dir: PathBuf,
         user_data_dir: PathBuf,
         clock: SharedClock,
     ) -> Self {
         Self {
-            downloads_dir,
+            assets_dir,
             vector_stores_dir,
             user_data_dir,
             probe: Arc::new(SystemDiskProbe),
@@ -136,8 +136,8 @@ impl DiskService {
         }
     }
 
-    pub fn downloads_dir(&self) -> &Path {
-        &self.inner.options.downloads_dir
+    pub fn assets_dir(&self) -> &Path {
+        &self.inner.options.assets_dir
     }
 
     fn cache(&self) -> std::sync::MutexGuard<'_, Cache> {
@@ -182,7 +182,7 @@ impl DiskService {
             .inner
             .options
             .probe
-            .free(&self.inner.options.downloads_dir)
+            .free(&self.inner.options.assets_dir)
             .await?
             .free_bytes)
     }
@@ -190,7 +190,7 @@ impl DiskService {
     async fn measure(&self) -> DiskUsageDto {
         let options = &self.inner.options;
         let probe = &options.probe;
-        let space = match probe.free(&options.downloads_dir).await {
+        let space = match probe.free(&options.assets_dir).await {
             Ok(space) => space,
             Err(_) => probe.free(&options.user_data_dir).await.unwrap_or_default(),
         };
@@ -198,7 +198,7 @@ impl DiskService {
         let mut accounted = 0_u64;
         for kind in DownloadItemKind::ALL {
             let bytes = probe
-                .size(&options.downloads_dir.join(download_kind(*kind).folder()))
+                .size(&download_kind(*kind).dir(&options.assets_dir))
                 .await;
             accounted += bytes;
             categories.push(DiskCategoryUsage {
@@ -218,7 +218,7 @@ impl DiskService {
             bytes: everything.saturating_sub(accounted),
         });
         DiskUsageDto {
-            root: options.downloads_dir.to_string_lossy().into_owned(),
+            root: options.assets_dir.to_string_lossy().into_owned(),
             total_bytes: space.total_bytes,
             free_bytes: space.free_bytes,
             used_bytes: space.total_bytes.saturating_sub(space.free_bytes),

@@ -279,7 +279,7 @@ impl Fixture {
             downloads: downloads.clone(),
             catalogue: catalogue.clone(),
             settings: settings.clone(),
-            downloads_dir: workspace.path().to_path_buf(),
+            assets_dir: workspace.path().to_path_buf(),
             device: Some(Arc::new(FakeDevice(gpu))),
             resolver,
             http: direct_http(),

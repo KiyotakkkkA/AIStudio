@@ -37,6 +37,7 @@ tar = { version = "=0.4.46", default-features = false }
 sysinfo = { version = "=0.38.4", default-features = false, features = ["system", "disk"] }
 thiserror = "=2.0.20"
 tokio-util = { version = "=0.7.19", features = ["rt"] }
+toml = "=1.2.1"
 unicode-segmentation = "=1.13.3"
 uuid = { version = "=1.26.1", default-features = false, features = ["std"] }
 url = "=2.5.8"

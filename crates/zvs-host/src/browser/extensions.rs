@@ -6,8 +6,8 @@ use zvs_contract::browser_extensions::{EXTENSION_TEXT_MAX, EXTENSIONS_MAX, is_ex
 use zvs_contract::validate::js_slice;
 use zvs_contract::{AppError, AppErrorCode, BrowserExtensionDto, BrowserExtensionsDto};
 
-pub const EXTENSIONS_DIR: &str = "extensions";
-pub const EXTENSIONS_OFF_DIR: &str = "extensions-off";
+pub const EXTENSIONS_DIR: &str = "enabled";
+pub const EXTENSIONS_OFF_DIR: &str = "disabled";
 pub const NOT_AN_EXTENSION: &str =
     "В папке нет файла manifest.json распакованного расширения Chromium";
 pub const EXTENSION_NOT_FOUND: &str = "Расширение не найдено";

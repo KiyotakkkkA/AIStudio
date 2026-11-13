@@ -1,19 +1,28 @@
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use zvs_contract::layout::{self, StateFile};
 
 use crate::state::shortcuts::Keymap;
 
-pub const APP_DATA_FOLDER: &str = "com.zvs.aistudio";
 pub const SHORTCUTS_FILE: &str = "shortcuts.json";
 
+pub fn settings_dir_in(local_data: &Path, development: bool) -> Option<PathBuf> {
+    let root = layout::state_root(local_data, development);
+    let current = StateFile::read(&root)
+        .ok()
+        .flatten()
+        .is_some_and(|file| file.matches_build());
+    current.then(|| layout::cli_settings_dir(&root))
+}
+
+pub fn settings_dir() -> Option<PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA")?;
+    settings_dir_in(Path::new(&local), cfg!(debug_assertions))
+}
+
 pub fn default_path() -> Option<PathBuf> {
-    std::env::var_os("APPDATA").map(|root| {
-        PathBuf::from(root)
-            .join(APP_DATA_FOLDER)
-            .join("cli")
-            .join(SHORTCUTS_FILE)
-    })
+    settings_dir().map(|dir| dir.join(SHORTCUTS_FILE))
 }
 
 pub fn load_from(path: &Path) -> Keymap {
@@ -69,11 +78,26 @@ mod tests {
     }
 
     #[test]
-    fn the_file_lives_beside_the_app_data() {
-        if let Some(path) = default_path() {
-            let text = path.to_string_lossy();
-            assert!(text.contains(APP_DATA_FOLDER));
-            assert!(text.ends_with(SHORTCUTS_FILE));
-        }
+    fn settings_are_read_only_from_a_root_whose_layout_matches_the_build() {
+        let local = std::env::temp_dir().join(format!("zvs-cli-root-{}", std::process::id()));
+        let root = layout::state_root(&local, true);
+        let _ = std::fs::remove_dir_all(&local);
+        assert_eq!(settings_dir_in(&local, true), None);
+        StateFile::parse(
+            "[schemas]
+project_struct = 0
+",
+        )
+        .expect("parses")
+        .write(&root)
+        .expect("writes");
+        assert_eq!(settings_dir_in(&local, true), None);
+        StateFile::current().write(&root).expect("writes");
+        assert_eq!(
+            settings_dir_in(&local, true),
+            Some(root.join("data").join("settings").join("cli"))
+        );
+        assert_eq!(settings_dir_in(&local, false), None);
+        let _ = std::fs::remove_dir_all(&local);
     }
 }

@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use std::time::Duration;
@@ -27,7 +26,7 @@ use crate::drivers::mcp::oauth::{
     SIGN_IN_TIMEOUT, is_auth_required,
 };
 use crate::drivers::mcp::{
-    LaunchSpec, McpClient, McpClientOptions, McpDiscovery, McpEndpoint, SpawnServer,
+    LaunchSpec, McpClient, McpClientOptions, McpDiscovery, McpEndpoint, SpawnServer, ToolchainDirs,
     TransportHooks, call_result, infer_destructive, infer_read_only, isolated_toolchain_env,
 };
 use crate::kernel::{
@@ -73,7 +72,7 @@ pub struct McpServiceOptions {
     pub max_backoff: Duration,
     pub max_restarts: u64,
     pub client_version: String,
-    pub toolchain_dir: Option<PathBuf>,
+    pub toolchain_dir: Option<ToolchainDirs>,
     pub toolchain: Option<Arc<dyn CommandLauncher>>,
     pub runtime: Option<Handle>,
     pub opener: Option<UrlOpener>,
@@ -1017,7 +1016,7 @@ impl McpService {
                             .inner
                             .options
                             .toolchain_dir
-                            .as_deref()
+                            .as_ref()
                             .map(isolated_toolchain_env)
                             .unwrap_or_default(),
                         cwd: None,

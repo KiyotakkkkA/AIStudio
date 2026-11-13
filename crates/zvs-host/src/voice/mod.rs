@@ -56,7 +56,7 @@ pub struct VoiceServiceOptions {
     pub audio: SharedAudioInput,
     pub device: Option<Arc<dyn RuntimeDevice>>,
     pub recognizer: SharedSpeechRecognizer,
-    pub downloads_dir: PathBuf,
+    pub assets_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub platform: Platform,
     pub logger: SharedLogger,
@@ -323,9 +323,8 @@ impl VoiceService {
     }
 
     fn model_path(&self, model: &SpeechModel) -> PathBuf {
-        self.options()
-            .downloads_dir
-            .join(DownloadKind::Model.folder())
+        DownloadKind::Model
+            .dir(&self.options().assets_dir)
             .join(model.file_name)
     }
 
@@ -445,8 +444,8 @@ impl VoiceService {
     }
 
     async fn unpack_engine(&self, row: &DownloadRow) -> Result<(), AppError> {
-        let downloads_dir = &self.options().downloads_dir;
-        let target = runtime_install_path(downloads_dir, ENGINE_RUNTIME_ID)
+        let assets_dir = &self.options().assets_dir;
+        let target = runtime_install_path(assets_dir, ENGINE_RUNTIME_ID)
             .map_err(|error| AppError::new(AppErrorCode::Unknown, error.to_string()))?;
         if target.exists() {
             let removal = target.clone();

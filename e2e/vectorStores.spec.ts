@@ -79,7 +79,7 @@ test("vector stores UI creates, searches native data, edits, detects loss and co
       window.zvs.call("vectorStores.list", undefined),
     )) as { ok: boolean; data: { id: string }[] };
     const id = response.data[0]!.id;
-    const path = assertTemporaryPath(join(directory.path, "vectors", id));
+    const path = assertTemporaryPath(join(directory.path, "indexes", "vectors", id));
     seedVectors(path, [
       {
         id: "a",

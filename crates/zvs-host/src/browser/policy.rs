@@ -21,10 +21,10 @@ static SCHEME: LazyLock<Regex> =
 static HOST_WITH_PORT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^[\w.-]+:\d+(?:/|$)").expect("a static pattern"));
 
-pub fn profile_dir(data_dir: &Path) -> PathBuf {
+pub fn profile_dir(profiles_dir: &Path) -> PathBuf {
     PROFILE_DIR
         .iter()
-        .fold(data_dir.to_path_buf(), |path, part| path.join(part))
+        .fold(profiles_dir.to_path_buf(), |path, part| path.join(part))
 }
 
 pub fn devtools_height(content: f64) -> f64 {
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn the_profile_lives_under_browser_work() {
-        let dir = profile_dir(Path::new("data"));
-        assert_eq!(dir, Path::new("data").join("browser").join("work"));
+        let dir = profile_dir(Path::new("profiles"));
+        assert_eq!(dir, Path::new("profiles").join("browser").join("work"));
     }
 }

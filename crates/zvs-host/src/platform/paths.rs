@@ -4,24 +4,58 @@ use zvs_contract::Timestamp;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathEnvironment {
-    pub data_dir: PathBuf,
+    pub state_dir: PathBuf,
     pub resource_dir: PathBuf,
     pub executable_dir: PathBuf,
     pub packaged: bool,
 }
 
+pub const DATA_DIR: &str = "data";
+pub const ASSETS_DIR: &str = "assets";
+pub const INDEXES_DIR: &str = "indexes";
+pub const PROFILES_DIR: &str = "profiles";
+pub const CACHE_DIR: &str = "cache";
+pub const TEMP_DIR: &str = "temp";
+pub const LOGS_DIR: &str = "logs";
+pub const BACKUPS_DIR: &str = "backups";
+pub const DATABASE_FILE: &str = "studio.sqlite";
+pub const NOTIFICATION_ICON: [&str; 2] = ["resources", "notification.png"];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StudioPaths {
+    pub root: PathBuf,
     pub data_dir: PathBuf,
     pub db_path: PathBuf,
+    pub conversations_dir: PathBuf,
+    pub scenarios_dir: PathBuf,
+    pub skills_dir: PathBuf,
+    pub dashboards_dir: PathBuf,
+    pub policy_dir: PathBuf,
+    pub cli_settings_dir: PathBuf,
+    pub assets_dir: PathBuf,
+    pub toolchain_dir: PathBuf,
+    pub computer_dir: PathBuf,
+    pub extensions_dir: PathBuf,
+    pub indexes_dir: PathBuf,
+    pub vector_stores_dir: PathBuf,
+    pub profiles_dir: PathBuf,
+    pub shell_profile_dir: PathBuf,
+    pub browser_profile_dir: PathBuf,
+    pub cache_dir: PathBuf,
+    pub documents_cache_dir: PathBuf,
+    pub thumbnails_dir: PathBuf,
+    pub favicons_dir: PathBuf,
+    pub capture_dir: PathBuf,
+    pub package_cache_dir: PathBuf,
+    pub temp_dir: PathBuf,
+    pub temp_downloads_dir: PathBuf,
+    pub staging_dir: PathBuf,
+    pub runs_dir: PathBuf,
     pub logs_dir: PathBuf,
     pub streams_dir: PathBuf,
     pub backups_dir: PathBuf,
-    pub cache_dir: PathBuf,
-    pub vector_stores_dir: PathBuf,
-    pub downloads_dir: PathBuf,
-    pub conversations_dir: PathBuf,
     pub resources_dir: PathBuf,
+    pub notification_icon: PathBuf,
     pub sidecar_path: PathBuf,
     pub cli_path: PathBuf,
     pub packaged: bool,
@@ -51,21 +85,56 @@ pub fn sidecar_path(executable_dir: &Path, windows: bool) -> PathBuf {
     executable_dir.join(sidecar_file_name(windows))
 }
 
+pub fn nested(root: &Path, parts: &[&str]) -> PathBuf {
+    parts
+        .iter()
+        .fold(root.to_path_buf(), |path, part| path.join(part))
+}
+
 impl StudioPaths {
     pub fn resolve(env: &PathEnvironment) -> Self {
-        let data = &env.data_dir;
-        let logs_dir = data.join("logs");
+        let root = &env.state_dir;
+        let data = root.join(DATA_DIR);
+        let assets = root.join(ASSETS_DIR);
+        let indexes = root.join(INDEXES_DIR);
+        let profiles = root.join(PROFILES_DIR);
+        let cache = root.join(CACHE_DIR);
+        let temp = root.join(TEMP_DIR);
+        let logs = root.join(LOGS_DIR);
         Self {
-            data_dir: data.clone(),
-            db_path: data.join("studio.sqlite"),
-            streams_dir: logs_dir.join("streams"),
-            logs_dir,
-            backups_dir: data.join("backups"),
-            cache_dir: data.join("cache"),
-            vector_stores_dir: data.join("vectors"),
-            downloads_dir: data.join("downloads"),
+            root: root.clone(),
+            db_path: data.join(DATABASE_FILE),
             conversations_dir: data.join(crate::conversations::CONVERSATIONS_DIR),
+            scenarios_dir: data.join("scenarios"),
+            skills_dir: nested(&data, &["library", "skills"]),
+            dashboards_dir: nested(&data, &["library", "dashboards"]),
+            policy_dir: nested(&data, &["library", "policy"]),
+            cli_settings_dir: zvs_contract::layout::cli_settings_dir(root),
+            data_dir: data,
+            toolchain_dir: assets.join("toolchain"),
+            computer_dir: nested(&assets, &["environments", "computer"]),
+            extensions_dir: assets.join("extensions"),
+            assets_dir: assets,
+            vector_stores_dir: indexes.join("vectors"),
+            indexes_dir: indexes,
+            shell_profile_dir: profiles.join("shell"),
+            browser_profile_dir: nested(&profiles, &crate::browser::PROFILE_DIR),
+            profiles_dir: profiles,
+            documents_cache_dir: cache.join("documents"),
+            thumbnails_dir: cache.join("thumbnails"),
+            favicons_dir: cache.join("favicons"),
+            capture_dir: cache.join("capture"),
+            package_cache_dir: cache.join("packages"),
+            cache_dir: cache,
+            temp_downloads_dir: temp.join("downloads"),
+            staging_dir: temp.join("staging"),
+            runs_dir: temp.join("runs"),
+            temp_dir: temp,
+            streams_dir: logs.join("streams"),
+            logs_dir: logs,
+            backups_dir: root.join(BACKUPS_DIR),
             resources_dir: env.resource_dir.clone(),
+            notification_icon: nested(&env.resource_dir, &NOTIFICATION_ICON),
             sidecar_path: sidecar_path(&env.executable_dir, cfg!(windows)),
             cli_path: cli_path(&env.executable_dir, env.packaged),
             packaged: env.packaged,
@@ -73,7 +142,74 @@ impl StudioPaths {
     }
 
     pub fn download_dir(&self, kind: DownloadKind) -> PathBuf {
-        self.downloads_dir.join(kind.folder())
+        kind.dir(&self.assets_dir)
+    }
+
+    pub fn stored_paths(&self) -> StoredPaths {
+        StoredPaths::new(vec![
+            (StoredRoot::Data, self.data_dir.clone()),
+            (StoredRoot::Assets, self.assets_dir.clone()),
+            (StoredRoot::Indexes, self.indexes_dir.clone()),
+        ])
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum StoredRoot {
+    Data,
+    Assets,
+    Indexes,
+}
+
+impl StoredRoot {
+    pub const ALL: [Self; 3] = [Self::Data, Self::Assets, Self::Indexes];
+
+    pub const fn prefix(self) -> &'static str {
+        match self {
+            Self::Data => "data:",
+            Self::Assets => "assets:",
+            Self::Indexes => "indexes:",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StoredPaths {
+    roots: Vec<(StoredRoot, PathBuf)>,
+}
+
+impl StoredPaths {
+    pub fn new(roots: Vec<(StoredRoot, PathBuf)>) -> Self {
+        Self { roots }
+    }
+
+    pub fn encode(&self, path: &Path) -> String {
+        for (root, base) in &self.roots {
+            if let Ok(relative) = path.strip_prefix(base) {
+                let parts: Vec<String> = relative
+                    .components()
+                    .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                    .collect();
+                return format!("{}{}", root.prefix(), parts.join("/"));
+            }
+        }
+        path.to_string_lossy().into_owned()
+    }
+
+    pub fn decode(&self, stored: &str) -> PathBuf {
+        for (root, base) in &self.roots {
+            if let Some(relative) = stored.strip_prefix(root.prefix()) {
+                return relative
+                    .split('/')
+                    .filter(|part| !part.is_empty())
+                    .fold(base.clone(), |path, part| path.join(part));
+            }
+        }
+        PathBuf::from(stored)
+    }
+
+    pub fn decode_text(&self, stored: &str) -> String {
+        self.decode(stored).to_string_lossy().into_owned()
     }
 }
 
@@ -106,14 +242,18 @@ impl DownloadKind {
         }
     }
 
-    pub const fn folder(self) -> &'static str {
+    pub const fn folders(self) -> &'static [&'static str] {
         match self {
-            Self::Model => "models",
-            Self::Embedding => "embeddings",
-            Self::Runtime => "runtimes",
-            Self::Mcp => "mcp",
-            Self::Skill => "skills",
+            Self::Model => &["models"],
+            Self::Embedding => &["embeddings"],
+            Self::Runtime => &["runtimes"],
+            Self::Mcp => &["packages", "mcp"],
+            Self::Skill => &["packages", "skills"],
         }
+    }
+
+    pub fn dir(self, assets: &Path) -> PathBuf {
+        nested(assets, self.folders())
     }
 }
 
@@ -148,9 +288,7 @@ pub fn runtime_install_path(downloads: &Path, runtime_id: &str) -> Result<PathBu
         && bytes.first().is_some_and(lower)
         && bytes[1..].iter().all(|byte| lower(byte) || *byte == b'-');
     if valid {
-        Ok(downloads
-            .join(DownloadKind::Runtime.folder())
-            .join(runtime_id))
+        Ok(DownloadKind::Runtime.dir(downloads).join(runtime_id))
     } else {
         Err(PathError::RuntimeId(runtime_id.to_owned()))
     }
@@ -169,7 +307,7 @@ pub fn download_target_path(
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
     if valid {
-        Ok(directory.join(kind.folder()).join(file_name))
+        Ok(kind.dir(directory).join(file_name))
     } else {
         Err(PathError::FileName(file_name.to_owned()))
     }
@@ -255,7 +393,7 @@ mod tests {
     fn env() -> PathEnvironment {
         let root = std::env::temp_dir();
         PathEnvironment {
-            data_dir: root.join("user"),
+            state_dir: root.join("user"),
             resource_dir: root.join("bundle"),
             executable_dir: root.join("target").join("debug"),
             packaged: false,
@@ -263,23 +401,112 @@ mod tests {
     }
 
     #[test]
-    fn platform_paths_separate_persistent_data_from_bundled_resources() {
+    fn every_root_has_one_lifecycle_and_no_root_contains_another() {
         let env = env();
         let paths = StudioPaths::resolve(&env);
-        assert_eq!(paths.data_dir, env.data_dir);
-        assert_eq!(paths.db_path, env.data_dir.join("studio.sqlite"));
-        assert_eq!(paths.logs_dir, env.data_dir.join("logs"));
-        assert_eq!(paths.streams_dir, env.data_dir.join("logs").join("streams"));
-        assert_eq!(paths.backups_dir, env.data_dir.join("backups"));
-        assert_eq!(paths.cache_dir, env.data_dir.join("cache"));
-        assert_eq!(paths.vector_stores_dir, env.data_dir.join("vectors"));
-        assert_eq!(paths.downloads_dir, env.data_dir.join("downloads"));
+        let root = &env.state_dir;
+        assert_eq!(paths.root, *root);
+        assert_eq!(paths.data_dir, root.join("data"));
+        assert_eq!(paths.db_path, root.join("data").join("studio.sqlite"));
+        assert_eq!(
+            paths.skills_dir,
+            root.join("data").join("library").join("skills")
+        );
+        assert_eq!(
+            paths.dashboards_dir,
+            root.join("data").join("library").join("dashboards")
+        );
+        assert_eq!(
+            paths.policy_dir,
+            root.join("data").join("library").join("policy")
+        );
+        assert_eq!(paths.scenarios_dir, root.join("data").join("scenarios"));
+        assert_eq!(
+            paths.cli_settings_dir,
+            root.join("data").join("settings").join("cli")
+        );
+        assert_eq!(paths.toolchain_dir, root.join("assets").join("toolchain"));
+        assert_eq!(
+            paths.computer_dir,
+            root.join("assets").join("environments").join("computer")
+        );
+        assert_eq!(
+            paths.vector_stores_dir,
+            root.join("indexes").join("vectors")
+        );
+        assert_eq!(paths.shell_profile_dir, root.join("profiles").join("shell"));
+        assert_eq!(
+            paths.browser_profile_dir,
+            root.join("profiles").join("browser").join("work")
+        );
+        assert_eq!(paths.package_cache_dir, root.join("cache").join("packages"));
+        assert_eq!(
+            paths.temp_downloads_dir,
+            root.join("temp").join("downloads")
+        );
+        assert_eq!(paths.runs_dir, root.join("temp").join("runs"));
+        assert_eq!(paths.streams_dir, root.join("logs").join("streams"));
+        assert_eq!(paths.backups_dir, root.join("backups"));
         assert_eq!(paths.resources_dir, env.resource_dir);
+        assert_eq!(
+            paths.notification_icon,
+            env.resource_dir.join("resources").join("notification.png")
+        );
         assert_eq!(
             paths.sidecar_path,
             env.executable_dir.join(sidecar_file_name(cfg!(windows)))
         );
         assert!(!paths.packaged);
+        let roots = [
+            &paths.data_dir,
+            &paths.assets_dir,
+            &paths.indexes_dir,
+            &paths.profiles_dir,
+            &paths.cache_dir,
+            &paths.temp_dir,
+            &paths.logs_dir,
+            &paths.backups_dir,
+        ];
+        for (index, left) in roots.iter().enumerate() {
+            assert_eq!(left.parent(), Some(root.as_path()));
+            for right in &roots[index + 1..] {
+                assert!(!left.starts_with(right) && !right.starts_with(left));
+            }
+        }
+    }
+
+    #[test]
+    fn stored_paths_are_relative_to_their_root_and_foreign_paths_stay_absolute() {
+        let paths = StudioPaths::resolve(&env());
+        let stored = paths.stored_paths();
+        let model = paths.assets_dir.join("models").join("qwen.gguf");
+        assert_eq!(stored.encode(&model), "assets:models/qwen.gguf");
+        assert_eq!(stored.decode("assets:models/qwen.gguf"), model);
+        let skill = paths.skills_dir.join("pdf");
+        assert_eq!(stored.encode(&skill), "data:library/skills/pdf");
+        assert_eq!(stored.decode(&stored.encode(&skill)), skill);
+        let store = paths.vector_stores_dir.join("s1");
+        assert_eq!(stored.encode(&store), "indexes:vectors/s1");
+        let foreign = std::env::temp_dir().join("elsewhere").join("a.txt");
+        let text = foreign.to_string_lossy().into_owned();
+        assert_eq!(stored.encode(&foreign), text);
+        assert_eq!(stored.decode(&text), foreign);
+        let moved = StoredPaths::new(vec![(
+            StoredRoot::Assets,
+            std::env::temp_dir().join("D").join("assets"),
+        )]);
+        assert_eq!(
+            moved.decode("assets:models/qwen.gguf"),
+            std::env::temp_dir()
+                .join("D")
+                .join("assets")
+                .join("models")
+                .join("qwen.gguf")
+        );
+        assert_eq!(
+            StoredPaths::default().decode("assets:x"),
+            PathBuf::from("assets:x")
+        );
     }
 
     #[test]
@@ -314,16 +541,20 @@ mod tests {
     }
 
     #[test]
-    fn downloads_land_in_one_folder_per_kind() {
+    fn installed_assets_land_in_one_folder_per_kind() {
         let paths = StudioPaths::resolve(&env());
         let folders: Vec<PathBuf> = DownloadKind::ALL
             .iter()
             .map(|kind| paths.download_dir(*kind))
             .collect();
-        let expected: Vec<PathBuf> = ["models", "embeddings", "runtimes", "mcp", "skills"]
-            .iter()
-            .map(|folder| paths.downloads_dir.join(folder))
-            .collect();
+        let assets = &paths.assets_dir;
+        let expected: Vec<PathBuf> = vec![
+            assets.join("models"),
+            assets.join("embeddings"),
+            assets.join("runtimes"),
+            assets.join("packages").join("mcp"),
+            assets.join("packages").join("skills"),
+        ];
         assert_eq!(folders, expected);
         for kind in DownloadKind::ALL {
             let name = format!("{kind:?}").to_lowercase();
@@ -349,7 +580,7 @@ mod tests {
 
     #[test]
     fn runtime_ids_follow_the_catalogue_shape() {
-        let root = Path::new("downloads");
+        let root = Path::new("assets");
         assert_eq!(
             runtime_install_path(root, "llama-cpp"),
             Ok(root.join("runtimes").join("llama-cpp"))
@@ -370,7 +601,11 @@ mod tests {
 
     #[test]
     fn download_targets_refuse_unknown_kinds_and_unsafe_names() {
-        let root = Path::new("downloads");
+        let root = Path::new("assets");
+        assert_eq!(
+            download_target_path(root, "mcp", "server.tgz"),
+            Ok(root.join("packages").join("mcp").join("server.tgz"))
+        );
         assert_eq!(
             download_target_path(root, "model", "qwen.Q4_K_M.gguf"),
             Ok(root.join("models").join("qwen.Q4_K_M.gguf"))

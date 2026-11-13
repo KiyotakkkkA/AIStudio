@@ -1001,7 +1001,9 @@ async fn stdio_servers_get_the_isolated_toolchain_env_and_a_servers_own_env_wins
     let recorder = Arc::clone(&seen);
     let toolchain = PathBuf::from("C:").join("data").join("mcp-toolchain");
     host.mcp = McpService::new(McpServiceOptions {
-        toolchain_dir: Some(toolchain.clone()),
+        toolchain_dir: Some(crate::drivers::mcp::ToolchainDirs::inside(
+            toolchain.clone(),
+        )),
         spawn: Some(Arc::new(move |spec: &LaunchSpec| {
             recorder.lock().expect("seen").push(spec.env.clone());
             Err(std::io::Error::new(
@@ -1065,7 +1067,10 @@ async fn runtime_commands_launch_through_the_toolchain_and_a_missing_one_never_s
     let seen: Arc<Mutex<Vec<LaunchSpec>>> = Arc::default();
     let recorder = Arc::clone(&seen);
     host.mcp = McpService::new(McpServiceOptions {
-        toolchain_dir: Some(PathBuf::from("C:").join("data").join("mcp-toolchain")),
+        toolchain_dir: Some(crate::drivers::mcp::ToolchainDirs::new(
+            PathBuf::from("C:").join("assets").join("toolchain"),
+            PathBuf::from("C:").join("cache").join("packages"),
+        )),
         toolchain: Some(Arc::new(FakeLauncher)),
         spawn: Some(Arc::new(move |spec: &LaunchSpec| {
             recorder.lock().expect("seen").push(spec.clone());
@@ -1112,7 +1117,23 @@ async fn runtime_commands_launch_through_the_toolchain_and_a_missing_one_never_s
     host.mcp.test(&other).await.expect("tests");
     let spawned = seen.lock().expect("seen").clone();
     assert_eq!(spawned[1].command, "python");
-    assert!(spawned[1].env["npm_config_cache"].contains("mcp-toolchain"));
+    assert_eq!(
+        spawned[1].env["npm_config_cache"],
+        PathBuf::from("C:")
+            .join("cache")
+            .join("packages")
+            .join("npm")
+            .to_string_lossy()
+    );
+    assert!(
+        spawned[1].env["npm_config_prefix"].starts_with(
+            PathBuf::from("C:")
+                .join("assets")
+                .join("toolchain")
+                .to_string_lossy()
+                .as_ref()
+        )
+    );
     assert!(!spawned[1].env.contains_key("PATH"));
 }
 

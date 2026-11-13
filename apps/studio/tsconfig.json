@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "./tsconfig.boot.json" },
     { "path": "./tsconfig.browser.json" },
     { "path": "./tsconfig.recovery.json" },
     { "path": "./tsconfig.renderer.json" },

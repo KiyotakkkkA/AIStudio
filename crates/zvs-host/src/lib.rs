@@ -5,6 +5,7 @@ pub mod agentic;
 pub mod artifact_pages;
 pub mod artifacts;
 pub mod background;
+pub mod boot;
 pub mod browser;
 pub mod chat_export;
 pub mod chat_files;

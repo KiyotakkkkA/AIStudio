@@ -188,8 +188,8 @@ impl ArtifactStore {
     }
 
     #[must_use]
-    pub fn with_thumbnails(mut self, cache: PathBuf) -> Self {
-        let capture = HeadlessCapture::new(self.launcher.clone(), cache.join("profile"));
+    pub fn with_thumbnails(mut self, cache: PathBuf, profile: PathBuf) -> Self {
+        let capture = HeadlessCapture::new(self.launcher.clone(), profile);
         self.thumbnails = Some((cache, Arc::new(capture)));
         self
     }

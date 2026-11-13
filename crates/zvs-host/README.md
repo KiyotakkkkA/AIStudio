@@ -10,6 +10,7 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 | `ipc`                      | `IpcServer`, `register`, and one file of thin handlers per domain                                                 |
 | `services`                 | `Services`, the handlers' only dependency, and the business logic                                                 |
 | `data`                     | `Database`, migrations, row structs and repositories (see `src/data/README.md`)                                   |
+| `boot`                     | `aistudio.toml` schema check, the ordered schema steps, the legacy-root migration and its cleanup                 |
 | `platform::paths`          | `PathEnvironment` → `StudioPaths`, plus the validated path builders                                               |
 | `platform::logger`         | `Logger` trait, `FileLogger` (JSON lines, rotation, redaction), `silent_logger`                                   |
 | `platform::ids`            | UUID v7 ids and the injectable `IdGenerator`                                                                      |
@@ -67,6 +68,23 @@ implements, and `apps/studio/src-tauri/src/lib.rs` is the composition root that 
 `testing` is compiled for this crate's own tests and behind the `testing` feature for other
 crates' tests. `debug-panic` adds `InProcessCore::debug_panic`, `vector_debug_panic` and
 `graph_debug_panic` for the panic-recovery test; release builds never enable it.
+
+## Boot
+
+`boot::Boot::inspect` reads `aistudio.toml` at the state root and returns `Ready`, `Fresh` or
+`Migrate(steps)`; a newer or unknown schema and a malformed file are `BootError`s, which the
+shell shows in the recovery window. `run` executes the pending `STEPS` in order, records the
+new version after each one, and writes the build's `SCHEMAS` at the end. `project_struct` 0 → 1
+copies the old `%APPDATA%\com.zvs.aistudio` root (and the shell's `EBWebView` profile) into the
+new tree: installed assets and backups are hard-linked, everything else is copied file by file
+through a `.migrating` name, caches and uv tool environments are left behind, and the copy is
+verified by size. The database is copied with its WAL into `studio.sqlite.migrating`, its
+stored paths are rewritten (`rewrite::rewrite_database`: root-relative `download.target_path`
+and `skill.path`, absolute prefixes in every text column in native, JSON-escaped and slashed
+form), checkpointed and renamed last, so a rerun after a crash resumes where it stopped. The
+old root is never modified; `sweep_legacy` removes it 30 days after the migration when nothing
+in it changed since, and only from a packaged build. `sweep_temp` empties `temp/staging` and
+`temp/runs` at startup.
 
 ## Core and sidecar
 
@@ -416,7 +434,12 @@ their own tasks in the stage that fits them.
 
 In `DownloadService`, a download is a `download` run with one
 `download.fetch` node; the node calls `DownloadService::execute`, which runs `job.download` in the
-sidecar (resume from `<target>.part`, checksum before the rename). The queue holds at most
+sidecar. With a `staging_dir` the sidecar writes `temp/downloads/<id>/<file>` (resume from its
+`.part`, checksum before the rename); installers run on the staged file, and what they leave is
+published into `assets` by rename (copy and size check across volumes) before the row turns
+`succeeded`. `target_path` is stored root-relative through `StoredPaths` and decoded for the
+DTO. `recover()` removes staged folders that no resumable row owns or that are older than 14
+days. The queue holds at most
 `downloads.concurrency` (1–8, default 2) running rows and fills free slots by priority, then
 size, then age (`DownloadRepository::next_queued`); pumping is serialised and re-entrant safe.
 A start is refused when the catalogue does not know the ref, the item is already active, or the
@@ -476,7 +499,7 @@ tree (`taskkill /T /F`) after a 2 s grace. `McpHttpClient` implements `rmcp`'s
 `StreamableHttpClient` over the shared `reqwest` client, sends static headers verbatim (secret
 values resolved at launch, never stored or logged) and names a 401/403 in the error. The client
 asks for `2025-06-18` and accepts three protocol versions. Stdio servers get the
-`mcp-toolchain` env under app data, a server's own env wins. A start that fails is never
+toolchain env (`assets/toolchain`, package caches in `cache/packages`), a server's own env wins. A start that fails is never
 restarted; a server that dies is restarted with backoff (1 s doubling to 60 s, five attempts).
 Discovered tools are registered as `mcp` tools and kernel nodes under `namespace.tool`;
 `dispose()` (shutdown stage `Dispose`) stops every server. Tests drive
@@ -514,7 +537,7 @@ deltas, several per reply, so services never branch on `ToolMode::Injected`.
 `browser::policy` holds the rules the browser workspace in `zvs-studio` enforces. Only
 `http:`/`https:` URLs without credentials are web URLs, and `navigation_url` turns typed text
 into one (`example.com` and `localhost:8123` get `https://`). The work profile is the WebView2
-user-data directory `<app data>/browser/work`. `BrowserLifecycle` delivers `link-finished`,
+user-data directory `<state root>/profiles/browser/work`. `BrowserLifecycle` delivers `link-finished`,
 `link-tab-closed`, `workspace-closed` and `cookies-cleared` to subscribers; dropping the
 `LifecycleSubscription` unsubscribes.
 

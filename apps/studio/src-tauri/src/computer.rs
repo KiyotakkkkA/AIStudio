@@ -228,18 +228,21 @@ impl ComputerShell {
         if let Some(existing) = self.0.app.get_webview_window(label) {
             return Some(existing);
         }
-        let window = WebviewWindowBuilder::new(&self.0.app, label, WebviewUrl::App(PAGE.into()))
-            .title("ZVS AI Studio")
-            .decorations(false)
-            .transparent(true)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .shadow(false)
-            .focused(false)
-            .visible(false)
-            .build()
-            .ok()?;
+        let mut builder =
+            WebviewWindowBuilder::new(&self.0.app, label, WebviewUrl::App(PAGE.into()))
+                .title("ZVS AI Studio")
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .shadow(false)
+                .focused(false)
+                .visible(false);
+        if let Some(dir) = crate::window::shell_profile() {
+            builder = builder.data_directory(dir);
+        }
+        let window = builder.build().ok()?;
         if let Some(handle) = raw(&window) {
             overlay::hide_from_capture(handle);
             overlay::set_no_activate(handle, true);

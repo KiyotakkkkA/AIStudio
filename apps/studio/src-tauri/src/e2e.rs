@@ -8,7 +8,6 @@ const DEFAULT_BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSma
 const CDP_PORT: &str = "ZVS_E2E_CDP_PORT";
 #[cfg(feature = "e2e")]
 const DATA_DIR: &str = "ZVS_DATA_DIR";
-const WEBVIEW_DIR: &str = "webview";
 
 pub fn webview2_variables(names: impl IntoIterator<Item = OsString>) -> Vec<OsString> {
     names
@@ -61,10 +60,6 @@ pub fn browser_args() -> Option<String> {
 #[cfg(not(feature = "e2e"))]
 pub const fn browser_args() -> Option<String> {
     None
-}
-
-pub fn webview_dir() -> Option<PathBuf> {
-    data_dir().map(|dir| dir.join(WEBVIEW_DIR))
 }
 
 #[cfg(test)]
@@ -122,6 +117,5 @@ mod tests {
     fn without_the_feature_nothing_opens_a_port_or_moves_the_data() {
         assert_eq!(browser_args(), None);
         assert_eq!(data_dir(), None);
-        assert_eq!(webview_dir(), None);
     }
 }

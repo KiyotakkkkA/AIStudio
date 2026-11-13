@@ -164,7 +164,7 @@ mod tests {
         assert_eq!(disk["ok"], json!(true), "{disk}");
         assert_eq!(
             disk["data"]["root"],
-            json!(host.downloads_dir().to_string_lossy())
+            json!(host.assets_dir().to_string_lossy())
         );
         assert_eq!(
             server

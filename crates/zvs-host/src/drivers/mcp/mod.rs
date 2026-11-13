@@ -14,5 +14,5 @@ pub use protocol::{
     infer_read_only,
 };
 pub use stdio::{LaunchSpec, SpawnServer, default_spawn, kill_tree};
-pub use toolchain_env::{TOOLCHAIN_DIR, isolated_toolchain_env};
+pub use toolchain_env::{ToolchainDirs, isolated_toolchain_env};
 pub use transport::TransportHooks;

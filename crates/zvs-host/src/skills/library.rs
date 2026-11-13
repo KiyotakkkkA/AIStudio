@@ -30,6 +30,7 @@ use crate::data::{Database, Repositories};
 use crate::platform::clock::{SharedClock, SystemClock};
 use crate::platform::ids::new_id;
 use crate::platform::logger::{LogLevel, SharedLogger, silent_logger};
+use crate::platform::paths::StoredPaths;
 
 pub const SKILLS_DIR: &str = "skills";
 pub const SKILL_NOT_FOUND: &str = "Навык не найден";
@@ -58,6 +59,7 @@ const TRASH_PREFIX: &str = ".trash-";
 pub struct SkillLibraryOptions {
     pub database: Arc<Database>,
     pub root: PathBuf,
+    pub stored: StoredPaths,
     pub logger: SharedLogger,
     pub clock: SharedClock,
     pub bundled: &'static [BundledSkill],
@@ -68,6 +70,7 @@ impl SkillLibraryOptions {
         Self {
             database,
             root,
+            stored: StoredPaths::default(),
             logger: silent_logger(),
             clock: Arc::new(SystemClock),
             bundled: BUNDLED_SKILLS,
@@ -78,6 +81,7 @@ impl SkillLibraryOptions {
 struct Inner {
     database: Arc<Database>,
     root: PathBuf,
+    stored: StoredPaths,
     logger: SharedLogger,
     clock: SharedClock,
     bundled: &'static [BundledSkill],
@@ -493,12 +497,17 @@ impl SkillLibrary {
             inner: Arc::new(Inner {
                 database: options.database,
                 root: options.root,
+                stored: options.stored,
                 logger: options.logger,
                 clock: options.clock,
                 bundled: options.bundled,
                 writing: Mutex::new(()),
             }),
         }
+    }
+
+    fn dir(&self, row: &SkillRow) -> PathBuf {
+        self.inner.stored.decode(&row.path)
     }
 
     pub fn root(&self) -> &Path {
@@ -574,7 +583,7 @@ impl SkillLibrary {
         let recorded = seeded
             .get(&row.key)
             .and_then(|entry| entry.digest.as_deref());
-        let modified = match (recorded, digest(Path::new(&row.path))) {
+        let modified = match (recorded, digest(&self.dir(row))) {
             (Some(recorded), Ok(current)) => recorded != current,
             _ => true,
         };
@@ -597,7 +606,7 @@ impl SkillLibrary {
     }
 
     fn refresh_with(&self, row: SkillRow) -> Result<SkillRow, AppError> {
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(&row);
         let scanned = if dir.join(SKILL_FILE).is_file() {
             scan(&dir).ok()
         } else {
@@ -688,7 +697,7 @@ impl SkillLibrary {
                 issues: Vec::new(),
                 file_count: 0,
                 content_hash: String::new(),
-                path: path.to_string_lossy().into_owned(),
+                path: self.inner.stored.encode(&path),
                 version: None,
                 author: None,
                 created_at: now,
@@ -725,7 +734,7 @@ impl SkillLibrary {
     }
 
     fn detail(&self, row: &SkillRow) -> Result<SkillDetailDto, AppError> {
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(row);
         let (instructions, files) = match scan(&dir) {
             Ok(scanned) => (
                 scanned
@@ -875,7 +884,7 @@ impl SkillLibrary {
             return Err(rejected(&issues));
         }
         let target = self.inner.root.join(&draft.key);
-        let previous = existing.map(|row| PathBuf::from(&row.path));
+        let previous = existing.map(|row| self.dir(row));
         if target.exists() && previous.as_deref() != Some(target.as_path()) {
             return Err(rejected(&[issue("key", SkillIssueRule::Duplicate)]));
         }
@@ -904,7 +913,7 @@ impl SkillLibrary {
             issues,
             file_count: scanned.files.len() as i64,
             content_hash: scanned.fingerprint,
-            path: target.to_string_lossy().into_owned(),
+            path: self.inner.stored.encode(&target),
             version: limited(meta(&draft.metadata, VERSION), SKILL_VERSION_MAX),
             author: limited(meta(&draft.metadata, AUTHOR), SKILL_AUTHOR_MAX),
             created_at: existing.map_or(now, |row| row.created_at),
@@ -945,8 +954,8 @@ impl SkillLibrary {
         self.commit(None, draft)
     }
 
-    fn draft_of(row: &SkillRow) -> Result<Draft, AppError> {
-        let dir = PathBuf::from(&row.path);
+    fn draft_of(&self, row: &SkillRow) -> Result<Draft, AppError> {
+        let dir = self.dir(row);
         let scanned = scan(&dir).map_err(|error| storage(&error))?;
         let manifest = scanned
             .manifest
@@ -988,7 +997,7 @@ impl SkillLibrary {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let row = self.find(&input.id.to_string())?;
-        let mut draft = Self::draft_of(&row)?;
+        let mut draft = self.draft_of(&row)?;
         if let Some(key) = &input.key {
             js_trim(key).clone_into(&mut draft.key);
         }
@@ -1100,7 +1109,7 @@ impl SkillLibrary {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let row = self.find(&id.to_string())?;
-        let mut draft = Self::draft_of(&row)?;
+        let mut draft = self.draft_of(&row)?;
         let taken: HashSet<String> = self.rows()?.into_iter().map(|row| row.key).collect();
         draft.key = copy_key(&row.key, |candidate| {
             taken.contains(candidate) || self.inner.root.join(candidate).exists()
@@ -1255,7 +1264,7 @@ impl SkillLibrary {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         let row = self.find(&id.to_string())?;
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(&row);
         if dir.exists() {
             let trash = self
                 .inner
@@ -1347,7 +1356,7 @@ impl SkillLibrary {
 
     pub fn export(&self, id: &SkillId, destination: &Path) -> Result<PathBuf, AppError> {
         let row = self.find(&id.to_string())?;
-        let source = PathBuf::from(&row.path);
+        let source = self.dir(&row);
         let scanned = scan(&source).map_err(|error| storage(&error))?;
         let target = destination.join(&row.key);
         if target.exists() {
@@ -1388,7 +1397,7 @@ impl SkillLibrary {
 
     pub fn load(&self, key: &str) -> Result<LoadedSkill, AppError> {
         let row = self.usable_row(key)?;
-        let scanned = scan(Path::new(&row.path)).map_err(|error| storage(&error))?;
+        let scanned = scan(&self.dir(&row)).map_err(|error| storage(&error))?;
         let manifest = scanned
             .manifest
             .as_deref()
@@ -1429,7 +1438,7 @@ impl SkillLibrary {
 
     pub fn folder(&self, key: &str) -> Result<PathBuf, AppError> {
         let row = self.usable_row(key)?;
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(&row);
         if dir.is_dir() {
             Ok(dir)
         } else {
@@ -1442,7 +1451,7 @@ impl SkillLibrary {
         if !is_skill_path(path) {
             return Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND));
         }
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(&row);
         let file = path
             .split('/')
             .fold(dir.clone(), |file, segment| file.join(segment));
@@ -1458,7 +1467,7 @@ impl SkillLibrary {
         if !is_skill_path(path) {
             return Err(AppError::new(AppErrorCode::NotFound, SKILL_FILE_NOT_FOUND));
         }
-        let dir = PathBuf::from(&row.path);
+        let dir = self.dir(&row);
         let file = path
             .split('/')
             .fold(dir.clone(), |file, segment| file.join(segment));

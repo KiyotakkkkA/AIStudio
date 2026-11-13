@@ -43,7 +43,9 @@ test("file tools access their own conversation directory and reject another owne
         modelId: "fixture-chat",
       });
     const conversation = await createConversation();
-    const owner = assertTemporaryPath(join(directory.path, "conversations", conversation.id));
+    const owner = assertTemporaryPath(
+      join(directory.path, "data", "conversations", conversation.id),
+    );
     const folder = join(owner, "attachments", "browser");
     const file = join(folder, "note.txt");
     const run = async (type: string, input: Record<string, unknown>, status = "succeeded") => {
@@ -96,9 +98,9 @@ test("file tools access their own conversation directory and reject another owne
     }
     const other = await createConversation();
     const secret = assertTemporaryPath(
-      join(directory.path, "conversations", other.id, "private.txt"),
+      join(directory.path, "data", "conversations", other.id, "private.txt"),
     );
-    await mkdir(join(directory.path, "conversations", other.id), { recursive: true });
+    await mkdir(join(directory.path, "data", "conversations", other.id), { recursive: true });
     await writeFile(secret, "private");
     await run("fs.read", { paths: [{ path: secret }] }, "failed");
     await run(

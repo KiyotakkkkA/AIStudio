@@ -125,7 +125,7 @@ pub struct RuntimeServiceOptions {
     pub downloads: Arc<dyn RuntimeDownloads>,
     pub catalogue: Arc<dyn RuntimeCatalogue>,
     pub settings: SettingService,
-    pub downloads_dir: PathBuf,
+    pub assets_dir: PathBuf,
     pub device: Option<Arc<dyn RuntimeDevice>>,
     pub resolver: ReleaseResolver,
     pub http: HttpClient,
@@ -526,7 +526,7 @@ impl RuntimeService {
         };
         self.stop(runtime_id);
         self.wait_stopped().await;
-        let target = runtime_install_path(&self.inner.options.downloads_dir, runtime_id)
+        let target = runtime_install_path(&self.inner.options.assets_dir, runtime_id)
             .map_err(|error| path_failure(&error))?;
         if target.exists() {
             let removal = target.clone();
@@ -677,7 +677,7 @@ impl RuntimeService {
         let Some(definition) = definition_of(&parsed.runtime_id) else {
             return Ok(());
         };
-        let target = runtime_install_path(&self.inner.options.downloads_dir, definition.id)
+        let target = runtime_install_path(&self.inner.options.assets_dir, definition.id)
             .map_err(|error| path_failure(&error))?;
         let report = extract_archive(
             Path::new(&row.target_path),
@@ -766,12 +766,7 @@ impl RuntimeService {
     fn model_path(&self, model_name: &str) -> Result<String, AppError> {
         let safe = file_name(model_name);
         for kind in [DownloadKind::Embedding, DownloadKind::Model] {
-            let candidate = self
-                .inner
-                .options
-                .downloads_dir
-                .join(kind.folder())
-                .join(&safe);
+            let candidate = kind.dir(&self.inner.options.assets_dir).join(&safe);
             if candidate.is_file() {
                 return Ok(candidate.to_string_lossy().into_owned());
             }

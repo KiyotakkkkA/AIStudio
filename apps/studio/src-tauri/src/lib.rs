@@ -11,20 +11,21 @@ mod toast;
 mod window;
 
 use std::error::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
 
 use serde_json::json;
-use tauri::{App, AppHandle, Manager, RunEvent, WindowEvent};
+use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 use tauri_plugin_deep_link::DeepLinkExt;
 use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
+use zvs_host::boot::{Boot as StateBoot, BootDecision, BootError, LegacySources};
 use zvs_host::browser::{
     AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserExtensions,
     BrowserGrants, BrowserImporter, BrowserLibrary, BrowserLifecycle, BrowserSettings, ImportRoots,
-    RoutedPages, profile_dir, register_browser_nodes, setting_limit, tool_switch,
+    RoutedPages, register_browser_nodes, setting_limit, tool_switch,
 };
 use zvs_host::commands::{CommandToolOptions, register_command_nodes};
 use zvs_host::computer::{
@@ -45,7 +46,7 @@ use zvs_host::drivers::ai::{
     ProviderRegistryOptions, ProxyMode,
 };
 use zvs_host::drivers::core::InProcessCore;
-use zvs_host::drivers::mcp::TOOLCHAIN_DIR;
+use zvs_host::drivers::mcp::ToolchainDirs;
 use zvs_host::drivers::sidecar::{SidecarDriver, SidecarOptions};
 use zvs_host::files::{FileToolOptions, VirtualRoots, register_file_nodes};
 use zvs_host::indexing::{
@@ -60,7 +61,7 @@ use zvs_host::kernel::{
     KernelServices, NodeRegistry, register_core_nodes, register_download_nodes, register_job_nodes,
 };
 use zvs_host::notifications::{NotificationService, NotificationServiceOptions};
-use zvs_host::platform::clock::{SharedClock, SystemClock};
+use zvs_host::platform::clock::{Clock, SharedClock, SystemClock};
 use zvs_host::platform::device::{DeviceProbe, DeviceProbeOptions};
 use zvs_host::platform::disk::free_bytes;
 use zvs_host::platform::events::{EventBus, EventBusOptions, EventRecorder};
@@ -79,13 +80,13 @@ use zvs_host::platform::theme::{
     apply_palette, apply_theme_source,
 };
 use zvs_host::platform::window_state::{WINDOW_STATE_KEY, WindowState, read_window_state};
-use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, POLICY_DIR, SealedPackKeys};
+use zvs_host::policy::{ExecPolicyOptions, ExecPolicyService, SealedPackKeys};
 use zvs_host::runtimes::{
     ReleaseResolver, ReleaseResolverOptions, RuntimeService, RuntimeServiceOptions,
 };
 use zvs_host::scenarios::{
-    EffectsSlot, HostScenarioEffects, SCENARIO_FILES_DIR, ScenarioNodeOptions, ScenarioRunner,
-    ScenarioRunnerOptions, ScenarioService, ScenarioServiceOptions, register_scenario_nodes,
+    EffectsSlot, HostScenarioEffects, ScenarioNodeOptions, ScenarioRunner, ScenarioRunnerOptions,
+    ScenarioService, ScenarioServiceOptions, register_scenario_nodes,
 };
 use zvs_host::services::rerank::local_rerankers;
 use zvs_host::services::system::DEMO_INTERVAL;
@@ -99,8 +100,7 @@ use zvs_host::services::{
     VectorStoreService, VectorStoreServiceOptions,
 };
 use zvs_host::skills::{
-    SKILLS_DIR, SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions,
-    register_skill_nodes,
+    SkillLibrary, SkillLibraryOptions, SkillService, SkillServiceOptions, register_skill_nodes,
 };
 use zvs_host::terminal::{NativePty, SystemShells, TerminalService, TerminalServiceOptions};
 use zvs_host::toolchain::{
@@ -124,7 +124,7 @@ use crate::shell::{ShellState, TauriShell};
 use crate::theme::TauriTheme;
 use zvs_host::platform::picker::SharedPicker;
 
-enum Boot {
+enum Launch {
     Studio {
         host: Host,
         window: WindowState,
@@ -183,82 +183,191 @@ pub fn run() {
             commands::computer_subscribe,
             commands::computer_pointer
         ])
-        .setup(|app| {
-            match compose(app)? {
-                Boot::Studio {
-                    host,
-                    window,
-                    hidden,
-                    shell,
-                    logger,
-                    lifecycle,
-                    browser,
-                } => {
-                    let services = Arc::clone(&host.services);
-                    let zoom_services = Arc::clone(&services);
-                    let gateway = browser.gateway;
-                    #[cfg(feature = "e2e")]
-                    probe_gateway(Arc::clone(&gateway), logger.clone());
-                    app.manage(browser.workspace);
-                    app.manage(browser.computer);
-                    app.manage(Arc::clone(&gateway));
-                    app.manage(browser.events);
-                    app.manage(host);
-                    app.manage(lifecycle);
-                    window::create_studio(app.handle(), window, hidden, shell, move |state| {
-                        let stored = serde_json::to_value(state)
-                            .map_err(|error| error.to_string())
-                            .and_then(|value| {
-                                services
-                                    .settings
-                                    .set(WINDOW_STATE_KEY, &value)
-                                    .map_err(|error| error.to_string())
-                            });
-                        if let Err(error) = stored {
-                            logger.log(
-                                LogLevel::Warn,
-                                "window",
-                                "Could not store the window geometry",
-                                &[("error", json!(error))],
-                            );
-                        }
-                    })?;
-                    if let Ok(stored) = zoom_services.settings.get(FONT_SIZE_SETTING_KEY) {
-                        apply_interface_zoom(
-                            stored.map(|setting| setting.value).as_ref(),
-                            zoom_services.theme.as_ref(),
-                        );
-                    }
-                    if let Ok(stored) = zoom_services.settings.get(THEME_SETTING_KEY) {
-                        apply_theme_source(
-                            stored.map(|setting| setting.value).as_ref(),
-                            zoom_services.theme.as_ref(),
-                        );
-                    }
-                    for mode in PaletteMode::ALL {
-                        if let Ok(stored) = zoom_services.settings.get(mode.setting_key()) {
-                            apply_palette(
-                                mode.setting_key(),
-                                stored.map(|setting| setting.value).as_ref(),
-                                zoom_services.theme.as_ref(),
-                            );
-                        }
-                    }
-                    if let Some(studio) = app.get_window(window::STUDIO) {
-                        studio.on_window_event(move |event| {
-                            if let WindowEvent::Destroyed = event {
-                                gateway.dispose();
-                            }
-                        });
-                    }
-                }
-                Boot::Recovery(failure) => window::create_recovery(app.handle(), &failure)?,
-            }
-            Ok(())
-        })
+        .setup(|app| start(app.handle()))
         .build(tauri::generate_context!())
         .expect("ZVS AI Studio failed to start")
         .run(on_run_event);
+}
+
+fn resolve_paths(app: &AppHandle) -> tauri::Result<(StudioPaths, Option<LegacySources>)> {
+    let packaged = !tauri::is_dev();
+    let (state_dir, legacy) = match e2e::data_dir() {
+        Some(dir) => (dir, None),
+        None => (
+            zvs_contract::layout::state_root(&app.path().local_data_dir()?, !packaged),
+            Some(LegacySources {
+                roaming: app.path().app_data_dir()?,
+                local: app.path().app_local_data_dir().ok(),
+            }),
+        ),
+    };
+    let paths = StudioPaths::resolve(&PathEnvironment {
+        state_dir,
+        resource_dir: app.path().resource_dir()?,
+        executable_dir: std::env::current_exe()?
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default(),
+        packaged,
+    });
+    Ok((paths, legacy))
+}
+
+fn boot_failure(
+    error: &BootError,
+    paths: &StudioPaths,
+    legacy: Option<&LegacySources>,
+) -> MigrationFailed {
+    let preserved = match error {
+        BootError::Io(_) | BootError::Mismatch(_) => legacy
+            .filter(|legacy| legacy.present())
+            .map_or_else(|| paths.root.clone(), |legacy| legacy.roaming.clone()),
+        _ => paths.root.clone(),
+    };
+    MigrationFailed {
+        message: error.to_string(),
+        backups_dir: preserved,
+    }
+}
+
+fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
+    let (paths, legacy) = resolve_paths(app)?;
+    window::set_shell_profile(paths.shell_profile_dir.clone());
+    let boot = StateBoot::new(&paths.root, legacy.as_ref());
+    let decision = match boot.inspect() {
+        Ok(decision) => decision,
+        Err(error) => {
+            window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
+            return Ok(());
+        }
+    };
+    match decision {
+        BootDecision::Migrate(_) => migrate_then_launch(app, paths, legacy, decision),
+        _ => {
+            if let Err(error) = boot.run(&decision, SystemClock.now(), &|_| {}) {
+                window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
+                return Ok(());
+            }
+            let packaged = paths.packaged;
+            let root = paths.root.clone();
+            launch(app, paths)?;
+            if packaged && let Some(legacy) = legacy {
+                std::thread::spawn(move || {
+                    zvs_host::boot::sweep_legacy(&root, &legacy, SystemClock.now());
+                });
+            }
+            Ok(())
+        }
+    }
+}
+
+fn migrate_then_launch(
+    app: &AppHandle,
+    paths: StudioPaths,
+    legacy: Option<LegacySources>,
+    decision: BootDecision,
+) -> Result<(), Box<dyn Error>> {
+    window::create_boot(app)?;
+    let app = app.clone();
+    std::thread::Builder::new()
+        .name("state-migration".to_owned())
+        .spawn(move || {
+            let reporter = window::BootReporter::new(app.clone());
+            let outcome = StateBoot::new(&paths.root, legacy.as_ref()).run(
+                &decision,
+                SystemClock.now(),
+                &|progress| reporter.report(progress),
+            );
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                let failure = match outcome {
+                    Ok(()) => launch(&handle, paths).err().map(|error| MigrationFailed {
+                        message: error.to_string(),
+                        backups_dir: PathBuf::new(),
+                    }),
+                    Err(error) => Some(boot_failure(&error, &paths, legacy.as_ref())),
+                };
+                if let Some(failure) = failure {
+                    let _ = window::create_recovery(&handle, &failure);
+                }
+                window::close_boot(&handle);
+            });
+        })?;
+    Ok(())
+}
+
+fn launch(app: &AppHandle, paths: StudioPaths) -> Result<(), Box<dyn Error>> {
+    match compose(app, paths)? {
+        Launch::Studio {
+            host,
+            window,
+            hidden,
+            shell,
+            logger,
+            lifecycle,
+            browser,
+        } => {
+            let services = Arc::clone(&host.services);
+            let zoom_services = Arc::clone(&services);
+            let gateway = browser.gateway;
+            #[cfg(feature = "e2e")]
+            probe_gateway(Arc::clone(&gateway), logger.clone());
+            app.manage(browser.workspace);
+            app.manage(browser.computer);
+            app.manage(Arc::clone(&gateway));
+            app.manage(browser.events);
+            app.manage(host);
+            app.manage(lifecycle);
+            window::create_studio(app, window, hidden, shell, move |state| {
+                let stored = serde_json::to_value(state)
+                    .map_err(|error| error.to_string())
+                    .and_then(|value| {
+                        services
+                            .settings
+                            .set(WINDOW_STATE_KEY, &value)
+                            .map_err(|error| error.to_string())
+                    });
+                if let Err(error) = stored {
+                    logger.log(
+                        LogLevel::Warn,
+                        "window",
+                        "Could not store the window geometry",
+                        &[("error", json!(error))],
+                    );
+                }
+            })?;
+            if let Ok(stored) = zoom_services.settings.get(FONT_SIZE_SETTING_KEY) {
+                apply_interface_zoom(
+                    stored.map(|setting| setting.value).as_ref(),
+                    zoom_services.theme.as_ref(),
+                );
+            }
+            if let Ok(stored) = zoom_services.settings.get(THEME_SETTING_KEY) {
+                apply_theme_source(
+                    stored.map(|setting| setting.value).as_ref(),
+                    zoom_services.theme.as_ref(),
+                );
+            }
+            for mode in PaletteMode::ALL {
+                if let Ok(stored) = zoom_services.settings.get(mode.setting_key()) {
+                    apply_palette(
+                        mode.setting_key(),
+                        stored.map(|setting| setting.value).as_ref(),
+                        zoom_services.theme.as_ref(),
+                    );
+                }
+            }
+            if let Some(studio) = app.get_window(window::STUDIO) {
+                studio.on_window_event(move |event| {
+                    if let WindowEvent::Destroyed = event {
+                        gateway.dispose();
+                    }
+                });
+            }
+        }
+        Launch::Recovery(failure) => window::create_recovery(app, &failure)?,
+    }
+    Ok(())
 }
 
 #[cfg(feature = "e2e")]
@@ -385,7 +494,7 @@ fn reject_launch_link(logger: &SharedLogger, url: &str) {
     );
 }
 
-fn register_link_scheme(app: &App, logger: &SharedLogger) {
+fn register_link_scheme(app: &AppHandle, logger: &SharedLogger) {
     if let Err(error) = app.deep_link().register(NOTIFICATION_SCHEME) {
         logger.log(
             LogLevel::Warn,
@@ -438,31 +547,7 @@ fn on_run_event(app: &AppHandle, event: RunEvent) {
 }
 
 const APP_NAME: &str = "ZVS AI Studio";
-const TOAST_ICON: &[u8] = include_bytes!("../icons/128x128.png");
-
-fn write_toast_icon(data_dir: &Path) -> Option<std::path::PathBuf> {
-    let icon = data_dir.join("shell").join("notification.png");
-    if std::fs::read(&icon).ok().as_deref() != Some(TOAST_ICON) {
-        std::fs::create_dir_all(icon.parent()?).ok()?;
-        std::fs::write(&icon, TOAST_ICON).ok()?;
-    }
-    Some(icon)
-}
-
-fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
-    let data_dir = match e2e::data_dir() {
-        Some(dir) => dir,
-        None => app.path().app_data_dir()?,
-    };
-    let paths = StudioPaths::resolve(&PathEnvironment {
-        data_dir: data_dir.clone(),
-        resource_dir: app.path().resource_dir()?,
-        executable_dir: std::env::current_exe()?
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_default(),
-        packaged: !tauri::is_dev(),
-    });
+fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>> {
     let clock: SharedClock = Arc::new(SystemClock);
 
     let mut options = LoggerOptions::new(paths.logs_dir.clone(), LogLevel::Info, clock.clone());
@@ -482,7 +567,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         clock: clock.clone(),
     }) {
         Ok(prepared) => prepared,
-        Err(failure) => return Ok(Boot::Recovery(failure)),
+        Err(failure) => return Ok(Launch::Recovery(failure)),
     };
     logger.log(
         LogLevel::Info,
@@ -490,16 +575,28 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         "Database ready",
         &[("applied", json!(report.applied.len()))],
     );
+    let swept = zvs_host::boot::sweep_temp(&[paths.staging_dir.clone(), paths.runs_dir.clone()]);
+    if swept > 0 {
+        logger.log(
+            LogLevel::Info,
+            "host",
+            "Cleared temporary files",
+            &[("count", json!(swept))],
+        );
+    }
     let database = Arc::new(database);
 
-    let theme: SharedThemePort = Arc::new(TauriTheme::new(app.handle().clone()));
+    let theme: SharedThemePort = Arc::new(TauriTheme::new(app.clone()));
     let shell_state = ShellState::shared();
     let activation: toast::ActivationSlot = Arc::new(OnceLock::new());
     app.manage(Arc::clone(&activation));
     if !paths.packaged && e2e::data_dir().is_none() {
         register_link_scheme(app, &logger);
     }
-    let toast_icon = write_toast_icon(&paths.data_dir);
+    let toast_icon = paths
+        .notification_icon
+        .is_file()
+        .then(|| paths.notification_icon.clone());
     let toaster = platform::toaster(
         &app.config().identifier,
         APP_NAME,
@@ -508,7 +605,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger.clone(),
     );
     let shell: SharedShellPort = Arc::new(TauriShell::new(
-        app.handle().clone(),
+        app.clone(),
         Arc::clone(&shell_state),
         toaster,
     ));
@@ -572,12 +669,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     );
 
     let browser_events = BrowserLifecycle::new();
-    let profile = profile_dir(&data_dir);
+    let profile = paths.browser_profile_dir.clone();
     let tokens = BearerTokens::default();
     let navigator: SharedNavigator = Arc::new(events.clone());
     let agent = BrowserAgent::new(clock.clone());
     let workspace = BrowserWorkspace::new(
-        app.handle().clone(),
+        app.clone(),
         profile.clone(),
         browser_events.clone(),
         tokens.clone(),
@@ -585,7 +682,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         agent.clone(),
     );
     let gateway = Arc::new(AccountGateway::with_options(
-        Arc::new(WebviewPages::new(app.handle().clone(), profile)),
+        Arc::new(WebviewPages::new(app.clone(), profile)),
         tokens,
         GatewayOptions::default(),
         logger.clone(),
@@ -617,7 +714,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger.clone(),
     ));
     registry.local_models = Some(Arc::new(FileSystemModelStore::new(
-        paths.downloads_dir.clone(),
+        paths.assets_dir.clone(),
     )));
     registry.logger = logger.clone();
     let registry = Arc::new(ProviderRegistry::new(registry));
@@ -659,7 +756,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let device = Arc::new(DeviceProbe::new(DeviceProbeOptions {
         gpu: Some(platform::gpu_probe()),
         free_disk: Some({
-            let downloads = paths.downloads_dir.clone();
+            let downloads = paths.assets_dir.clone();
             Arc::new(move || free_bytes(&downloads))
         }),
         logger: logger.clone(),
@@ -705,9 +802,9 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         )
     });
     let disk = DiskService::new(DiskServiceOptions::new(
-        paths.downloads_dir.clone(),
+        paths.assets_dir.clone(),
         paths.vector_stores_dir.clone(),
-        paths.data_dir.clone(),
+        paths.root.clone(),
         clock.clone(),
     ));
     let ollama_base_url = {
@@ -744,12 +841,14 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     let downloads = DownloadService::new(DownloadServiceOptions {
         settings: Some(settings.clone()),
+        staging_dir: Some(paths.temp_downloads_dir.clone()),
+        stored: paths.stored_paths(),
         ..DownloadServiceOptions::new(
             Arc::clone(&database),
             Arc::new(sidecar.clone()),
             disk,
             catalogue.clone(),
-            paths.downloads_dir.clone(),
+            paths.assets_dir.clone(),
             logger.clone(),
             clock.clone(),
         )
@@ -758,7 +857,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         downloads: Arc::new(downloads.clone()),
         catalogue: Arc::new(catalogue.clone()),
         settings: settings.clone(),
-        downloads_dir: paths.downloads_dir.clone(),
+        assets_dir: paths.assets_dir.clone(),
         device: Some(device.clone()),
         resolver: ReleaseResolver::new(ReleaseResolverOptions::new(
             http.clone(),
@@ -775,11 +874,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     downloads.attach_installer(Arc::new(runtimes.clone()));
     catalogue.add_provider(runtimes.catalogue_provider());
-    let picker: SharedPicker = Arc::new(DialogPicker::new(app.handle().clone()));
+    let picker: SharedPicker = Arc::new(DialogPicker::new(app.clone()));
     let toolchain = ToolchainService::new(ToolchainServiceOptions {
         picker: Some(Arc::clone(&picker)),
+        package_cache: Some(paths.package_cache_dir.clone()),
         ..ToolchainServiceOptions::new(
-            paths.data_dir.join(TOOLCHAIN_DIR),
+            paths.toolchain_dir.clone(),
             settings.clone(),
             Arc::new(downloads.clone()),
             Arc::new(catalogue.clone()),
@@ -799,7 +899,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         audio: platform::audio_input(),
         device: Some(device.clone()),
         recognizer: Arc::new(WhisperCli),
-        downloads_dir: paths.downloads_dir.clone(),
+        assets_dir: paths.assets_dir.clone(),
         cache_dir: paths.cache_dir.clone(),
         platform: zvs_host::runtimes::Platform::current(),
         logger: logger.clone(),
@@ -811,7 +911,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let documents = DocumentExtractorOptions {
         jobs: Arc::new(sidecar.clone()),
         ocr: Some(Arc::new(runtimes.clone())),
-        scratch_dir: paths.cache_dir.join("documents"),
+        scratch_dir: paths.documents_cache_dir.clone(),
         logger: logger.clone(),
     };
     indexing
@@ -845,24 +945,25 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     let skill_library = SkillLibrary::new(SkillLibraryOptions {
         logger: logger.clone(),
         clock: clock.clone(),
-        ..SkillLibraryOptions::new(Arc::clone(&database), paths.data_dir.join(SKILLS_DIR))
+        stored: paths.stored_paths(),
+        ..SkillLibraryOptions::new(Arc::clone(&database), paths.skills_dir.clone())
     });
     let artifacts = ArtifactStore::new(paths.conversations_dir.clone())
-        .with_library(DASHBOARDS, paths.data_dir.join(DASHBOARDS))
+        .with_library(DASHBOARDS, paths.dashboards_dir.clone())
         .with_dashboards(Arc::new(ProcessDashboardRunner::new(
             Arc::new(toolchain.clone()),
             skill_library.clone(),
         )))
         .with_picker(Arc::clone(&picker))
         .with_launcher(platform::file_launcher())
-        .with_thumbnails(paths.cache_dir.join("gallery"))
+        .with_thumbnails(paths.thumbnails_dir.clone(), paths.capture_dir.clone())
         .with_pages(Arc::new(RoutedPages::new(
             Arc::new(WorkspacePages(workspace.clone())),
             zvs_host::platform::external::system_url_opener(),
             browser_settings.clone(),
         )));
     let sites = zvs_host::sites::SiteService::new(zvs_host::sites::SiteServiceOptions {
-        cache_dir: Some(paths.cache_dir.join("favicons")),
+        cache_dir: Some(paths.favicons_dir.clone()),
         pages: Some(Arc::new(RoutedPages::new(
             Arc::new(WorkspacePages(workspace.clone())),
             zvs_host::platform::external::system_url_opener(),
@@ -885,7 +986,10 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         logger: logger.clone(),
         clock: clock.clone(),
         client_version: app.package_info().version.to_string(),
-        toolchain_dir: Some(paths.data_dir.join(TOOLCHAIN_DIR)),
+        toolchain_dir: Some(ToolchainDirs::new(
+            paths.toolchain_dir.clone(),
+            paths.package_cache_dir.clone(),
+        )),
         toolchain: Some(Arc::new(toolchain.clone())),
         runtime: Some(runtime.clone()),
         opener: Some(zvs_host::platform::external::system_url_opener()),
@@ -899,7 +1003,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     });
     let exec_policy = ExecPolicyService::new(ExecPolicyOptions {
         logger: logger.clone(),
-        packs: Some(paths.data_dir.join(POLICY_DIR)),
+        packs: Some(paths.policy_dir.clone()),
         keys: Some(Arc::new(SealedPackKeys::new(
             SettingService::new(Arc::clone(&database), clock.clone()),
             Arc::clone(&secrets),
@@ -935,11 +1039,12 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..ScenarioServiceOptions::new(Arc::clone(&database), Arc::clone(&nodes))
     });
     let forbidden = ForbiddenFolders::from_environment(&[
+        paths.root.clone(),
         paths.data_dir.clone(),
+        paths.assets_dir.clone(),
+        paths.profiles_dir.clone(),
         paths.cache_dir.clone(),
         paths.logs_dir.clone(),
-        paths.downloads_dir.clone(),
-        profile_dir(&paths.data_dir),
     ]);
     let folders = FolderAccessService::new(
         Arc::clone(&database),
@@ -956,7 +1061,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         ..DocumentServiceOptions::new(
             Arc::clone(&database),
             core.clone(),
-            paths.cache_dir.join("documents"),
+            paths.documents_cache_dir.clone(),
         )
     });
     register_file_nodes(
@@ -975,10 +1080,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         CommandToolOptions {
             roots,
             shells: Some(shells.clone()),
-            ..CommandToolOptions::new(
-                Some(Arc::new(toolchain.clone())),
-                paths.cache_dir.join("code-runs"),
-            )
+            ..CommandToolOptions::new(Some(Arc::new(toolchain.clone())), paths.runs_dir.clone())
         },
     )?;
     let grants = BrowserGrants::new(Arc::clone(&database), clock.clone());
@@ -1015,11 +1117,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         },
         browser_library.clone(),
     );
-    let browser_extensions = BrowserExtensions::new(
-        profile_dir(&paths.data_dir)
-            .parent()
-            .unwrap_or(&paths.data_dir),
-    );
+    let browser_extensions = BrowserExtensions::new(&paths.extensions_dir);
     workspace.set_extensions(browser_extensions.enabled_folders());
     {
         let workspace = workspace.clone();
@@ -1042,7 +1140,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
                 Arc::new(move |args: &[String]| {
                     toolchain.launch(zvs_host::toolchain::ToolchainCommand::Uv, args)
                 }),
-                paths.data_dir.join("computer"),
+                paths.computer_dir.clone(),
                 logger.clone(),
             )),
             Arc::clone(&database),
@@ -1279,7 +1377,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     scenario_effects.attach(Arc::new(HostScenarioEffects {
         chat: chat.clone(),
         notifications: Some(notifications.clone()),
-        files_dir: paths.data_dir.join(SCENARIO_FILES_DIR),
+        files_dir: paths.scenarios_dir.clone(),
     }));
     notifications.start()?;
     let launched = cold_launch_target(&logger);
@@ -1347,15 +1445,13 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
         folders,
         picker: Some(picker),
         cli: platform::cli_installer(paths.cli_path.clone()),
-        cli_theme: zvs_host::cli::CliThemeFile::new(
-            &paths.data_dir.join(zvs_host::platform::paths::CLI_FOLDER),
-        ),
+        cli_theme: zvs_host::cli::CliThemeFile::new(&paths.cli_settings_dir),
         cli_connections,
         voice,
     });
     {
         let services = Arc::clone(&services);
-        let app = app.handle().clone();
+        let app = app.clone();
         let _ = activation.set(Arc::new(move |target| {
             window::focus_studio(&app);
             services.notifications.activated(target);
@@ -1403,7 +1499,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
     }
     warm_sidecar(sidecar, logger.clone());
 
-    Ok(Boot::Studio {
+    Ok(Launch::Studio {
         host: Host {
             server,
             events: events.clone(),
@@ -1422,7 +1518,7 @@ fn compose(app: &App) -> Result<Boot, Box<dyn Error>> {
             computer: {
                 let appearance = workspace.clone();
                 computer::ComputerShell::new(
-                    app.handle().clone(),
+                    app.clone(),
                     computer_agent,
                     Arc::new(move || appearance.appearance()),
                     notices,

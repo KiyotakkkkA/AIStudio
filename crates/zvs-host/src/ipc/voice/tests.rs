@@ -120,7 +120,7 @@ fn landed_row(item_kind: DownloadItemKind, item_ref: &str, target: &Path) -> Dow
 fn install_engine_and_model(host: &TestServices) {
     let services = host.shared();
     let executable = host
-        .downloads_dir()
+        .assets_dir()
         .join("runtimes/whisper-cpp/whisper-cli.exe");
     std::fs::create_dir_all(executable.parent().expect("parent")).expect("creates");
     std::fs::write(&executable, b"").expect("writes");
@@ -131,7 +131,7 @@ fn install_engine_and_model(host: &TestServices) {
             &json!({ "executablePath": executable.to_string_lossy() }),
         )
         .expect("stores the engine");
-    let model = host.downloads_dir().join("models/ggml-small-q8_0.bin");
+    let model = host.assets_dir().join("models/ggml-small-q8_0.bin");
     std::fs::create_dir_all(model.parent().expect("parent")).expect("creates");
     std::fs::write(&model, b"model").expect("writes");
     services
@@ -298,9 +298,7 @@ async fn installing_a_model_queues_the_engine_and_the_model_once() {
 async fn a_landed_engine_is_unpacked_and_the_first_model_is_selected() {
     let (host, _server) = registered();
     let services = host.shared();
-    let archive = host
-        .downloads_dir()
-        .join("runtimes/whisper-blas-bin-x64.zip");
+    let archive = host.assets_dir().join("runtimes/whisper-blas-bin-x64.zip");
     std::fs::create_dir_all(archive.parent().expect("parent")).expect("creates");
     std::fs::write(&archive, zip_with("Release/whisper-cli.exe", b"MZ")).expect("writes");
     services
@@ -318,7 +316,7 @@ async fn a_landed_engine_is_unpacked_and_the_first_model_is_selected() {
     assert!(executable.ends_with("whisper-cli.exe"));
     assert!(Path::new(executable).is_file());
 
-    let model = host.downloads_dir().join("models/ggml-small-q8_0.bin");
+    let model = host.assets_dir().join("models/ggml-small-q8_0.bin");
     services
         .voice
         .install(&landed_row(DownloadItemKind::Model, SMALL, &model))
@@ -335,9 +333,7 @@ async fn a_landed_engine_is_unpacked_and_the_first_model_is_selected() {
 #[tokio::test]
 async fn an_engine_archive_without_the_cli_fails_the_install() {
     let (host, _server) = registered();
-    let archive = host
-        .downloads_dir()
-        .join("runtimes/whisper-blas-bin-x64.zip");
+    let archive = host.assets_dir().join("runtimes/whisper-blas-bin-x64.zip");
     std::fs::create_dir_all(archive.parent().expect("parent")).expect("creates");
     std::fs::write(&archive, zip_with("Release/readme.txt", b"hi")).expect("writes");
     let failed = host

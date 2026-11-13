@@ -64,7 +64,7 @@ are Rust.
 The preloads became capabilities: the studio webview may call only `ipc_call` and
 `events_subscribe` (§7, §14). `WebContentsView` became child webviews (§21). The
 `persist:browser-work` partition became a dedicated WebView2 user-data directory,
-`<app data>/browser/work`, still called "the work profile". `safeStorage` became Windows
+`<state root>/profiles/browser/work`, still called "the work profile". `safeStorage` became Windows
 DPAPI (§9). `net.fetch` became one shared `reqwest` client for API traffic. `session.fetch`
 for account mode became requests issued *inside* a hidden webview of the work profile, so
 cookies never leave it (§12). `webContents.debugger` became WebView2's DevTools Protocol API.
@@ -505,9 +505,23 @@ repositories.
 
 - `rusqlite` (bundled SQLite) opened in **WAL** mode, `foreign_keys = ON`,
   `busy_timeout = 5000`, `synchronous = NORMAL`. One connection, one writer.
-- Database file `studio.sqlite` in Tauri's app data directory
-  (`%APPDATA%\<bundle identifier>`). Never bundled, never in the app directory. Electron's old
-  `userData` is not read: the Tauri build started fresh.
+- The state root is `%LOCALAPPDATA%\ZVS\AIStudio` (`AIStudio-Dev` for an unpackaged build without
+  `ZVS_DATA_DIR`, the E2E temporary folder with it). Its top level is split by lifecycle —
+  `data`, `assets`, `indexes`, `profiles`, `cache`, `temp`, `logs`, `backups` — and
+  `StudioPaths` is the only place that names a folder in it. The tree, the lifecycle rules and
+  the migration from the old `%APPDATA%\com.zvs.aistudio` root are in
+  [FILES_STRUCTURE.md](FILES_STRUCTURE.md). Files that ship with the program are bundled
+  resources and never copied into the state root.
+- Database file `data/studio.sqlite` under the state root. Never bundled, never in the app
+  directory. Electron's old `userData` is not read: the Tauri build started fresh.
+- On-disk formats outside SQLite are versioned schemas recorded in `aistudio.toml` at the state
+  root. The boot module (`zvs-host/src/boot`) compares them with the build's `SCHEMAS` before
+  the logger, the database or any webview starts, runs the missing steps in order behind a
+  progress window, and refuses a root written by a newer build with the recovery window.
+  Expected versions are constants of the build, never environment variables.
+- Paths that record where an installed resource lives (`download.target_path`, `skill.path`)
+  are stored relative to their root (`assets:models/x.gguf`), so moving a root rewrites no
+  rows.
 - Row types in `zvs-host/src/data/schema/*.rs`, one module per table.
 - Migrations are hand-written SQL in `crates/zvs-host/migrations/NNNN_<name>.sql`, embedded
   with `include_str!`, recorded with a checksum in `__migrations`, and applied **on startup
@@ -1664,8 +1678,9 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
    (TASK_043) was removed after the managed copy crashed on almost every conversion; DOCX,
    XLSX and PPTX render in the renderer (docx-preview, an OOXML sheet reader over jszip,
    slide text) and are marked «приближённое отображение».
-9. The browser ships one profile ("work", the WebView2 data directory `<app data>/browser/work`).
-   Multiple named profiles come later, as further data directories under `browser/`.
+9. The browser ships one profile ("work", the WebView2 data directory
+   `<state root>/profiles/browser/work`). Multiple named profiles come later, as further data
+   directories under `profiles/browser/`.
 10. **Confirmed (2026-10-10):** no import of Electron-era data. The Tauri build starts from an
     empty data directory, and existing secrets are re-entered.
 
@@ -1825,7 +1840,7 @@ turns popups into tabs (adopting the created webview, so POST and OAuth openers 
 ### Session and identity
 
 One persistent profile, "work": a dedicated WebView2 user-data directory,
-`<app data>/browser/work`. The user logs into sites once, inside the app, and those cookies
+`<state root>/profiles/browser/work`. The user logs into sites once, inside the app, and those cookies
 survive restarts, which is what makes the automations useful at all. The profile is separate
 from the studio webview's environment and holds no app credentials.
 
@@ -2011,7 +2026,7 @@ and `browserSettings.set` (`BrowserSettingsDto`, stored as the one setting `brow
 
 - **Extensions** (`browserExtensions.*`, `zvs-host/src/browser/extensions.rs`). An unpacked
   Chromium extension (a folder with `manifest.json`) picked by the user is copied into
-  `<app data>/browser/extensions/<slug>`; turning it off moves it to `extensions-off/`. Every
+  `<state root>/assets/extensions/enabled/<slug>`; turning it off moves it to `disabled/`. Every
   webview of the work profile, the gateway's hidden ones included, is created with
   `AreBrowserExtensionsEnabled`, because WebView2 refuses a second environment on the same data
   folder with other options. On the first tab of a session and after every change the shell

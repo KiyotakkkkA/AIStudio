@@ -83,7 +83,7 @@ test("chat streams grounded answers, preserves scroll, cancels and fits a narrow
       embeddingModelId: "fixture-chat",
       dimension: 3,
     });
-    seedVectors(join(directory.path, "vectors", store.id), [
+    seedVectors(join(directory.path, "indexes", "vectors", store.id), [
       {
         id: "rotation",
         vector: [1, 0, 0],

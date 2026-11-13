@@ -28,7 +28,8 @@ locale rules: [CONVENTIONS.md](CONVENTIONS.md).
 The whole host is Rust (PASSPORT D10). The renderer only renders: it reaches the host through
 `ipc_call` (request/response over the contract in `packages/shared`) and `events_subscribe`
 (streams). All I/O, state and policy live in `zvs-host`. Data lives in
-`%APPDATA%\com.zvs.aistudio`.
+`%LOCALAPPDATA%\ZVS\AIStudio` (`AIStudio-Dev` for development builds); the layout is in
+[docs/FILES_STRUCTURE.md](docs/FILES_STRUCTURE.md).
 
 ## Workspace
 

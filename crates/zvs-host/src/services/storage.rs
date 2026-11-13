@@ -6,14 +6,10 @@ use zvs_contract::{
     StoragePart, StoragePartUsage, StorageUsageDto,
 };
 
-use crate::artifacts::DASHBOARDS;
-use crate::browser::PROFILE_DIR;
 use crate::data::{Database, Repositories};
 use crate::downloads::disk::directory_size;
-use crate::drivers::mcp::TOOLCHAIN_DIR;
 use crate::platform::clock::SharedClock;
 use crate::platform::paths::{DownloadKind, StudioPaths};
-use crate::skills::SKILLS_DIR;
 
 pub const CACHE_BUSY: &str = "Кэш нельзя очистить, пока выполняются задачи";
 
@@ -42,7 +38,7 @@ impl StorageRoot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageRoots {
     pub categories: Vec<StorageRoot>,
-    pub cache_dir: PathBuf,
+    pub disposable: Vec<PathBuf>,
 }
 
 const fn download_part(kind: DownloadKind) -> StoragePart {
@@ -59,44 +55,41 @@ fn toolchain_parts(root: &Path) -> Vec<(StoragePart, Vec<PathBuf>)> {
     let uv = root.join("uv");
     vec![
         (StoragePart::Node, vec![root.join("node")]),
-        (
-            StoragePart::Npm,
-            vec![root.join("npm-cache"), root.join("npm-global")],
-        ),
+        (StoragePart::Npm, vec![root.join("npm-global")]),
         (StoragePart::Uv, vec![uv.clone()]),
         (StoragePart::Python, vec![uv.join("python")]),
         (
             StoragePart::PythonPackages,
-            vec![
-                uv.join("tools"),
-                uv.join("bin"),
-                uv.join("cache"),
-                root.join("pip-cache"),
-            ],
+            vec![uv.join("tools"), uv.join("bin")],
         ),
     ]
 }
 
 impl StorageRoots {
     pub fn resolve(paths: &StudioPaths) -> Self {
-        let data = &paths.data_dir;
         let database = paths.db_path.to_string_lossy().into_owned();
-        let toolchain = data.join(TOOLCHAIN_DIR);
+        let toolchain = paths.toolchain_dir.clone();
         Self {
             categories: vec![
                 StorageRoot::new(
                     StorageCategory::Conversations,
                     vec![paths.conversations_dir.clone()],
                 ),
-                StorageRoot::new(StorageCategory::Dashboards, vec![data.join(DASHBOARDS)]),
-                StorageRoot::new(StorageCategory::Skills, vec![data.join(SKILLS_DIR)]),
+                StorageRoot::new(
+                    StorageCategory::Dashboards,
+                    vec![paths.dashboards_dir.clone()],
+                ),
+                StorageRoot::new(StorageCategory::Skills, vec![paths.skills_dir.clone()]),
                 StorageRoot::new(
                     StorageCategory::Vectors,
                     vec![paths.vector_stores_dir.clone()],
                 ),
                 StorageRoot::new(
                     StorageCategory::Downloads,
-                    vec![paths.downloads_dir.clone()],
+                    DownloadKind::ALL
+                        .iter()
+                        .map(|kind| paths.download_dir(*kind))
+                        .collect(),
                 )
                 .with_parts(
                     DownloadKind::ALL
@@ -104,10 +97,22 @@ impl StorageRoots {
                         .map(|kind| (download_part(*kind), vec![paths.download_dir(*kind)]))
                         .collect(),
                 ),
-                StorageRoot::new(StorageCategory::Toolchain, vec![toolchain.clone()])
-                    .with_parts(toolchain_parts(&toolchain)),
-                StorageRoot::new(StorageCategory::Browser, vec![data.join(PROFILE_DIR[0])]),
-                StorageRoot::new(StorageCategory::Cache, vec![paths.cache_dir.clone()]),
+                StorageRoot::new(
+                    StorageCategory::Toolchain,
+                    vec![toolchain.clone(), paths.computer_dir.clone()],
+                )
+                .with_parts(toolchain_parts(&toolchain)),
+                StorageRoot::new(
+                    StorageCategory::Browser,
+                    vec![
+                        paths.profiles_dir.join(crate::browser::PROFILE_DIR[0]),
+                        paths.extensions_dir.clone(),
+                    ],
+                ),
+                StorageRoot::new(
+                    StorageCategory::Cache,
+                    vec![paths.cache_dir.clone(), paths.temp_dir.clone()],
+                ),
                 StorageRoot::new(StorageCategory::Logs, vec![paths.logs_dir.clone()]),
                 StorageRoot::new(StorageCategory::Backups, vec![paths.backups_dir.clone()]),
                 StorageRoot::new(
@@ -118,7 +123,11 @@ impl StorageRoots {
                         .collect(),
                 ),
             ],
-            cache_dir: paths.cache_dir.clone(),
+            disposable: vec![
+                paths.cache_dir.clone(),
+                paths.staging_dir.clone(),
+                paths.runs_dir.clone(),
+            ],
         }
     }
 }
@@ -256,10 +265,15 @@ impl StorageService {
         if busy {
             return Err(AppError::new(AppErrorCode::Conflict, CACHE_BUSY));
         }
-        let directory = self.inner.roots.cache_dir.clone();
-        let removed_bytes = tokio::task::spawn_blocking(move || clear_directory(&directory))
-            .await
-            .map_err(native)?;
+        let directories = self.inner.roots.disposable.clone();
+        let removed_bytes = tokio::task::spawn_blocking(move || {
+            directories
+                .iter()
+                .map(|directory| clear_directory(directory))
+                .sum()
+        })
+        .await
+        .map_err(native)?;
         *self.cached() = None;
         Ok(StorageClearCacheOutput { removed_bytes })
     }
@@ -289,7 +303,7 @@ mod tests {
     fn fixture() -> Fixture {
         let root = tempfile::tempdir().expect("a data folder");
         let paths = StudioPaths::resolve(&PathEnvironment {
-            data_dir: root.path().join("data"),
+            state_dir: root.path().join("state"),
             resource_dir: root.path().join("resources"),
             executable_dir: root.path().join("bin"),
             packaged: false,
@@ -326,16 +340,15 @@ mod tests {
     #[tokio::test]
     async fn usage_sums_every_category_and_is_cached_until_a_refresh() {
         let test = fixture();
-        let data = &test.paths.data_dir;
         write(&test.paths.conversations_dir.join("c1/work/report.md"), 100);
         write(&test.paths.conversations_dir.join("c1/snapshots/r1/a"), 20);
-        write(&data.join("dashboards/sales.html"), 7);
-        write(&data.join("skills/dashboard/SKILL.md"), 5);
+        write(&test.paths.dashboards_dir.join("sales.html"), 7);
+        write(&test.paths.skills_dir.join("dashboard/SKILL.md"), 5);
         write(&test.paths.vector_stores_dir.join("s1/data"), 11);
-        write(&test.paths.downloads_dir.join("models/m.gguf"), 13);
-        write(&data.join("mcp-toolchain/node/node.exe"), 17);
-        write(&data.join("browser/work/Cookies"), 19);
-        write(&test.paths.cache_dir.join("code-runs/r1/out.txt"), 23);
+        write(&test.paths.assets_dir.join("models/m.gguf"), 13);
+        write(&test.paths.toolchain_dir.join("node/node.exe"), 17);
+        write(&test.paths.browser_profile_dir.join("Cookies"), 19);
+        write(&test.paths.runs_dir.join("r1/out.txt"), 23);
         write(&test.paths.logs_dir.join("studio.jsonl"), 29);
         write(&test.paths.backups_dir.join("db-1.sqlite"), 31);
         write(&test.paths.db_path, 37);
@@ -371,7 +384,7 @@ mod tests {
         );
         assert!(parts(&usage, StorageCategory::Cache).is_empty());
 
-        write(&data.join("dashboards/more.html"), 1000);
+        write(&test.paths.dashboards_dir.join("more.html"), 1000);
         test.clock.advance(5);
         assert_eq!(test.service.usage(false).await.expect("cached"), usage);
         let refreshed = test.service.usage(true).await.expect("measures");
@@ -396,21 +409,20 @@ mod tests {
     #[tokio::test]
     async fn downloads_and_components_are_split_into_parts_that_add_up() {
         let test = fixture();
-        let downloads = &test.paths.downloads_dir;
-        let toolchain = test.paths.data_dir.join(TOOLCHAIN_DIR);
-        write(&downloads.join("models/m.gguf"), 13);
-        write(&downloads.join("embeddings/e.gguf"), 5);
-        write(&downloads.join("runtimes/node.zip"), 7);
-        write(&downloads.join("stray.part"), 2);
+        let assets = &test.paths.assets_dir;
+        let toolchain = test.paths.toolchain_dir.clone();
+        write(&assets.join("models/m.gguf"), 13);
+        write(&assets.join("embeddings/e.gguf"), 5);
+        write(&assets.join("runtimes/llama/llama-server.exe"), 7);
+        write(&assets.join("packages/mcp/server.tgz"), 2);
         write(&toolchain.join("node/22.0.0/node.exe"), 40);
-        write(&toolchain.join("npm-cache/a"), 3);
-        write(&toolchain.join("npm-global/b"), 4);
+        write(&toolchain.join("npm-global/b"), 7);
         write(&toolchain.join("uv/0.8.0/uv.exe"), 9);
         write(&toolchain.join("uv/python/3.13/python.exe"), 30);
-        write(&toolchain.join("uv/tools/ruff/r"), 6);
-        write(&toolchain.join("uv/cache/c"), 1);
-        write(&toolchain.join("pip-cache/p"), 2);
+        write(&toolchain.join("uv/tools/ruff/r"), 9);
         write(&toolchain.join("state.json"), 1);
+        write(&test.paths.package_cache_dir.join("npm/a"), 3);
+        write(&test.paths.computer_dir.join("scripts/s.py"), 4);
 
         let usage = test.service.usage(false).await.expect("measures");
 
@@ -421,7 +433,7 @@ mod tests {
                 (StoragePart::Models, 13),
                 (StoragePart::Embeddings, 5),
                 (StoragePart::Runtimes, 7),
-                (StoragePart::Other, 2),
+                (StoragePart::Mcp, 2),
             ]
         );
         assert_eq!(
@@ -432,37 +444,46 @@ mod tests {
                 (StoragePart::Uv, 9),
                 (StoragePart::Python, 30),
                 (StoragePart::PythonPackages, 9),
-                (StoragePart::Other, 1),
+                (StoragePart::Other, 5),
             ]
         );
+        assert_eq!(bytes(&usage, StorageCategory::Cache), 3);
     }
 
     #[tokio::test]
-    async fn clearing_the_cache_empties_only_the_cache_and_drops_the_cached_usage() {
+    async fn clearing_the_cache_empties_disposable_roots_and_keeps_resumable_downloads() {
         let test = fixture();
-        write(&test.paths.cache_dir.join("code-runs/r1/out.txt"), 23);
+        write(&test.paths.runs_dir.join("r1/out.txt"), 23);
+        write(&test.paths.staging_dir.join("j1/x.bin"), 5);
         write(&test.paths.cache_dir.join("documents/d.bin"), 7);
+        write(&test.paths.temp_downloads_dir.join("d1/m.gguf.part"), 11);
         write(&test.paths.logs_dir.join("studio.jsonl"), 29);
         let before = test.service.usage(false).await.expect("measures");
-        assert_eq!(bytes(&before, StorageCategory::Cache), 30);
+        assert_eq!(bytes(&before, StorageCategory::Cache), 46);
 
         let cleared = test.service.clear_cache().await.expect("clears");
 
-        assert_eq!(cleared.removed_bytes, 30);
+        assert_eq!(cleared.removed_bytes, 35);
         assert!(test.paths.cache_dir.is_dir());
         assert_eq!(
             fs::read_dir(&test.paths.cache_dir).expect("lists").count(),
             0
         );
+        assert!(
+            test.paths
+                .temp_downloads_dir
+                .join("d1/m.gguf.part")
+                .is_file()
+        );
         let after = test.service.usage(false).await.expect("measures");
-        assert_eq!(bytes(&after, StorageCategory::Cache), 0);
+        assert_eq!(bytes(&after, StorageCategory::Cache), 11);
         assert_eq!(bytes(&after, StorageCategory::Logs), 29);
     }
 
     #[tokio::test]
     async fn the_cache_is_kept_while_a_run_is_unfinished() {
         let test = fixture();
-        write(&test.paths.cache_dir.join("code-runs/r1/out.txt"), 23);
+        write(&test.paths.runs_dir.join("r1/out.txt"), 23);
         test.database
             .shared()
             .with_connection(|connection| {
@@ -489,6 +510,6 @@ mod tests {
 
         assert_eq!(error.code, AppErrorCode::Conflict);
         assert_eq!(error.message, CACHE_BUSY);
-        assert!(test.paths.cache_dir.join("code-runs/r1/out.txt").is_file());
+        assert!(test.paths.runs_dir.join("r1/out.txt").is_file());
     }
 }

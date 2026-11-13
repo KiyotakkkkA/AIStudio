@@ -1,52 +1,33 @@
-# Proposed Application File Structure
+# Application File Structure
 
-Status: proposal; not implemented.
-
-This document proposes how ZVS AI Studio should locate and manage application files on
-Windows. It does not change the current architecture. [PASSPORT.md](PASSPORT.md) remains
-binding; its storage rules must be updated as part of an approved implementation.
-
-## Current layout
-
-The application currently obtains one root through Tauri's `app_data_dir()`. On Windows,
-the root is `%APPDATA%\com.zvs.aistudio`. `StudioPaths` derives the database, logs,
-backups, cache, vector stores, downloads and conversation directories from that root.
-Additional service directories are constructed in the shell bootstrap code.
-
-This mixes durable user data, installed resources, browser profiles and disposable files
-under Roaming. It also distributes path decisions across the application.
+This document describes where ZVS AI Studio keeps its files on Windows, how each folder is
+maintained, and how the application moves data from one layout version to the next.
+[PASSPORT.md](PASSPORT.md) §9 holds the binding summary.
 
 ## Location policy
 
-Use `%LOCALAPPDATA%\ZVS\AIStudio` as the default application state root. Keep application
-binaries in the installation directory, separately from writable application state.
+The state root is `%LOCALAPPDATA%\ZVS\AIStudio`. Program files and bundled resources stay in
+the installation directory, separately from writable state.
 
-Resolve Windows locations through Tauri or Windows Known Folder APIs. Environment-variable
-paths in this document describe their usual locations; they are not instructions to
-construct paths from a user name or a hard-coded drive letter.
+Locations are resolved through Tauri's path API (`local_data_dir`, `resource_dir`), never by
+assembling a user name or a drive letter. Environment-variable paths in this document describe
+their usual locations.
 
 ### Local and Roaming
 
-Local contains the working database, installed resources, indexes, browser profiles,
-caches, temporary files, logs and automatic backups. These files may be large, depend on
-the current machine, or contain state that requires coordinated migration.
+Local holds everything: the working database, installed resources, indexes, WebView profiles,
+caches, temporary files, logs and automatic backups. These files are large, machine-specific
+or need coordinated migration.
 
-Do not use Roaming initially. Preferences already have a source of truth in SQLite;
-splitting them between SQLite and a roaming configuration file solely to populate both
-locations would introduce unnecessary synchronization rules.
-
-If cross-machine preference transfer becomes a product requirement, a small, explicitly
-defined set of portable preferences may use Roaming. Candidate values include appearance
-and response-style preferences. Local paths, credentials, browser sessions, device
-configuration and machine-specific grants must remain local. Define ownership and conflict
-handling before introducing a second settings store.
-
-Provide explicit export and import for user-controlled transfers. Placing files in Roaming
-is not the application's backup or synchronization mechanism.
+Roaming is not used. Preferences have one source of truth in SQLite. If cross-machine transfer
+of preferences becomes a requirement, a small, explicitly defined set may move to Roaming, with
+ownership and conflict handling defined first. Local paths, credentials, browser sessions,
+device configuration and machine-specific grants stay local. Explicit export and import, not
+Roaming, is the way to move data between machines.
 
 ### Installation directory
 
-A per-user installation may use `%LOCALAPPDATA%\Programs\ZVS AI Studio`:
+A per-user installation uses `%LOCALAPPDATA%\Programs\ZVS AI Studio`:
 
 ```text
 ZVS AI Studio/
@@ -54,157 +35,271 @@ ZVS AI Studio/
 ├── zvs-jobd.exe
 ├── cli/
 │   └── aistudio.exe
-└── ... bundled application resources
+└── resources/
+    └── notification.png
 ```
 
-The installer owns this directory. Updates replace program files without relocating user
-data. Downloaded runtimes and models belong in the state root, not beside the executable.
+The installer owns this directory, and updates replace it without touching user data. Files
+that ship with the program are bundled resources (`bundle.resources` in `tauri.conf.json`),
+read from `resource_dir()`; the application never copies its own files into the state root.
+Downloaded runtimes and models belong in the state root.
 
-## Proposed state tree
+## State tree
+
+The top level classifies files by lifecycle; the second level names the owner. Each top-level
+root has one rule for backup, cleanup, uninstall and relocation, and no root contains another.
+`StudioPaths` (`zvs-host/src/platform/paths.rs`) is the only code that names these folders.
 
 ```text
 %LOCALAPPDATA%/ZVS/AIStudio/
+├── aistudio.toml
 ├── data/
 │   ├── studio.sqlite
 │   ├── conversations/<conversation-id>/
-│   ├── scenarios/<scenario-id>/
-│   ├── dashboards/
-│   ├── skills/
-│   ├── policy/
-│   └── terminal/
+│   │   ├── attachments/
+│   │   ├── work/
+│   │   ├── outputs/
+│   │   └── snapshots/<run-id>/
+│   ├── scenarios/
+│   ├── library/
+│   │   ├── skills/
+│   │   ├── dashboards/
+│   │   └── policy/
+│   └── settings/
+│       └── cli/
 ├── assets/
 │   ├── models/
-│   │   ├── embeddings/
-│   │   ├── rerankers/
-│   │   └── speech/
-│   ├── runtimes/
-│   └── packages/
+│   ├── embeddings/
+│   ├── runtimes/<runtime-id>/
+│   ├── toolchain/
+│   ├── packages/
+│   │   ├── mcp/
+│   │   └── skills/
+│   ├── environments/
+│   │   └── computer/
+│   └── extensions/
+│       ├── enabled/<slug>/
+│       └── disabled/<slug>/
 ├── indexes/
 │   └── vectors/<store-id>/
-├── webviews/
-│   ├── studio/
-│   └── browser/
+├── profiles/
+│   ├── shell/
+│   └── browser/work/
 ├── cache/
 │   ├── documents/
 │   ├── thumbnails/
 │   ├── favicons/
+│   ├── capture/
+│   ├── voice/
 │   └── packages/
+│       ├── npm/
+│       ├── uv/
+│       └── pip/
 ├── temp/
-│   ├── downloads/
-│   ├── extraction/
-│   └── executions/
+│   ├── downloads/<download-id>/
+│   ├── staging/
+│   └── runs/<run-id>/
 ├── logs/
-│   ├── host/
-│   ├── jobs/
 │   └── streams/
 └── backups/
 ```
 
-Create directories only when their owning feature needs them. The tree defines ownership,
-not a requirement to create empty directories or introduce new features.
+Directories are created when their owning feature first writes to them. Folders for features
+that store no files yet are added when they need them.
+
+## Root rules
+
+| Root       | Backup                 | Cleanup                                           | Uninstall                    | Relocation    |
+| ---------- | ---------------------- | ------------------------------------------------- | ---------------------------- | ------------- |
+| `data`     | Full                   | Never                                             | Kept unless the user opts in | No            |
+| `assets`   | No; reinstallable      | Never; explicit uninstall only                    | Removed                      | `models` only |
+| `indexes`  | Optional               | Never; explicit rebuild only                      | Kept with `data`             | Yes           |
+| `profiles` | No                     | Never; explicit sign-out or reset only            | Removed                      | No            |
+| `cache`    | No                     | «Очистить кэш», when no run is unfinished         | Removed                      | No            |
+| `temp`     | No                     | At startup and with the cache, except `downloads` | Removed                      | No            |
+| `logs`     | No                     | Rotation                                          | Removed                      | No            |
+| `backups`  | Is the recovery source | Retention policy                                  | Kept with `data`             | No            |
 
 ## Directory responsibilities
 
-| Directory            | Contents and lifecycle                                                                                                                        |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data`               | Durable application and user data. Never removed by cache cleanup. SQLite remains the source of truth for settings and structured records.    |
-| `data/conversations` | Attachments, retained tool outputs and generated files owned by a conversation.                                                               |
-| `data/scenarios`     | Persistent files owned by a scenario.                                                                                                         |
-| `data/dashboards`    | Saved dashboard and page artifacts.                                                                                                           |
-| `data/skills`        | User-authored or adopted skill library content. Installed dependencies belong in `assets/packages`.                                           |
-| `data/policy`        | User-managed policy packs. Existing database ownership of policy records remains unchanged.                                                   |
-| `data/terminal`      | Terminal-specific files that need an independent file representation. Do not duplicate database settings here.                                |
-| `assets/models`      | Completed model installations, grouped by purpose. Add categories when supported.                                                             |
-| `assets/runtimes`    | Installed Node, Python, uv and other supported execution environments.                                                                        |
-| `assets/packages`    | Installed tool and connector packages and their required dependencies.                                                                        |
-| `indexes/vectors`    | Persistent vector-store data. Treat rebuilding as an explicit operation, since it may require unavailable sources, time or paid requests.     |
-| `webviews`           | Separate WebView profiles for the application shell and integrated browser. Preserve their sessions during ordinary cleanup.                  |
-| `cache`              | Automatically reproducible document representations, thumbnails, favicons and package download caches.                                        |
-| `temp`               | Partial downloads, extraction staging and intermediate execution files. Retained results must be promoted to their owner's durable directory. |
-| `logs`               | Diagnostic and stream logs, with explicit retention and rotation rules.                                                                       |
-| `backups`            | Automatic recovery snapshots with a retention policy. A database-only snapshot is not a complete backup of user files.                        |
+| Directory                      | Contents                                                                                                                        |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `aistudio.toml`                | Versions of the on-disk schemas and the legacy migration record. See [Boot and schema migrations](#boot-and-schema-migrations). |
+| `data/studio.sqlite`           | Source of truth for settings and structured records, together with its `-wal` and `-shm` files.                                 |
+| `data/conversations`           | Attachments, working files, retained outputs with their `manifest.json`, and pre-run snapshots owned by a conversation.         |
+| `data/scenarios`               | Persistent files written by scenarios.                                                                                          |
+| `data/library`                 | User-authored or adopted skills, dashboards and policy packs.                                                                   |
+| `data/settings/cli`            | `theme.json` and `shortcuts.json`, read by `aistudio.exe`, which has no database access.                                        |
+| `assets/models`, `embeddings`  | Downloaded model files. Discovery reads the folder, so the purpose is part of the location.                                     |
+| `assets/runtimes`              | Engines such as llama.cpp and whisper.cpp, one folder per runtime id.                                                           |
+| `assets/toolchain`             | The managed Node and uv with their Python installs, `npm-global`, uv tools.                                                     |
+| `assets/packages`              | Downloaded MCP and skill packages.                                                                                              |
+| `assets/environments/computer` | The computer-use sidecar scripts and their environment.                                                                         |
+| `assets/extensions`            | Unpacked browser extensions; turning one off moves it from `enabled` to `disabled`.                                             |
+| `indexes/vectors`              | LanceDB vector stores. Rebuilding may need unavailable sources, time or paid requests.                                          |
+| `profiles/shell`               | WebView2 profile shared by the studio, recovery, boot, computer and browser-chrome webviews.                                    |
+| `profiles/browser/work`        | The integrated browser's work profile with the user's site sessions.                                                            |
+| `cache`                        | Files that can be deleted without loss: document representations, thumbnails, favicons, the capture profile, package caches.    |
+| `temp/downloads`               | Downloads in progress, one folder per download id, with resumable `.part` files.                                                |
+| `temp/runs`                    | Working folders of script runs without a conversation folder. Kept results are copied into the conversation's `outputs`.        |
+| `logs`                         | Rotated `studio.jsonl` files and dated stream logs under `logs/streams`.                                                        |
+| `backups`                      | Database snapshots taken before database migrations. A database snapshot is not a complete backup of user files.                |
 
-Secrets continue to use the host's existing protected storage mechanism. This proposal does
-not introduce plaintext credential files or change the permission model.
+Secrets use the host's existing protected storage. Nothing here introduces plaintext
+credential files or changes the permission model.
 
-## Downloads, installation and cleanup
+## Downloads and installation
 
-A download is a lifecycle stage, not the permanent classification of a file:
+A download is a lifecycle stage, not a location:
 
-1. Download into `temp/downloads` using a partial-file name.
-2. Verify the completed download and extract into staging when necessary.
-3. Publish the verified resource into its destination under `assets`.
-4. Record the installation only after publication succeeds.
-5. Remove staging files after success; retain resumable partial files only under a defined
-   retry and expiry policy.
+1. The sidecar writes `temp/downloads/<download-id>/<file>.part` and resumes from it.
+2. It verifies the checksum and renames the file within the staging folder.
+3. Installers run on the staged file: an engine or toolchain archive is extracted into its
+   `assets` folder and the archive is deleted.
+4. A file that no installer consumed is published into `assets` by rename; across volumes it is
+   copied under a `.part` name, checked by size and renamed.
+5. Only then does the download row turn `succeeded`, and the staging folder is removed.
 
-Use an atomic rename when source and destination share a volume. For another volume,
-copy into a staging directory on the destination volume, verify it, then publish there.
+At startup the download service removes staging folders that no queued, running, paused or
+failed download owns, and those older than 14 days. Model and runtime removal are explicit
+uninstall operations.
 
-Cache cleanup may remove only registered disposable roots. It must respect active tasks
-and must not delete installed resources, browser sessions, vector stores or retained
-execution results. Temporary execution directories must not hold the only copy of a
-user-visible artifact.
+## Path resolution and stored paths
 
-Model and runtime removal are explicit uninstall operations. Log rotation and backup
-retention are independent maintenance operations.
+`StudioPaths::resolve` derives every folder from the state root and the installation
+directory. The shell bootstrap passes concrete folders to services; services only create
+validated child paths under the folders they receive. The renderer reaches files through IPC.
 
-## Centralized path resolution
+Columns that record where an installed resource lives are stored relative to their root:
+`download.target_path` as `assets:models/<file>`, `skill.path` as `data:library/skills/<key>`.
+`StoredPaths` encodes and decodes them; DTOs carry absolute paths. Moving a root changes the
+root and rewrites no rows. Other text that mentions a path, such as message bodies and
+settings JSON, keeps absolute paths and is rewritten by the migration step that moves it.
 
-`StudioPaths` should be the host's single authority for application-owned paths. Resolve
-the state root, installation resources and optional storage overrides during startup, then
-pass concrete feature roots to services.
-
-Services must not independently discover AppData or assemble their own top-level paths.
-They may create validated child paths under the roots they receive, using existing ID and
-path validation rules. The renderer continues to request operations through IPC; it does
-not obtain direct filesystem access.
-
-Storage accounting, cleanup, backup and migration must use the same resolved roots.
-Classify nested paths without double-counting their sizes.
+Storage accounting («Хранилище») reports one figure per category, built from these folders
+without nesting, so nothing is counted twice.
 
 ## Moving large resources
 
-Allow models and vector-store data to use another local drive through explicit settings.
-Keep the database and ordinary application state in Local by default.
-
-Treat relocation as a managed operation: pause affected work, check the destination,
-copy and verify the data, switch the recorded location, then remove the old copy only
-after success. Persist the override before dependent services start. A missing external
-location must produce an actionable error rather than silently creating an empty store.
+`assets/models` and `indexes/vectors` are the roots that may later move to another local
+drive through an explicit setting. The stored-path encoding is in place for that; the setting
+and the managed move (pause affected work, copy, verify, switch, remove the old copy) are not
+part of this layout version.
 
 ## Development and test isolation
 
-Development and production must never share writable state. Use a separate development
-root, such as `%LOCALAPPDATA%\ZVS\AIStudio-Dev`.
+An unpackaged build without `ZVS_DATA_DIR` uses `%LOCALAPPDATA%\ZVS\AIStudio-Dev`, and a debug
+`aistudio.exe` reads its settings from the same root. E2E runs set `ZVS_DATA_DIR` to a
+temporary folder, and every root, both WebView profiles included, resolves beneath it. Unit
+tests use temporary folders. The production override surface is unchanged.
 
-E2E runs continue to use their explicit temporary `ZVS_DATA_DIR`. Every proposed directory,
-including both WebView profiles and resource installations, must resolve beneath that
-isolated root unless a test explicitly supplies another temporary location. Unit tests use
-the repository's temporary-directory helpers.
+## Boot and schema migrations
 
-Do not expand the production environment-variable override surface as a side effect of
-this reorganization.
+A schema is a versioned on-disk format that the application owns outside SQLite. The first
+schema is `project_struct`, this tree. The database schema is not one: its version stays in
+the database and `zvs-host/src/data/migrate.rs` owns it.
 
-## Migration from the current layout
+### Expected versions
 
-Implementation requires a versioned startup migration and a corresponding update to
-`PASSPORT.md`, which currently places the database in Roaming.
+The versions a build expects are constants, `SCHEMAS` in `zvs-contract/src/layout.rs`. The
+ordered steps of each schema are `STEPS` in `zvs-host/src/boot/mod.rs`. Expected versions are
+never read from environment variables: an override could make a build treat its own layout as
+older and migrate live data again, and environment variables reach `zvs-jobd`, MCP servers,
+terminals and runtimes.
 
-1. Detect the legacy root and the destination before starting database-dependent services,
-   background workers or WebViews. Coordinate with any existing application instance.
-2. Back up the legacy state. Close database writers and account for SQLite WAL state;
-   copying an actively written database file alone is insufficient.
-3. Copy files into their new categories and verify the result. Preserve IDs, file ownership
-   relationships and browser profiles; update application-owned stored paths as necessary.
-4. Persist a migration version and completion marker. Recovery after interruption must be
-   resumable and must not merge two independent databases automatically.
-5. Start services against the verified destination. Retain the legacy copy for recovery
-   until a defined cleanup policy permits its removal.
+### Recorded versions
 
-Do not treat a partially populated destination as a successful migration. Export, recovery
-and uninstall behavior must clearly distinguish program files, durable data, installed
-resources and disposable files.
+Each state root records its versions in `aistudio.toml`:
+
+```toml
+[schemas]
+project_struct = 1
+
+[legacy]
+source = 'C:\Users\<user>\AppData\Roaming\com.zvs.aistudio'
+migrated_at = 1763000000000
+```
+
+The application creates and updates this file; the installer does not, because one
+installation serves the production, development and E2E roots and a missing file has to be
+handled anyway. `[legacy]` exists only until the old root is removed. The file holds no
+settings. Writes go to `aistudio.toml.tmp` and are renamed over the file.
+
+### Boot sequence
+
+The boot module runs in the shell's `setup`, after the single-instance check and before the
+logger, the database, the sidecar or any webview starts:
+
+| State on disk                                                 | Action                                                      |
+| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| No `aistudio.toml`, no `data/studio.sqlite`, legacy root      | Run every step from version 0                               |
+| No `aistudio.toml`, otherwise                                 | Record the current versions and start                       |
+| A recorded version lower than expected                        | Run the missing steps in order                              |
+| All recorded versions equal to expected                       | Start                                                       |
+| A recorded version higher than expected, or an unknown schema | Refuse to start against this root; show the recovery window |
+| A malformed `aistudio.toml`                                   | Refuse to start; show the recovery window                   |
+
+Steps run on a background thread behind a small progress window («Обновление структуры
+данных») that shows the amount moved. The new version is recorded after each completed step,
+so an interrupted migration resumes from the last completed one, and every step is safe to
+repeat. A failed step opens the recovery window with the error and the location of the
+untouched data. Only the studio application migrates: `aistudio.exe` reads its settings only
+from a root whose recorded versions match its build, and `zvs-jobd` never reads the root, it
+receives concrete paths from the host.
+
+## Migration from the old layout
+
+`project_struct` 0 → 1 moves the old `%APPDATA%\com.zvs.aistudio` root, and the shell's
+profile in `%LOCALAPPDATA%\com.zvs.aistudio\EBWebView`, into this tree. It copies and never
+modifies the source, so the old root is the backup of the step.
+
+| Old location                                   | New location                                | Transfer   |
+| ---------------------------------------------- | ------------------------------------------- | ---------- |
+| `studio.sqlite` with `-wal` and `-shm`         | `data/studio.sqlite`                        | Copy, last |
+| `conversations/`                               | `data/conversations/`                       | Copy       |
+| `scenario-files/`                              | `data/scenarios/`                           | Copy       |
+| `skills/`                                      | `data/library/skills/`                      | Copy       |
+| `dashboards/`                                  | `data/library/dashboards/`                  | Copy       |
+| `policy/`                                      | `data/library/policy/`                      | Copy       |
+| `cli/`                                         | `data/settings/cli/`                        | Copy       |
+| `downloads/models/`, `downloads/embeddings/`   | `assets/models/`, `assets/embeddings/`      | Hard link  |
+| `downloads/runtimes/`                          | `assets/runtimes/`                          | Hard link  |
+| `downloads/mcp/`, `downloads/skills/`          | `assets/packages/mcp/`, `.../skills/`       | Hard link  |
+| `mcp-toolchain/`                               | `assets/toolchain/`                         | Hard link  |
+| `mcp-toolchain/{npm-cache,pip-cache,uv/cache}` | `cache/packages/{npm,pip,uv}`               | Not moved  |
+| `mcp-toolchain/uv/{tools,bin}`                 | `assets/toolchain/uv/{tools,bin}`           | Not moved  |
+| `computer/`                                    | `assets/environments/computer/`             | Copy       |
+| `browser/extensions/`, `extensions-off/`       | `assets/extensions/enabled/`, `disabled/`   | Copy       |
+| `browser/work/`                                | `profiles/browser/work/`                    | Copy       |
+| `%LOCALAPPDATA%\com.zvs.aistudio\EBWebView`    | `profiles/shell/EBWebView`                  | Copy       |
+| `vectors/`                                     | `indexes/vectors/`                          | Copy       |
+| `cache/`, including `code-runs` and `gallery`  | `cache/`, `temp/runs/`, `cache/thumbnails/` | Not moved  |
+| `shell/notification.png`                       | Bundled resource                            | Not moved  |
+| `logs/`                                        | `logs/`                                     | Copy       |
+| `backups/`                                     | `backups/`                                  | Hard link  |
+
+Hard links keep large, immutable files on disk once; a link that fails, across volumes for
+example, falls back to a copy. Caches are rebuilt on demand. uv tool environments are not
+moved because they embed absolute paths to their Python; they are reinstalled when used.
+
+The step runs in this order:
+
+1. Plan every file, then copy or link each through a `.migrating` name, skipping files that
+   already match by size.
+2. Verify that every planned file exists with its source size.
+3. Copy the database with its WAL to `data/studio.sqlite.migrating`, rewrite stored paths,
+   checkpoint, and rename it last. An existing `data/studio.sqlite` means this stage is done.
+4. Record `project_struct = 1` and the `[legacy]` source and time.
+
+The path rewrite stores `download.target_path` and `skill.path` root-relative and replaces old
+absolute prefixes in every text column of every table, in native, JSON-escaped and slashed
+form, only at a path boundary.
+
+The old root is kept for 30 days. After that, a packaged build removes it, together with the
+old shell profile, if nothing in it changed since the migration; a change means an older build
+still uses it, and it stays. Development builds never remove it. Because the development root
+is separate, a development build copies the old root into `AIStudio-Dev` on its own and leaves
+it for the packaged build.
 
 ## Windows references
 

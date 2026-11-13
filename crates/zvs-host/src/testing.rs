@@ -218,7 +218,7 @@ impl TestServices {
         Arc::clone(&self.services)
     }
 
-    pub fn downloads_dir(&self) -> PathBuf {
+    pub fn assets_dir(&self) -> PathBuf {
         self.workspace.join("downloads")
     }
 }
@@ -330,13 +330,13 @@ pub fn test_services(system: SystemService) -> TestServices {
     let workspace = temporary_directory("studio-host-");
     let pty = FakePty::shared();
     std::fs::create_dir_all(workspace.join("home")).expect("creates a home folder");
-    let downloads_dir = workspace.join("downloads");
+    let assets_dir = workspace.join("downloads");
     let download_jobs = FakeDownloadJobs::shared();
     let disk_probe = FixedDiskProbe::shared(1000 * GIB, 100 * GIB);
     let disk = DiskService::new(DiskServiceOptions {
         probe: disk_probe.clone(),
         ..DiskServiceOptions::new(
-            downloads_dir.clone(),
+            assets_dir.clone(),
             database.directory().join("vector-stores"),
             workspace.path().to_path_buf(),
             clock.clone(),
@@ -351,7 +351,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             download_jobs.clone(),
             disk,
             catalogue.clone(),
-            downloads_dir.clone(),
+            assets_dir.clone(),
             silent_logger(),
             clock.clone(),
         )
@@ -365,7 +365,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         downloads: Arc::new(downloads.clone()),
         catalogue: Arc::new(catalogue.clone()),
         settings: settings.clone(),
-        downloads_dir: downloads_dir.clone(),
+        assets_dir: assets_dir.clone(),
         device: None,
         resolver: ReleaseResolver::new(ReleaseResolverOptions {
             url: "http://127.0.0.1:9/releases".to_owned(),
@@ -384,7 +384,7 @@ pub fn test_services(system: SystemService) -> TestServices {
         audio: audio.clone(),
         device: None,
         recognizer: recognizer.clone(),
-        downloads_dir: downloads_dir.clone(),
+        assets_dir: assets_dir.clone(),
         cache_dir: workspace.join("cache"),
         platform: crate::runtimes::Platform::new("win32", "x64"),
         logger: silent_logger(),
@@ -607,7 +607,7 @@ pub fn test_services(system: SystemService) -> TestServices {
     let storage = crate::services::StorageService::new(
         crate::services::StorageRoots::resolve(&crate::platform::paths::StudioPaths::resolve(
             &crate::platform::paths::PathEnvironment {
-                data_dir: workspace.join("data"),
+                state_dir: workspace.join("state"),
                 resource_dir: workspace.join("resources"),
                 executable_dir: workspace.join("bin"),
                 packaged: false,

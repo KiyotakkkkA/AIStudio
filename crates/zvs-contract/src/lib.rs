@@ -29,6 +29,7 @@ pub mod graph_expansion;
 pub mod ids;
 pub mod images;
 pub mod integrations;
+pub mod layout;
 pub mod mail;
 pub mod mcp;
 pub mod memory;

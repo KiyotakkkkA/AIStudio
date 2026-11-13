@@ -769,7 +769,7 @@ impl BrowserWorkspace {
         if let Some(args) = crate::e2e::browser_args() {
             builder = builder.additional_browser_args(&args);
         }
-        if let Some(dir) = crate::e2e::webview_dir() {
+        if let Some(dir) = crate::window::shell_profile() {
             builder = builder.data_directory(dir);
         }
         let chrome = window

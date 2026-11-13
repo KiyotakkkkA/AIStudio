@@ -1,0 +1,11 @@
+{
+  "extends": "@zvs/tsconfig/base.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "rootDir": "src/boot",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src/boot/**/*.ts"]
+}

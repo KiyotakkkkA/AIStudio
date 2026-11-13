@@ -22,7 +22,7 @@ use super::process::path_dirs;
 use super::releases::{ToolchainBuild, ToolchainResolver};
 use crate::data::schema::DownloadRow;
 use crate::downloads::{CatalogueItem, CatalogueProvider, DownloadInstaller, InstalledItem};
-use crate::drivers::mcp::isolated_toolchain_env;
+use crate::drivers::mcp::{ToolchainDirs, isolated_toolchain_env};
 use crate::platform::archive::{ExtractOptions, extract_archive};
 use crate::platform::logger::{LogLevel, SharedLogger};
 use crate::platform::picker::SharedPicker;
@@ -62,6 +62,7 @@ pub trait CommandLauncher: Send + Sync {
 #[derive(Clone)]
 pub struct ToolchainServiceOptions {
     pub root: PathBuf,
+    pub package_cache: Option<PathBuf>,
     pub settings: SettingService,
     pub downloads: Arc<dyn RuntimeDownloads>,
     pub catalogue: Arc<dyn RuntimeCatalogue>,
@@ -83,6 +84,7 @@ impl ToolchainServiceOptions {
     ) -> Self {
         Self {
             root,
+            package_cache: None,
             settings,
             downloads,
             catalogue,
@@ -747,7 +749,10 @@ impl ToolchainService {
     }
 
     pub fn isolated_env(&self) -> BTreeMap<String, String> {
-        isolated_toolchain_env(self.root())
+        isolated_toolchain_env(&ToolchainDirs {
+            root: self.root().to_path_buf(),
+            cache: self.options().package_cache.clone(),
+        })
     }
 
     pub fn launch(

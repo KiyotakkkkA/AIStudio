@@ -95,6 +95,7 @@ export default defineConfig(({ command }) => {
           browser: "src/browser-ui/index.html",
           computer: "src/computer-ui/index.html",
           recovery: "src/recovery/index.html",
+          boot: "src/boot/index.html",
         },
       },
     },

@@ -3,15 +3,10 @@ use std::time::SystemTime;
 
 use zvs_contract::{CLI_THEME_FILE, CliTheme, CliThemeDto};
 
-use crate::keymap_file::{self, APP_DATA_FOLDER};
+use crate::keymap_file;
 
 pub fn default_path() -> Option<PathBuf> {
-    std::env::var_os("APPDATA").map(|root| {
-        PathBuf::from(root)
-            .join(APP_DATA_FOLDER)
-            .join("cli")
-            .join(CLI_THEME_FILE)
-    })
+    keymap_file::settings_dir().map(|dir| dir.join(CLI_THEME_FILE))
 }
 
 pub fn load_from(path: &Path) -> CliTheme {
