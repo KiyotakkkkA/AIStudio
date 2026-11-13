@@ -27,7 +27,6 @@ import IconButton from "../../ui/atoms/buttons/IconButton";
 import TextArea from "../../ui/atoms/TextArea";
 import ChatMessage from "./ChatMessage";
 import CompactionMark from "./CompactionMark";
-import RecapBlock from "./RecapBlock";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
 import { AUTO_COMPACTING, COMPACTING, COMPACTION_STOPPED } from "./compactionCopy";
 import MessageActions from "../../ui/molecules/MessageActions";
@@ -459,6 +458,7 @@ export default observer(function ChatThread({
                       durationMs={message.durationMs}
                       completedAt={message.createdAt + message.durationMs}
                       content={message.content}
+                      recap={message.recap}
                       reasoning={message.reasoning}
                       rounds={message.rounds}
                       citations={answerCitations(message.citations, message.toolCalls)}
@@ -484,7 +484,6 @@ export default observer(function ChatThread({
                         onNewDialog: () => void store.branchConversation(message.id),
                       }}
                     />
-                    {message.recap !== undefined && <RecapBlock recap={message.recap} />}
                   </div>
                 )}
                 {store.active?.compactions

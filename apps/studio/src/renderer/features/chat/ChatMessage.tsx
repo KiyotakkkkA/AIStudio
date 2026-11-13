@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import type {
   ChatCitationDto,
   ChatRoundDto,
@@ -10,9 +10,11 @@ import type {
   WebSourceDto,
 } from "@zvs/shared";
 import { ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiFileEyeOutline } from "@mdi/js";
+import { mdiFileEyeOutline, mdiTextBoxOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import ChatMarkdown from "./ChatMarkdown";
+import RecapBlock from "./RecapBlock";
+import { RECAP_HIDE, RECAP_SHOW } from "./compactionCopy";
 import AnswerQuote from "./AnswerQuote";
 import AnswerFlow from "./AnswerFlow";
 import ChatSources from "./ChatSources";
@@ -38,6 +40,7 @@ import GenerationStatus from "../../ui/molecules/GenerationStatus";
 export default function ChatMessage({
   messageId,
   content,
+  recap,
   reasoning = "",
   rounds = [],
   citations,
@@ -63,6 +66,7 @@ export default function ChatMessage({
 }: {
   readonly messageId?: MessageId;
   readonly content: string;
+  readonly recap?: string;
   readonly reasoning?: string;
   readonly rounds?: readonly ChatRoundDto[];
   readonly citations: readonly ChatCitationDto[];
@@ -89,6 +93,8 @@ export default function ChatMessage({
   const { viewer, chat } = useStore();
   const selections = documentSelections(attached);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [recapOpen, setRecapOpen] = useState(false);
+  const recapId = useId();
   const storeName = (storeId: VectorStoreId) =>
     stores.find((store) => store.id === storeId)?.name ?? "Хранилище";
   const view = (citation: ChatCitationDto) => {
@@ -165,7 +171,9 @@ export default function ChatMessage({
           )}
           {usage && <p className="pt-2 font-mono text-[11px] text-main-500">{usage}</p>}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <div
+          className={`mt-2 flex flex-wrap items-center gap-x-3 transition-opacity ${recap !== undefined && recapOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}
+        >
           <MessageActions
             content={content}
             onEdit={onEdit}
@@ -174,7 +182,24 @@ export default function ChatMessage({
             pinned={pinned}
             onPin={onPin}
             branch={branch}
-          />
+          >
+            {recap !== undefined && (
+              <IconButton
+                label={recapOpen ? RECAP_HIDE : RECAP_SHOW}
+                tooltip="top-right"
+                path={mdiTextBoxOutline}
+                aria-expanded={recapOpen}
+                aria-pressed={recapOpen}
+                aria-controls={recapOpen ? recapId : undefined}
+                {...(recapOpen
+                  ? {
+                      toneClassName: "text-accent-medium hover:bg-main-700 hover:text-accent-light",
+                    }
+                  : {})}
+                onClick={() => setRecapOpen((open) => !open)}
+              />
+            )}
+          </MessageActions>
           {!generating && completedAt !== undefined ? (
             <time
               dateTime={new Date(completedAt).toISOString()}
@@ -189,6 +214,7 @@ export default function ChatMessage({
             </time>
           ) : null}
         </div>
+        {recap !== undefined && recapOpen && <RecapBlock id={recapId} recap={recap} />}
       </div>
       <SlidedPanel
         open={sourcesOpen}

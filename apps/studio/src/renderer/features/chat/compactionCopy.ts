@@ -13,6 +13,8 @@ export const COMPACTION_UNDO = "Отменить сжатие";
 export const COMPACTION_STOP = "Остановить";
 export const COMPACTION_STOPPED = "Сжатие остановлено.";
 export const RECAP_TITLE = "Итог";
+export const RECAP_SHOW = "Показать итог";
+export const RECAP_HIDE = "Скрыть итог";
 
 export function compactionMessages(count: number): string {
   const word = plural(count, "сообщение", "сообщения", "сообщений").slice(String(count).length + 1);

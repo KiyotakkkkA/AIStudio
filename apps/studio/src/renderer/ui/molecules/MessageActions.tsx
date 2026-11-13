@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import {
   mdiCheck,
@@ -31,6 +31,7 @@ export default function MessageActions({
   pinned = false,
   onPin,
   branch,
+  children,
 }: {
   readonly content: string;
   readonly isUser?: boolean;
@@ -40,6 +41,7 @@ export default function MessageActions({
   readonly pinned?: boolean;
   readonly onPin?: () => void;
   readonly branch?: MessageBranchAction;
+  readonly children?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
   const tooltip = isUser ? "bottom-left" : "top-right";
@@ -107,7 +109,7 @@ export default function MessageActions({
             rounded=""
             className="rounded-control"
             disabled={branch.disabled}
-            toneClassName="text-main-400 hover:bg-main-700 hover:text-main-50"
+            toneClassName="bg-transparent text-main-400 hover:bg-main-700 hover:text-main-50"
           />
           <ActionMenu label={branch.label}>
             <ActionMenuItem icon={mdiSourceBranchPlus} onClick={branch.onNewDialog}>
@@ -116,6 +118,7 @@ export default function MessageActions({
           </ActionMenu>
         </Dropdown>
       )}
+      {children}
       {onEdit && (
         <IconButton
           aria-label="Редактировать сообщение"
