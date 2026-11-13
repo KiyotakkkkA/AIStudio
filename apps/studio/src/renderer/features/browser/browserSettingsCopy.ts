@@ -9,7 +9,9 @@ export const BROWSER_ENABLED_HINT =
 export const BROWSER_DISABLED_NOTE =
   "Встроенный браузер отключён. Ссылки открываются в системном браузере.";
 
-export const BROWSER_GENERAL_TITLE = "Основные";
+export const BROWSER_MAIN_TITLE = "Основное";
+
+export const BROWSER_GENERAL_TITLE = "Настройки браузера";
 
 export const WEB_LINKS_ID = "browser.webLinks";
 export const WEB_LINKS_LABEL = "Открытие веб-ссылок";

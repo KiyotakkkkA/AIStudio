@@ -7,13 +7,12 @@ import type {
   Contract,
   FolderGrantDto,
   FolderGrantId,
-  ToolGrantDto,
   UserRuleDto,
 } from "@zvs/shared";
 import { CHANGE_FAILED } from "../access/accessCopy";
 import { LOAD_ERROR, revokeErrorCopy } from "./permissionsPresentation";
 
-export type AccessTab = "folders" | "sites" | "apps" | "tools" | "rules";
+export type AccessTab = "folders" | "sites" | "apps" | "rules";
 
 export interface PermissionsStoreOptions {
   readonly clock?: () => number;
@@ -82,22 +81,16 @@ export default class PermissionsStore {
     return this.access?.apps ?? [];
   }
 
-  get tools(): readonly ToolGrantDto[] {
-    return this.access?.tools ?? [];
-  }
-
   get rules(): readonly UserRuleDto[] {
     return this.access?.rules.rules ?? [];
   }
 
   get counts(): Record<AccessTab, number | null> {
-    if (this.access === null)
-      return { folders: null, sites: null, apps: null, tools: null, rules: null };
+    if (this.access === null) return { folders: null, sites: null, apps: null, rules: null };
     return {
       folders: this.grants.length,
       sites: this.sites.length,
       apps: this.apps.length,
-      tools: this.tools.length,
       rules: this.rules.length,
     };
   }

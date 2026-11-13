@@ -1,6 +1,15 @@
 import { mdiShieldCheckOutline, mdiShieldOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import AppPermissions from "../features/device/AppPermissions";
+import SitePermissions from "../features/browser/SitePermissions";
+import {
+  ACCESS_TAB_ORDER,
+  fromBrowserPreferences,
+  fromDevicePreferences,
+  requestedAccessTab,
+} from "../features/access/accessNavigation";
 import FolderGrantDetail from "../features/permissions/FolderGrantDetail";
 import FolderGrantList from "../features/permissions/FolderGrantList";
 import type { AccessTab } from "../features/permissions/PermissionsStore";
@@ -17,9 +26,7 @@ import {
   TAB_FOLDERS,
   TAB_RULES,
   TAB_SITES,
-  TAB_TOOLS,
 } from "../features/access/accessCopy";
-import { AppAccessList, SiteAccessList, ToolAccessList } from "../features/access/AccessLists";
 import { EXEC_MODE_COPY, JUDGE_NONE } from "../features/execPolicy/execPolicyCopy";
 import RuleList from "../features/execPolicy/RuleList";
 import { useStore } from "../stores/useStore";
@@ -34,11 +41,8 @@ const TAB_LABELS: Record<AccessTab, string> = {
   folders: TAB_FOLDERS,
   sites: TAB_SITES,
   apps: TAB_APPS,
-  tools: TAB_TOOLS,
   rules: TAB_RULES,
 };
-
-const TAB_ORDER: readonly AccessTab[] = ["folders", "sites", "apps", "tools", "rules"];
 
 const FoldersPane = observer(function FoldersPane() {
   const { permissions } = useStore();
@@ -73,12 +77,19 @@ const FoldersPane = observer(function FoldersPane() {
 });
 
 function PermissionsPage() {
-  const { permissions, execPolicy } = useStore();
+  const { permissions, execPolicy, browserSites, devicePermissions, ui } = useStore();
+  const [params, setParams] = useSearchParams();
+  const requestedTab = requestedAccessTab(params);
+  const fromBrowser = fromBrowserPreferences(params);
+  const fromDevice = fromDevicePreferences(params);
+  useEffect(() => {
+    if (requestedTab !== null) permissions.setTab(requestedTab);
+  }, [permissions, requestedTab]);
   useEffect(() => {
     void permissions.load();
   }, [permissions]);
 
-  const tab = permissions.tab;
+  const tab = requestedTab ?? permissions.tab;
   const policy = permissions.access?.policy ?? null;
   const counts = permissions.counts;
 
@@ -98,13 +109,21 @@ function PermissionsPage() {
         <PageTabs
           label={ACCESS_TABS_LABEL}
           value={tab}
-          tabs={TAB_ORDER.map((value) => ({
+          tabs={ACCESS_TAB_ORDER.map((value) => ({
             value,
             label: TAB_LABELS[value],
-            count: counts[value],
+            count:
+              value === "sites" && browserSites.loaded
+                ? browserSites.sites.sites.length
+                : value === "apps" && devicePermissions.loaded
+                  ? devicePermissions.grants.length
+                  : counts[value],
           }))}
           onChange={(next) => {
             permissions.setTab(next);
+            const nextParams = new URLSearchParams(params);
+            nextParams.set("tab", next);
+            setParams(nextParams);
             void permissions.load();
           }}
         />
@@ -119,10 +138,30 @@ function PermissionsPage() {
         </Alert>
       )}
       {tab === "folders" ? <FoldersPane /> : null}
-      {tab === "sites" ? <SiteAccessList /> : null}
-      {tab === "apps" ? <AppAccessList /> : null}
-      {tab === "tools" ? <ToolAccessList /> : null}
-      {tab === "rules" ? <RuleList store={execPolicy} /> : null}
+      {tab === "sites" ? (
+        <div className="mx-auto w-full max-w-240">
+          <SitePermissions onBack={fromBrowser ? () => ui.openPreferences("browser") : undefined} />
+        </div>
+      ) : null}
+      {tab === "apps" ? (
+        <div className="mx-auto w-full max-w-240">
+          <AppPermissions
+            onBack={
+              fromDevice
+                ? () => {
+                    devicePermissions.cancelAdding();
+                    ui.openPreferences("device");
+                  }
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
+      {tab === "rules" ? (
+        <div className="mx-auto w-full max-w-240">
+          <RuleList store={execPolicy} />
+        </div>
+      ) : null}
     </PageShell>
   );
 }

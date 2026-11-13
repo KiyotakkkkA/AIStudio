@@ -151,7 +151,7 @@ describe("PermissionsStore", () => {
     const { store } = setup([grant(1)], [APP]);
     expect(store.counts.folders).toBeNull();
     await store.load();
-    expect(store.counts).toEqual({ folders: 1, sites: 1, apps: 1, tools: 1, rules: 0 });
+    expect(store.counts).toEqual({ folders: 1, sites: 1, apps: 1, rules: 0 });
     store.setTab("apps");
     expect(store.tab).toBe("apps");
     expect(store.access?.policy.mode).toBe("always-ask");

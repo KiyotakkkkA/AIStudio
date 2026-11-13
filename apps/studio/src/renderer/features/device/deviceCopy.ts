@@ -1,6 +1,7 @@
 import { ACCESS_ANSWERS } from "../computer/computerCopy";
 import type { AppGrantDto } from "@zvs/shared";
 
+export const DEVICE_MAIN_TITLE = "Основное";
 export const DEVICE_TITLE = "Устройство";
 export const DEVICE_HINT = "Управление устройством и доступ к приложениям.";
 export const DEVICE_ENABLED_ID = "computer.enabled";
@@ -8,7 +9,7 @@ export const DEVICE_ENABLED_LABEL = "Управление устройством
 export const DEVICE_ENABLED_HINT = "Управление приложениями с помощью команды /computer-use.";
 export const APP_PERMISSIONS_ID = "computer.permissions";
 export const APP_PERMISSIONS_TITLE = "Разрешения приложений";
-export const APP_PERMISSIONS_HINT = "Постоянный доступ и доступ в отдельных диалогах.";
+export const APP_PERMISSIONS_HINT = "Разрешения на доступ к приложениям устройства";
 export const APP_PERMISSIONS_EMPTY = "Разрешений для приложений нет.";
 export const APP_LOAD_FAILED = "Не удалось загрузить разрешения приложений.";
 export const APP_ADD_FAILED = "Не удалось добавить разрешение.";

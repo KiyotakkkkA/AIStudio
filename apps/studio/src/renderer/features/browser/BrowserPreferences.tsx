@@ -8,7 +8,9 @@ import Alert from "../../ui/molecules/Alert";
 import PreferenceContainer from "../../ui/molecules/PreferenceContainer";
 import { useStore } from "../../stores/useStore";
 import SettingRow from "../preferences/SettingRow";
-import SitePermissions from "./SitePermissions";
+import { useAppNavigation } from "../../hooks/useAppNavigation";
+import { SITES_HINT, SITES_ID, SITES_TITLE } from "./browserSitesCopy";
+import { BROWSER_SITE_ACCESS_URL } from "../access/accessNavigation";
 import DownloadHistory from "./DownloadHistory";
 import BrowserExtensionsPage, { ExtensionsBlock } from "./BrowserExtensionsPage";
 import { BookmarksPage, HistoryPage, ImportPage } from "./BrowserLibraryPages";
@@ -31,6 +33,7 @@ import {
   BROWSER_ENABLED_ID,
   BROWSER_ENABLED_LABEL,
   BROWSER_GENERAL_TITLE,
+  BROWSER_MAIN_TITLE,
   FULL_URL_HINT,
   FULL_URL_ID,
   FULL_URL_LABEL,
@@ -46,28 +49,37 @@ import {
 const BrowserSwitch = observer(function BrowserSwitch() {
   const { browserSettings, ui } = useStore();
   const enabled = browserSettings.enabled;
+  const navigation = useAppNavigation();
   return (
-    <div
-      data-setting={BROWSER_ENABLED_ID}
-      data-setting-highlighted={ui.preferenceTarget === BROWSER_ENABLED_ID || undefined}
-      className="flex items-center gap-3.5 rounded-card border border-line bg-main-850 px-4 py-3.5"
-    >
-      <span className="flex size-10 flex-none items-center justify-center rounded-control bg-main-800 text-main-200">
-        <Icon path={mdiWeb} size={20} />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-[13px] font-medium text-main-100">{BROWSER_ENABLED_LABEL}</span>
-        <span className="text-[12px] text-main-500">
-          {enabled ? BROWSER_ENABLED_HINT : BROWSER_DISABLED_NOTE}
+    <PreferenceContainer title={BROWSER_MAIN_TITLE}>
+      <div
+        data-setting={BROWSER_ENABLED_ID}
+        data-setting-highlighted={ui.preferenceTarget === BROWSER_ENABLED_ID || undefined}
+        className="flex items-center gap-3.5 border-b border-line py-3.5"
+      >
+        <span className="flex size-10 flex-none items-center justify-center rounded-control bg-main-800 text-main-200">
+          <Icon path={mdiWeb} size={20} />
         </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[13px] font-medium text-main-100">{BROWSER_ENABLED_LABEL}</span>
+          <span className="text-[12px] text-main-500">
+            {enabled ? BROWSER_ENABLED_HINT : BROWSER_DISABLED_NOTE}
+          </span>
+        </div>
+        <Toggle
+          label={enabled ? TOGGLE_ON : TOGGLE_OFF}
+          checked={enabled}
+          disabled={!browserSettings.loaded || browserSettings.saving}
+          onChange={(value) => void browserSettings.update({ enabled: value })}
+        />
       </div>
-      <Toggle
-        label={enabled ? TOGGLE_ON : TOGGLE_OFF}
-        checked={enabled}
-        disabled={!browserSettings.loaded || browserSettings.saving}
-        onChange={(value) => void browserSettings.update({ enabled: value })}
-      />
-    </div>
+      <SettingRow id={SITES_ID} label={SITES_TITLE} hint={SITES_HINT}>
+        <Button tone="primary" size="sm" onClick={() => navigation.go(BROWSER_SITE_ACCESS_URL)}>
+          <Icon path={mdiTune} />
+          {MANAGE}
+        </Button>
+      </SettingRow>
+    </PreferenceContainer>
   );
 });
 
@@ -164,7 +176,6 @@ export default observer(function BrowserPreferences() {
       <AutofillBlock />
       <ExtensionsBlock onManage={setPage} />
       <DownloadsBlock onManage={setPage} />
-      <SitePermissions />
     </div>
   );
 });

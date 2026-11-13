@@ -2,7 +2,7 @@ import type { BrowserSiteAction, BrowserSiteDecision } from "@zvs/shared";
 
 export const SITES_TITLE = "Разрешения сайтов";
 export const SITES_HINT =
-  "Действия модели в браузере по умолчанию и исключения для отдельных сайтов.";
+  "Общие разрешения на действия в браузере и исключения для отдельных сайтов.";
 export const SITES_ID = "browser.sites";
 export const SITES_ADD = "Добавить";
 export const SITE_COLUMN = "Сайт";

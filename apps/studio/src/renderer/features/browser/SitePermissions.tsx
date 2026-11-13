@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import { mdiClose, mdiPlus } from "@mdi/js";
+import { mdiArrowLeft, mdiClose, mdiPlus } from "@mdi/js";
 import {
   BROWSER_SITE_ACTIONS,
   BROWSER_SITE_DECISIONS,
@@ -16,6 +16,7 @@ import TextInput from "../../ui/atoms/TextInput";
 import Alert from "../../ui/molecules/Alert";
 import PreferenceContainer from "../../ui/molecules/PreferenceContainer";
 import { useStore } from "../../stores/useStore";
+import { BACK } from "./browserDataCopy";
 import {
   SITE_ACTION_HINTS,
   SITE_ACTION_LABELS,
@@ -116,7 +117,11 @@ const AddRow = observer(function AddRow() {
   );
 });
 
-export default observer(function SitePermissions() {
+export default observer(function SitePermissions({
+  onBack,
+}: {
+  readonly onBack?: (() => void) | undefined;
+}) {
   const { browserSites, ui } = useStore();
   useEffect(() => {
     void browserSites.load();
@@ -128,15 +133,23 @@ export default observer(function SitePermissions() {
       hint={SITES_HINT}
       bare
       action={
-        <Button
-          tone="secondary"
-          size="sm"
-          disabled={browserSites.adding}
-          onClick={browserSites.startAdding}
-        >
-          <Icon path={mdiPlus} size={14} />
-          {SITES_ADD}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            tone="secondary"
+            size="sm"
+            disabled={browserSites.adding}
+            onClick={browserSites.startAdding}
+          >
+            <Icon path={mdiPlus} size={14} />
+            {SITES_ADD}
+          </Button>
+          {onBack === undefined ? null : (
+            <Button tone="secondary" size="sm" onClick={onBack}>
+              <Icon path={mdiArrowLeft} size={14} />
+              {BACK}
+            </Button>
+          )}
+        </div>
       }
     >
       <div

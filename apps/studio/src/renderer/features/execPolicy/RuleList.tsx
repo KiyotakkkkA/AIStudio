@@ -1,6 +1,6 @@
 import { observer } from "mobx-react-lite";
 import { useEffect, useState } from "react";
-import { mdiAlertOutline, mdiTrashCanOutline } from "@mdi/js";
+import { mdiAlertOutline, mdiClose } from "@mdi/js";
 import Button from "../../ui/atoms/buttons/Button";
 import IconButton from "../../ui/atoms/buttons/IconButton";
 import Icon from "../../ui/atoms/Icon";
@@ -65,8 +65,10 @@ function RuleList({ store }: { readonly store: ExecPolicyStore }) {
                 </p>
               </div>
               <IconButton
-                path={mdiTrashCanOutline}
+                path={mdiClose}
                 label={RULE_REMOVE_LABEL}
+                size="sm"
+                tone="danger"
                 disabled={store.rulesBusy !== null}
                 onClick={() => void store.removeRule(rule.id)}
               />

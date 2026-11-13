@@ -76,9 +76,12 @@ function AppFrame() {
     [navigation],
   );
 
+  const handledPreferenceRequest = useRef(0);
   const preferenceRequest = ui.preferenceRequest;
   useEffect(() => {
-    if (preferenceRequest > 0) navigation.go(ROUTES.settings);
+    if (preferenceRequest <= handledPreferenceRequest.current) return;
+    handledPreferenceRequest.current = preferenceRequest;
+    navigation.go(ROUTES.settings);
   }, [preferenceRequest, navigation]);
 
   return (
