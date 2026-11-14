@@ -270,6 +270,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0044_chat_compaction",
         sql: include_str!("../../migrations/0044_chat_compaction.sql"),
     },
+    Migration {
+        id: 45,
+        name: "0045_message_sources",
+        sql: include_str!("../../migrations/0045_message_sources.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -679,6 +684,79 @@ mod tests {
             query(
                 &database,
                 "SELECT name FROM pragma_table_info('message') WHERE name = 'tool_calls' UNION ALL SELECT name FROM pragma_table_info('agentic_session') WHERE name = 'transcript'"
+            )
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn citations_and_web_sources_fold_into_one_source_list_keeping_order_within_each_kind() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(&database, &MIGRATIONS[..45], &options(&backups, &clock)).expect("applies");
+        let vector = |document: &str, chunk: u64| {
+            format!(
+                r#"{{"storeId":"0199aa11-5555-7111-8111-111111111111","documentId":"{document}","sourcePath":"a.md","chunkIndex":{chunk},"score":0.5,"section":"","page":null,"related":null}}"#
+            )
+        };
+        let web = |url: &str| format!(r#"{{"url":"{url}","title":"t","snippet":"","date":null}}"#);
+        let both_citations = format!("[{},{}]", vector("d2", 4), vector("d1", 0));
+        let both_web = format!(
+            "[{},{}]",
+            web("https://b.example/"),
+            web("https://a.example/")
+        );
+        let only_web = format!("[{}]", web("https://c.example/"));
+        let only_vector = format!("[{}]", vector("d3", 1));
+        database
+            .with_connection(|connection| {
+                connection.execute_batch(
+                    r#"INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, created_at, updated_at) VALUES ('c1', 't', 'p', 'm', '{}', '', '[]', 1, 1);"#,
+                )?;
+                let mut insert = connection.prepare(
+                    "INSERT INTO message (id, conversation_id, role, content, citations, web_sources, tokens_in, tokens_out, usage_estimated, duration_ms, partial, created_at) VALUES (?1, 'c1', 'assistant', '', ?2, ?3, 0, 0, 1, 0, 0, ?4)",
+                )?;
+                insert.execute(params!["m1", both_citations, both_web, 1])?;
+                insert.execute(params!["m2", "[]", only_web, 2])?;
+                insert.execute(params!["m3", only_vector, "[]", 3])?;
+                insert.execute(params!["m4", "[]", "[]", 4])?;
+                Ok(())
+            })
+            .expect("seeds");
+        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        let stored = query(&database, "SELECT sources FROM message ORDER BY created_at");
+        let parsed: Vec<Vec<zvs_contract::ChatSourceDto>> = stored
+            .iter()
+            .map(|text| serde_json::from_str(text).expect("sources parse"))
+            .collect();
+        let label = |source: &zvs_contract::ChatSourceDto| match source {
+            zvs_contract::ChatSourceDto::Vector(citation) => {
+                format!("vector:{}:{}", citation.document_id, citation.chunk_index)
+            }
+            zvs_contract::ChatSourceDto::Web(source) => format!("web:{}", source.url),
+        };
+        let labels: Vec<Vec<String>> = parsed
+            .iter()
+            .map(|sources| sources.iter().map(label).collect())
+            .collect();
+        assert_eq!(
+            labels,
+            [
+                vec![
+                    "vector:d2:4".to_owned(),
+                    "vector:d1:0".to_owned(),
+                    "web:https://b.example/".to_owned(),
+                    "web:https://a.example/".to_owned(),
+                ],
+                vec!["web:https://c.example/".to_owned()],
+                vec!["vector:d3:1".to_owned()],
+                Vec::new(),
+            ]
+        );
+        assert!(
+            query(
+                &database,
+                "SELECT name FROM pragma_table_info('message') WHERE name IN ('citations', 'web_sources')"
             )
             .is_empty()
         );

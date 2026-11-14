@@ -1,8 +1,8 @@
 use rusqlite::Row;
 use zvs_contract::{
-    ChatCitationDto, ChatCommand, ChatEventDto, ChatGoalDto, ChatPluginDto, ChatRoundDto,
-    ChatSettings, ChatToolCallDto, CompactionTrigger, DocumentSelectionDto, MessageRole,
-    OfferedToolDto, RetrievalMode, Timestamp, WebSourceDto,
+    ChatCommand, ChatEventDto, ChatGoalDto, ChatPluginDto, ChatRoundDto, ChatSettings,
+    ChatSourceDto, ChatToolCallDto, CompactionTrigger, DocumentSelectionDto, MessageRole,
+    OfferedToolDto, RetrievalMode, Timestamp,
 };
 
 use super::columns::{EnumColumn, json_column, optional_json_column};
@@ -61,14 +61,13 @@ pub struct MessageRow {
     pub role: MessageRole,
     pub content: String,
     pub reasoning: String,
-    pub citations: Vec<ChatCitationDto>,
+    pub sources: Vec<ChatSourceDto>,
     pub tool_calls: Vec<ChatToolCallDto>,
     pub images: Vec<zvs_contract::ImageAttachmentDto>,
     pub selections: Vec<DocumentSelectionDto>,
     pub commands: Vec<ChatCommand>,
     pub plugins: Vec<ChatPluginDto>,
     pub offered_tools: Vec<OfferedToolDto>,
-    pub web_sources: Vec<WebSourceDto>,
     pub rounds: Vec<ChatRoundDto>,
     pub tokens_in: i64,
     pub tokens_out: i64,
@@ -85,9 +84,9 @@ pub struct MessageRow {
 }
 
 impl MessageRow {
-    pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, citations, \
+    pub const COLUMNS: &str = "id, conversation_id, role, content, reasoning, sources, \
         (SELECT json_group_array(json(call) ORDER BY idx) FROM message_tool_call \
-        WHERE message_id = message.id) AS tool_calls, images, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
+        WHERE message_id = message.id) AS tool_calls, images, selections, commands, plugins, offered_tools, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, \
         pinned, event, created_at, recap";
 
     pub fn from_row(row: &Row<'_>) -> rusqlite::Result<Self> {
@@ -97,14 +96,13 @@ impl MessageRow {
             role: row.get::<_, EnumColumn<MessageRole>>("role")?.0,
             content: row.get("content")?,
             reasoning: row.get("reasoning")?,
-            citations: json_column(row, "citations")?,
+            sources: json_column(row, "sources")?,
             tool_calls: json_column(row, "tool_calls")?,
             images: json_column(row, "images")?,
             selections: json_column(row, "selections")?,
             commands: json_column(row, "commands")?,
             plugins: json_column(row, "plugins")?,
             offered_tools: json_column(row, "offered_tools")?,
-            web_sources: json_column(row, "web_sources")?,
             rounds: json_column(row, "rounds")?,
             tokens_in: row.get("tokens_in")?,
             tokens_out: row.get("tokens_out")?,

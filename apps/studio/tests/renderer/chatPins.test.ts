@@ -19,7 +19,6 @@ const answer = MessageDto.parse({
   conversationId: id,
   role: "assistant",
   content: "## План\n\nТекст",
-  citations: [],
   tokensIn: 1,
   tokensOut: 1,
   usageEstimated: false,

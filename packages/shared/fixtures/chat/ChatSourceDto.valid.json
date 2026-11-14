@@ -1,0 +1,26 @@
+[
+  {
+    "name": "vector",
+    "value": {
+      "kind": "vector",
+      "storeId": "0199aa11-5555-7111-8111-111111111111",
+      "documentId": "doc",
+      "sourcePath": "docs/a.md",
+      "chunkIndex": 3,
+      "score": 0.9,
+      "section": "Отпуск",
+      "page": 2,
+      "related": null
+    }
+  },
+  {
+    "name": "web",
+    "value": {
+      "kind": "web",
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "EUR 90,24",
+      "date": null
+    }
+  }
+]

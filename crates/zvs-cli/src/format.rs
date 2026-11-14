@@ -31,6 +31,10 @@ pub fn tokens(count: u64) -> String {
     plural(count, "токен", "токена", "токенов")
 }
 
+pub fn sources(count: u64) -> String {
+    plural(count, "источник", "источника", "источников")
+}
+
 pub fn messages(count: u64) -> String {
     plural(count, "сообщение", "сообщения", "сообщений")
 }

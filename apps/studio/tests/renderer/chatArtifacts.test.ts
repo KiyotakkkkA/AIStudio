@@ -146,7 +146,6 @@ const message = (id: string, role: string, calls: unknown[]) =>
     conversationId: "0199aa11-2222-7111-8111-111111111111",
     role,
     content: "",
-    citations: [],
     toolCalls: calls,
     tokensIn: 0,
     tokensOut: 0,

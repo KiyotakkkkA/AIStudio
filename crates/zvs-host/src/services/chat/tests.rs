@@ -565,7 +565,7 @@ async fn a_storeless_turn_returns_before_tokens_skips_retrieval_and_persists_usa
     assert_eq!(answer.content, "Hello world");
     assert!(!answer.partial);
     assert_eq!(answer.run_id, Some(handle.id));
-    assert!(answer.citations.is_empty());
+    assert!(answer.citations().is_empty());
     assert!(answer.usage_estimated);
     assert!(answer.tokens_in > 0);
     assert!(answer.tokens_out > 0);
@@ -612,7 +612,7 @@ async fn attached_stores_search_in_parallel_and_only_supplied_passages_become_ci
     harness.search.open();
     within(harness.runs.wait(&handle.id)).await;
     assert_eq!(harness.status(&handle), RunStatus::Succeeded);
-    let citations = &harness.messages(created)[1].citations;
+    let citations = &harness.messages(created)[1].citations();
     assert_eq!(
         citations
             .iter()
@@ -1012,7 +1012,7 @@ async fn a_store_with_reranking_on_hands_chat_reranked_citations() {
         ..harness.input()
     });
     within(harness.turn(created, "Where is the answer?")).await;
-    let citations = &harness.messages(created)[1].citations;
+    let citations = &harness.messages(created)[1].citations();
     assert_eq!(citations[0].document_id, "doc5");
     assert_eq!(citations[0].source_path, "docs/doc5.md");
     assert!(citations[0].score > 0.99);
@@ -1089,7 +1089,7 @@ async fn chat_brings_neighbours_always_and_related_documents_only_when_asked() {
     let first_answer = &harness.messages(created.id)[1];
     assert_eq!(
         first_answer
-            .citations
+            .citations()
             .iter()
             .map(|citation| citation.document_id.as_str())
             .collect::<Vec<_>>(),
@@ -1117,7 +1117,7 @@ async fn chat_brings_neighbours_always_and_related_documents_only_when_asked() {
     let answer = &harness.messages(created.id)[3];
     assert_eq!(
         answer
-            .citations
+            .citations()
             .iter()
             .map(|citation| (citation.document_id.as_str(), citation.related.as_deref()))
             .collect::<Vec<_>>(),
@@ -1159,7 +1159,7 @@ async fn an_off_topic_turn_fetches_candidates_but_injects_no_sources_block() {
         harness.driver.requests()[0].messages,
         [ChatMessage::user("Спасибо!")]
     );
-    assert!(harness.messages(created)[1].citations.is_empty());
+    assert!(harness.messages(created)[1].citations().is_empty());
     let logged = harness.logger.matching(RETRIEVAL_ASSEMBLED);
     assert_eq!(logged.len(), 1);
     let fields = &logged[0].fields;
@@ -1213,7 +1213,7 @@ async fn two_stores_merge_by_score_and_the_stronger_second_store_is_cited_first(
         ..harness.input()
     });
     within(harness.turn(created, "Which store knows it?")).await;
-    let citations = &harness.messages(created)[1].citations;
+    let citations = &harness.messages(created)[1].citations();
     assert_eq!(
         citations
             .iter()

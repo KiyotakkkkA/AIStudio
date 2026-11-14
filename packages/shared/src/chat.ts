@@ -110,6 +110,15 @@ export const WebSourceDto = z.object({
   icon: WebUrl.optional(),
 });
 export type WebSourceDto = z.infer<typeof WebSourceDto>;
+export const CHAT_SOURCES_MAX = 400;
+export const CHAT_SOURCE_KINDS = ["vector", "web"] as const;
+export const ChatSourceKind = z.enum(CHAT_SOURCE_KINDS);
+export type ChatSourceKind = z.infer<typeof ChatSourceKind>;
+export const ChatSourceDto = z.discriminatedUnion("kind", [
+  ChatCitationDto.extend({ kind: z.literal("vector") }),
+  WebSourceDto.extend({ kind: z.literal("web") }),
+]);
+export type ChatSourceDto = z.infer<typeof ChatSourceDto>;
 export const CHAT_COMMANDS = ["browser-use", "computer-use", "goal"] as const;
 export const ChatCommand = z.enum(CHAT_COMMANDS);
 export type ChatCommand = z.infer<typeof ChatCommand>;
@@ -318,14 +327,13 @@ export const MessageDto = z
     role: MessageRole,
     content: z.string(),
     reasoning: z.string().default(""),
-    citations: z.array(ChatCitationDto),
+    sources: z.array(ChatSourceDto).max(CHAT_SOURCES_MAX).default([]),
     toolCalls: z.array(ChatToolCallDto).default([]),
     images: ImageAttachments.optional(),
     selections: Selections.default([]),
     commands: ChatCommands.default([]),
     plugins: z.array(ChatPluginDto).max(CHAT_PLUGINS_MAX).default([]),
     offeredTools: z.array(OfferedToolDto).default([]),
-    webSources: z.array(WebSourceDto).max(WEB_SOURCES_MAX).default([]),
     rounds: z.array(ChatRoundDto).default([]),
     tokensIn: z.number().int().nonnegative(),
     tokensOut: z.number().int().nonnegative(),

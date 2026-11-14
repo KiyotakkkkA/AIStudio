@@ -30,7 +30,7 @@ import {
   type RunId,
   type AllowRuleScope,
   type ChatAttachDto,
-  type ChatCitationDto,
+  type ChatSourceDto,
   type ChatCommand,
   type ChatCommandDto,
   type ComputerAppDto,
@@ -58,7 +58,6 @@ import {
   type ToolDto,
   type VectorStoreDto,
   type VendorTurnOptions,
-  type WebSourceDto,
 } from "@zvs/shared";
 import type { EventRouter, RoutedEvent } from "../../app/EventRouter";
 import ConversationVm from "./ConversationVm";
@@ -68,6 +67,7 @@ import { accountProviderLabel } from "../providers/accountPresentation";
 import { suggestedBaseUrl } from "../providers/providerPresentation";
 import { answerErrorCopy, folderErrorCopy } from "./workingFolderCopy";
 import ArtifactActions from "./ArtifactActions";
+import { withStoreCitations } from "./sources";
 import ConversationExport from "./ConversationExport";
 import ChatStatsStore from "./stats/ChatStatsStore";
 import { dialogArtifacts, type DialogArtifact } from "./artifacts";
@@ -154,8 +154,7 @@ export default class ChatStore {
   liveText = "";
   liveReasoning = "";
   liveRounds: ChatRoundDto[] = [];
-  liveCitations: ChatCitationDto[] = [];
-  liveWebSources: WebSourceDto[] = [];
+  liveSources: ChatSourceDto[] = [];
   liveSelections: DocumentSelectionDto[] = [];
   liveToolCalls: ChatToolCallDto[] = [];
   searchedStoreIds: VectorStoreDto["id"][] = [];
@@ -1172,8 +1171,7 @@ export default class ChatStore {
         }
         this.liveText = "";
         this.liveReasoning = "";
-        this.liveCitations = [];
-        this.liveWebSources = [];
+        this.liveSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.subagents.clear();
@@ -1214,8 +1212,7 @@ export default class ChatStore {
     this.outcome = null;
     this.liveText = "";
     this.liveReasoning = "";
-    this.liveCitations = [];
-    this.liveWebSources = [];
+    this.liveSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
     this.liveRounds = [];
@@ -1348,8 +1345,7 @@ export default class ChatStore {
     this.retryText = text;
     this.retryImages = images;
     this.liveText = "";
-    this.liveCitations = [];
-    this.liveWebSources = [];
+    this.liveSources = [];
     this.liveSelections = [];
     this.liveToolCalls = [];
     this.subagents.clear();
@@ -1578,8 +1574,7 @@ export default class ChatStore {
         );
         this.liveText = "";
         this.liveReasoning = "";
-        this.liveCitations = [];
-        this.liveWebSources = [];
+        this.liveSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.subagents.clear();
@@ -1913,9 +1908,10 @@ export default class ChatStore {
         if (storeId && hits.success && !this.searchedStoreIds.includes(storeId))
           this.searchedStoreIds.push(storeId);
         if (storeId && hits.success)
-          this.liveCitations = [
-            ...this.liveCitations.filter((citation) => citation.storeId !== storeId),
-            ...hits.data.map((hit) => ({
+          this.liveSources = withStoreCitations(
+            this.liveSources,
+            storeId,
+            hits.data.map((hit) => ({
               storeId,
               documentId: hit.documentId,
               sourcePath: hit.path,
@@ -1925,7 +1921,7 @@ export default class ChatStore {
               page: hit.page,
               related: null,
             })),
-          ];
+          );
       }
       if (nodeId === "persist") {
         const message = MessageDto.safeParse(event.step.output);
@@ -1934,8 +1930,7 @@ export default class ChatStore {
           this.liveText = message.data.content;
           this.liveReasoning = message.data.reasoning;
           this.liveRounds = message.data.rounds;
-          this.liveCitations = message.data.citations;
-          this.liveWebSources = message.data.webSources;
+          this.liveSources = message.data.sources;
         }
       }
     }
@@ -2008,8 +2003,7 @@ export default class ChatStore {
         );
         this.liveText = "";
         this.liveReasoning = "";
-        this.liveCitations = [];
-        this.liveWebSources = [];
+        this.liveSources = [];
         this.liveSelections = [];
         this.liveToolCalls = [];
         this.subagents.clear();
@@ -2040,8 +2034,7 @@ export default class ChatStore {
       this.outcome = null;
       this.liveText = "";
       this.liveReasoning = "";
-      this.liveCitations = [];
-      this.liveWebSources = [];
+      this.liveSources = [];
       this.liveSelections = [];
       this.liveToolCalls = [];
       this.liveRounds = [];

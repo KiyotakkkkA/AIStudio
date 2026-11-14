@@ -177,6 +177,7 @@ pub enum Request {
     LinkAccount(AccountFamily),
     CancelLink(AccountFamily),
     OpenDesktop(ConversationId),
+    OpenUrl(String),
     Open,
     Providers,
     Policy,
@@ -2885,7 +2886,10 @@ impl App {
                 selection.cursor = (x, y);
                 if selection.anchor == selection.cursor {
                     self.selection = None;
-                    return Vec::new();
+                    let screen = ratatui::layout::Rect::new(0, 0, self.viewport.0, self.viewport.1);
+                    return crate::ui::link_at(self, screen, x, y)
+                        .map(|url| vec![Request::OpenUrl(url)])
+                        .unwrap_or_default();
                 }
                 self.selection = Some(selection);
                 if self.auto_copy {

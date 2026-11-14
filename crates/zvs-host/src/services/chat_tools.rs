@@ -1128,7 +1128,6 @@ mod tests {
             "conversationId": "0199aa11-2222-7111-8111-111111111111",
             "role": role,
             "content": "x",
-            "citations": [],
             "toolCalls": calls,
             "commands": command.into_iter().collect::<Vec<_>>(),
             "tokensIn": 1,

@@ -13,16 +13,17 @@ use zvs_contract::{
     AppError, AppErrorCode, ChatAttachDto, ChatCitationDto, ChatCommand, ChatCommandDto,
     ChatContextDto, ChatContextInput, ChatContextToolDto, ChatEvalCaseDto, ChatEvalInput,
     ChatEvalModeDto, ChatEvalRunDto, ChatEventDto, ChatGoalDto, ChatPromptSection,
-    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto,
-    ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto, ConversationDto, ConversationId,
-    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DeltaKind, DocumentId, FolderGrantScope,
-    GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus, GraphDirection, GraphExpansionDocument,
-    GraphNeighborhood, GraphNeighborsInput, HostEvent, HostEventDraft, MessageDto, MessageId,
-    MessageRole, ProviderCapability, ProviderId, QuestionRecordDto, RetrievalMode, RunGraph,
-    RunHandleDto, RunId, RunKind, RunOutcomeStatus, RunStatus, SUBAGENT_DOMAIN, StartRunInput,
-    StreamId, ToolListFilter, ToolMode, ToolTier, Validate, VectorSearchHitDto, VectorStoreId,
-    VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX, WebSourceDto, log_line,
-    merge_graph_neighbors, model_tool_support, resolve_tool_mode,
+    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatSourceDto, ChatSourceKind,
+    ChatStatsDto, ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto,
+    ConversationDto, ConversationId, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
+    DeltaKind, DocumentId, FolderGrantScope, GRAPH_EXPANSION_DEFAULT_MAX, GoalReason, GoalStatus,
+    GraphDirection, GraphExpansionDocument, GraphNeighborhood, GraphNeighborsInput, HostEvent,
+    HostEventDraft, MessageDto, MessageId, MessageRole, ProviderCapability, ProviderId,
+    QuestionRecordDto, RetrievalMode, RunGraph, RunHandleDto, RunId, RunKind, RunOutcomeStatus,
+    RunStatus, SUBAGENT_DOMAIN, StartRunInput, StreamId, ToolListFilter, ToolMode, ToolTier,
+    Validate, VectorSearchHitDto, VectorStoreId, VendorTurnOptions, WAKE_STEP_DOMAIN,
+    WEB_SOURCES_MAX, WebSourceDto, log_line, merge_graph_neighbors, model_tool_support,
+    replace_sources, resolve_tool_mode, vector_sources,
 };
 
 use super::assistant::AssistantService;
@@ -381,14 +382,13 @@ fn message_dto(row: MessageRow) -> Result<MessageDto, AppError> {
         role: row.role,
         content: row.content,
         reasoning: row.reasoning,
-        citations: row.citations,
+        sources: row.sources,
         tool_calls: row.tool_calls,
         images: row.images,
         selections: row.selections,
         commands: row.commands,
         plugins: row.plugins,
         offered_tools: row.offered_tools,
-        web_sources: row.web_sources,
         rounds: row.rounds,
         tokens_in: count(row.tokens_in),
         tokens_out: count(row.tokens_out),
@@ -1949,14 +1949,18 @@ impl PlainNode for PrepareNode {
             role: MessageRole::Assistant,
             content: String::new(),
             reasoning: String::new(),
-            citations: prepared.citations.clone(),
+            sources: prepared
+                .citations
+                .iter()
+                .cloned()
+                .map(ChatSourceDto::Vector)
+                .collect(),
             tool_calls: Vec::new(),
             images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),
             offered_tools: offered_record(&offered),
-            web_sources: Vec::new(),
             rounds: Vec::new(),
             tokens_in: prepared.tokens_in,
             tokens_out: 0,
@@ -2414,7 +2418,13 @@ impl GenerateChatNode {
                             && let Err(error) = inner.update_message(
                                 assistant_id,
                                 &MessagePatch {
-                                    citations: Some(citations),
+                                    sources: Some(
+                                        citations
+                                            .iter()
+                                            .cloned()
+                                            .map(ChatSourceDto::Vector)
+                                            .collect(),
+                                    ),
                                     ..MessagePatch::default()
                                 },
                             )
@@ -2841,7 +2851,11 @@ impl PlainNode for PersistNode {
             &MessagePatch {
                 content: Some(input.result.text),
                 reasoning: Some(input.result.reasoning),
-                web_sources: Some(input.result.web_sources),
+                sources: Some(replace_sources(
+                    &message.sources,
+                    ChatSourceKind::Web,
+                    input.result.web_sources.into_iter().map(ChatSourceDto::Web),
+                )),
                 tokens_out,
                 partial: Some(false),
                 duration_ms: Some((inner.now() - message.created_at).max(0)),
@@ -3273,14 +3287,13 @@ impl ChatService {
             role: MessageRole::Assistant,
             content: text.to_owned(),
             reasoning: String::new(),
-            citations: Vec::new(),
+            sources: Vec::new(),
             tool_calls: Vec::new(),
             images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),
             offered_tools: Vec::new(),
-            web_sources: Vec::new(),
             rounds: Vec::new(),
             tokens_in: 0,
             tokens_out: tokens(text),
@@ -3520,14 +3533,13 @@ impl ChatService {
                 role: MessageRole::User,
                 content: text.clone(),
                 reasoning: String::new(),
-                citations: Vec::new(),
+                sources: Vec::new(),
                 tool_calls: Vec::new(),
                 images: Vec::new(),
                 selections: Vec::new(),
                 commands: Vec::new(),
                 plugins: Vec::new(),
                 offered_tools: Vec::new(),
-                web_sources: Vec::new(),
                 rounds: Vec::new(),
                 tokens_in: tokens(text),
                 tokens_out: 0,
@@ -3627,7 +3639,7 @@ impl ChatService {
             },
             content: text.clone(),
             reasoning: String::new(),
-            citations: Vec::<ChatCitationDto>::new(),
+            sources: Vec::new(),
             tool_calls: Vec::new(),
             images: input.images.clone(),
             selections: input.selections.clone(),
@@ -3642,7 +3654,6 @@ impl ChatService {
                 resolve_plugins(self.inner.plugins.as_deref(), &input.plugins)?
             },
             offered_tools: Vec::new(),
-            web_sources: Vec::new(),
             rounds: Vec::new(),
             tokens_in: tokens(&with_selections(&text, &input.selections)),
             tokens_out: 0,
@@ -4056,9 +4067,7 @@ impl ChatService {
             Ok((status, None)) => failed(format!("Ответ не получен: {}", status.as_str())),
             Ok((status, Some(answer))) => {
                 let cited = unique(
-                    &answer
-                        .citations
-                        .iter()
+                    &vector_sources(&answer.sources)
                         .map(|citation| citation.document_id.clone())
                         .collect::<Vec<_>>(),
                 );

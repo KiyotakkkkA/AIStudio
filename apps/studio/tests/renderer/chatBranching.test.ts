@@ -23,7 +23,6 @@ const answer = MessageDto.parse({
   conversationId: id,
   role: "assistant",
   content: "Ответ",
-  citations: [],
   tokensIn: 1,
   tokensOut: 1,
   usageEstimated: false,

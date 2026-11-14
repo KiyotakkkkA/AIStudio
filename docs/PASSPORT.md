@@ -700,7 +700,7 @@ Core concepts:
   2 000 tokens and marked as truncated; a call that did not succeed carries only its status
   (`failed`, `refused`, `denied`, `cancelled`), never its error text; (2) the sources behind every
   `[n]` and `[[n]]` marker in the answer: title, store and location (or URL) and an excerpt of
-  up to 300 characters. `[n]` numbers the message citations followed by the citations of its
+  up to 300 characters. `[n]` numbers the message's `vector` sources followed by the citations of its
   successful tool calls, as the renderer does; excerpts are read by `VectorSearch::chunks`, not
   by a new search. Uncited passages and reasoning are never carried. Everything carried is
   fenced as untrusted (`<tool_result>`, `<carried_source>`). The sources go as one user message
@@ -715,6 +715,20 @@ Core concepts:
   exactly one result), then whole call records are dropped, then sources. Carried parts never
   push a message out. `chat.stats` reports each part per message (`ChatCarriedPartDto`: `sent`,
   `shortened`, `dropped`), and the «Статистика» view lists reasoning as «Не передаётся».
+- **Answer sources** (TASK_084). An assistant message carries one list, `MessageDto.sources`
+  (`ChatSourceDto`, one `sources` column), whatever the origin. Each entry is tagged by `kind`
+  and keeps that origin's payload unchanged: `vector` is a `ChatCitationDto` (attached-store
+  retrieval and the knowledge tools' citation book), `web` is a `WebSourceDto` (vendor web
+  search). The list is ordered by kind (`ChatSourceKind` order), and within a kind by the order
+  the origin produced. Inline markers count within their kind: `[n]` is the n-th `vector`
+  source (then the tool-call citations, see above), `[[n]]` is the n-th `web` source; the
+  vendor's web numbering is therefore never deduplicated or reordered. Each origin writes only
+  its own kind through `replace_sources`: the knowledge book replaces `vector` while the loop
+  runs, the persist step replaces `web` from the run output. Carry, export, branching and the
+  renderer read the list through `vector_sources` / `web_sources` (`sources.ts` in the
+  renderer). Adding an origin means a new `ChatSourceDto` variant with its validation, a
+  fixture, the producer's `replace_sources` call, and a row kind in `ChatSources`; no new
+  column, field or migration. The list holds at most `CHAT_SOURCES_MAX` = 400 entries.
 - **Message queue** (`services/chat/queue.rs`, 2026-11-02). While a dialog has a running turn
   (or an active goal), a message from the person goes to a per-dialog queue held in host
   memory (`chat.queue.*`, at most `CHAT_QUEUE_MAX` = 10, lost on restart); every change is

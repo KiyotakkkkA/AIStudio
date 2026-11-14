@@ -119,20 +119,20 @@ pub use browser_sites::{
 };
 pub use channels::{CHANNELS, is_channel};
 pub use chat::{
-    BranchConversationInput, ChatAttachDto, ChatAttachInput, ChatAttachOutput, ChatCarriedKind,
-    ChatCarriedPartDto, ChatCarriedStatus, ChatCitationDto, ChatCommand, ChatCommandDto,
-    ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
+    BranchConversationInput, CHAT_SOURCES_MAX, ChatAttachDto, ChatAttachInput, ChatAttachOutput,
+    ChatCarriedKind, ChatCarriedPartDto, ChatCarriedStatus, ChatCitationDto, ChatCommand,
+    ChatCommandDto, ChatCommandsOutput, ChatContextDto, ChatContextInput, ChatContextToolDto,
     ChatConversationsListOutput, ChatEvalCaseDto, ChatEvalInput, ChatEvalModeDto, ChatEvalRunDto,
     ChatEventDto, ChatHistoryEntryDto, ChatHistoryStatus, ChatPluginDto, ChatPromptSection,
-    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatStatsDto, ChatToolCallDto,
-    ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto, ConversationDto,
-    ConversationExportDto, ConversationExportFormat, ConversationRef, CreateConversationInput,
-    DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto, ExportConversationInput, MessageDto,
-    MessageRole, OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,
-    RenameConversationInput, RetrievalMode, ThinkingEffort, TruncateConversationInput,
-    UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    ChatPromptSectionDto, ChatRoundDto, ChatSendInput, ChatSettings, ChatSourceDto, ChatSourceKind,
+    ChatStatsDto, ChatToolCallDto, ChatToolCallStatus, ChatWakeStepDto, ConversationDetailDto,
+    ConversationDto, ConversationExportDto, ConversationExportFormat, ConversationRef,
+    CreateConversationInput, DEFAULT_CONVERSATION_TITLE, DocumentSelectionDto,
+    ExportConversationInput, MessageDto, MessageRole, OfferedToolDto, OfferedToolSource,
+    PinConversationInput, PinMessageInput, RenameConversationInput, RetrievalMode, ThinkingEffort,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
-    WebSourceDto,
+    WebSourceDto, replace_sources, vector_sources, web_sources,
 };
 pub use cli::{
     CLI_COMMAND, CLI_CONFIRM_SETTING_KEY, CLI_IMAGE_MAX, CLI_LAUNCH_ARG, CLI_LINE_MAX,

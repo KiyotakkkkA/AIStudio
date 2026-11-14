@@ -39,7 +39,7 @@ import ChatGoalBar from "./ChatGoalBar";
 import ChatQueueBar from "./ChatQueueBar";
 import FolderAccessModal from "./FolderAccessModal";
 import { ToolCallItems } from "./ChatToolCalls";
-import { answerCitations, questionSelections } from "./citations";
+import { questionSelections } from "./citations";
 import { answerArtifacts } from "./artifacts";
 import ChatArtifacts from "./ChatArtifacts";
 import { shouldPinToBottom } from "./scroll";
@@ -121,7 +121,7 @@ export default observer(function ChatThread({
     store.liveText,
     store.active?.messages.length,
     store.generating,
-    store.liveCitations.length,
+    store.liveSources.length,
     store.liveToolCalls,
   ]);
   const pinIds = store.pinnedMessages.map((message) => message.id).join(",");
@@ -461,8 +461,7 @@ export default observer(function ChatThread({
                       recap={message.recap}
                       reasoning={message.reasoning}
                       rounds={message.rounds}
-                      citations={answerCitations(message.citations, message.toolCalls)}
-                      webSources={message.webSources}
+                      sources={message.sources}
                       selections={answerSelections.get(message.id)}
                       stores={store.stores}
                       partial={message.partial}
@@ -526,8 +525,7 @@ export default observer(function ChatThread({
                   content={store.liveText}
                   reasoning={store.liveReasoning}
                   rounds={store.liveRounds}
-                  citations={answerCitations(store.liveCitations, store.liveToolCalls)}
-                  webSources={store.liveWebSources}
+                  sources={store.liveSources}
                   selections={store.liveSelections}
                   stores={store.stores}
                   generating={store.generating}

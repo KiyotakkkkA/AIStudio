@@ -38,7 +38,6 @@ function message(role: "user" | "assistant", patch: Partial<MessageDto> = {}): M
     conversationId: CONVERSATION,
     role,
     content: role === "user" ? "Вопрос" : "Ответ",
-    citations: [],
     tokensIn: 0,
     tokensOut: 0,
     usageEstimated: true,

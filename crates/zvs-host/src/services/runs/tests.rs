@@ -972,7 +972,7 @@ async fn clearing_finished_runs_spares_the_ones_a_conversation_still_references(
                 [],
             )?;
             connection.execute(
-                "INSERT INTO message (id, conversation_id, role, content, citations, tokens_in, \
+                "INSERT INTO message (id, conversation_id, role, content, sources, tokens_in, \
                  tokens_out, duration_ms, run_id, partial, created_at) \
                  VALUES ('m1', 'c1', 'user', 'Привет', '[]', 1, 0, 0, ?1, 0, 1)",
                 [kept.to_string()],

@@ -39,7 +39,6 @@ function renderMessage(props: {
     <StoreContext.Provider value={rootStore}>
       <ChatMessage
         content="Готово."
-        citations={[]}
         stores={[]}
         toolCalls={props.toolCalls ?? [call()]}
         durationMs={props.durationMs ?? 240_000}

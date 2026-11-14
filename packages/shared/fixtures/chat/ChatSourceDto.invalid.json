@@ -1,0 +1,41 @@
+[
+  {
+    "name": "missing kind",
+    "value": {
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "",
+      "date": null
+    }
+  },
+  {
+    "name": "unknown kind",
+    "value": {
+      "kind": "note",
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "",
+      "date": null
+    }
+  },
+  {
+    "name": "web payload under the vector kind",
+    "value": {
+      "kind": "vector",
+      "url": "https://example.com/rates",
+      "title": "Курсы валют",
+      "snippet": "",
+      "date": null
+    }
+  },
+  {
+    "name": "invalid web payload",
+    "value": {
+      "kind": "web",
+      "url": "https://example.com/rates",
+      "title": "",
+      "snippet": "",
+      "date": null
+    }
+  }
+]

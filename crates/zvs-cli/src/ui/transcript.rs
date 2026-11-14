@@ -4,7 +4,7 @@ use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
 use zvs_contract::{
     ChatToolCallDto, ChatToolCallStatus, McpCapabilityDto, McpCapabilityKind, McpOAuthState,
-    McpServerDetailDto, McpServerStatus, McpStartup, McpTransport, McpValue,
+    McpServerDetailDto, McpServerStatus, McpStartup, McpTransport, McpValue, WebSourceDto,
 };
 
 use super::text::{markdown, truncate, wrap};
@@ -19,6 +19,7 @@ pub const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦",
 pub const TICKS_PER_SECOND: u64 = 10;
 const RESULT_LINES: usize = 12;
 const COLLAPSED_ARGUMENT: usize = 80;
+const SOURCES_SHOWN: usize = 5;
 
 pub fn spinner(frame: u64) -> &'static str {
     SPINNER[usize::try_from(frame).unwrap_or(0) % SPINNER.len()]
@@ -821,6 +822,54 @@ fn recap(text: &str, width: usize) -> Vec<Line<'static>> {
     lines
 }
 
+fn site(url: &str) -> &str {
+    let rest = url.split_once("://").map_or(url, |(_, rest)| rest);
+    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    host.strip_prefix("www.").unwrap_or(host)
+}
+
+fn sources_header(count: usize, expanded: bool, toggle: &str) -> Line<'static> {
+    let mut spans = vec![Span::styled(
+        format!(
+            "  ◦ {} · {}",
+            copy::WEB_SOURCES,
+            format::number(count as u64)
+        ),
+        theme::muted().add_modifier(Modifier::BOLD),
+    )];
+    if count > SOURCES_SHOWN {
+        let action = if expanded {
+            copy::MCP_COLLAPSE
+        } else {
+            copy::MCP_EXPAND
+        };
+        spans.push(Span::styled(
+            format!("   {toggle} — {action}"),
+            theme::faint(),
+        ));
+    }
+    Line::from(spans)
+}
+
+fn source_line(index: usize, source: &WebSourceDto, width: usize) -> Line<'static> {
+    let number = format!("    {}. ", index + 1);
+    let title = if source.title.trim().is_empty() {
+        source.url.as_str()
+    } else {
+        source.title.trim()
+    };
+    let host = format!(" · {}", site(&source.url));
+    let room = width.saturating_sub(number.width() + host.width()).max(8);
+    Line::from(vec![
+        Span::styled(number, theme::muted()),
+        Span::styled(
+            truncate(title, room),
+            theme::accent().add_modifier(Modifier::UNDERLINED),
+        ),
+        Span::styled(host, theme::faint()),
+    ])
+}
+
 fn compaction_mark(text: &str, width: usize) -> Vec<Line<'static>> {
     let room = width.saturating_sub(4).max(8);
     let label = format!(" {text} ");
@@ -857,12 +906,40 @@ fn notice(tone: Tone, text: &str, width: usize) -> Vec<Line<'static>> {
 }
 
 pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
+    layout(app, width).0
+}
+
+pub fn layout(app: &App, width: usize) -> (Vec<Line<'static>>, Vec<(usize, String)>) {
     let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut links: Vec<(usize, String)> = Vec::new();
     let expanded = app.expanded;
     let toggle = app.keymap.label(Shortcut::Details);
     for entry in &app.transcript.entries {
         if !matches!(entry, Entry::Attachments(_)) {
             lines.push(Line::default());
+        }
+        if let Entry::Sources(sources) = entry {
+            lines.push(sources_header(sources.len(), expanded, &toggle));
+            let shown = if expanded {
+                sources.len()
+            } else {
+                sources.len().min(SOURCES_SHOWN)
+            };
+            for (index, source) in sources.iter().take(shown).enumerate() {
+                links.push((lines.len(), source.url.clone()));
+                lines.push(source_line(index, source, width));
+            }
+            if shown < sources.len() {
+                lines.push(Line::from(Span::styled(
+                    format!(
+                        "    … {} {}",
+                        copy::MORE,
+                        format::sources((sources.len() - shown) as u64)
+                    ),
+                    theme::faint(),
+                )));
+            }
+            continue;
         }
         lines.extend(match entry {
             Entry::User(text) => user(text, width),
@@ -903,6 +980,7 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Entry::Compaction(text) => compaction_mark(text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
             Entry::Server(detail) => server_card(detail, expanded, &toggle, width),
+            Entry::Sources(_) => Vec::new(),
         });
     }
     if let Some(run) = &app.shell {
@@ -958,7 +1036,7 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
             Span::styled(format!(" · {seconds} с · Esc"), theme::faint()),
         ]));
     }
-    lines
+    (lines, links)
 }
 
 #[cfg(test)]

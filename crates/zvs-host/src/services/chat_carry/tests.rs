@@ -19,7 +19,6 @@ fn message(index: u32, role: &str, content: &str, extra: Value) -> MessageDto {
         "conversationId": CONVERSATION,
         "role": role,
         "content": content,
-        "citations": [],
         "tokensIn": 0,
         "tokensOut": 0,
         "usageEstimated": true,
@@ -28,8 +27,18 @@ fn message(index: u32, role: &str, content: &str, extra: Value) -> MessageDto {
         "partial": false,
         "createdAt": index,
     });
-    if let (Some(target), Value::Object(fields)) = (value.as_object_mut(), extra) {
+    if let (Some(target), Value::Object(mut fields)) = (value.as_object_mut(), extra) {
+        let mut sources = Vec::new();
+        for (key, kind) in [("citations", "vector"), ("webSources", "web")] {
+            if let Some(Value::Array(listed)) = fields.remove(key) {
+                sources.extend(listed.into_iter().map(|mut source| {
+                    source["kind"] = json!(kind);
+                    source
+                }));
+            }
+        }
         target.extend(fields);
+        target.insert("sources".to_owned(), Value::Array(sources));
     }
     serde_json::from_value(value).expect("a message")
 }

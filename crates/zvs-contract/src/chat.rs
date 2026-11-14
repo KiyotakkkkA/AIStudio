@@ -34,6 +34,7 @@ pub const WEB_SOURCE_URL_MAX: usize = 4096;
 pub const WEB_SOURCE_TEXT_MAX: usize = 4000;
 pub const WEB_SOURCE_DATE_MAX: usize = 100;
 pub const WEB_SOURCES_MAX: usize = 200;
+pub const CHAT_SOURCES_MAX: usize = 400;
 
 wire_enum!(RetrievalMode {
     Auto => "auto",
@@ -291,6 +292,78 @@ impl Validate for WebSourceDto {
             check::max_len("date", date, WEB_SOURCE_DATE_MAX)
         })
     }
+}
+
+wire_enum!(ChatSourceKind {
+    Vector => "vector",
+    Web => "web",
+});
+
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChatSourceDto {
+    Vector(ChatCitationDto),
+    Web(WebSourceDto),
+}
+
+impl ChatSourceDto {
+    pub const fn kind(&self) -> ChatSourceKind {
+        match self {
+            Self::Vector(_) => ChatSourceKind::Vector,
+            Self::Web(_) => ChatSourceKind::Web,
+        }
+    }
+
+    pub const fn vector(&self) -> Option<&ChatCitationDto> {
+        match self {
+            Self::Vector(citation) => Some(citation),
+            Self::Web(_) => None,
+        }
+    }
+
+    pub const fn web(&self) -> Option<&WebSourceDto> {
+        match self {
+            Self::Web(source) => Some(source),
+            Self::Vector(_) => None,
+        }
+    }
+}
+
+impl Validate for ChatSourceDto {
+    fn validate(&self) -> Result<(), AppError> {
+        match self {
+            Self::Vector(citation) => citation.validate(),
+            Self::Web(source) => source.validate(),
+        }
+    }
+}
+
+pub fn vector_sources(sources: &[ChatSourceDto]) -> impl Iterator<Item = &ChatCitationDto> {
+    sources.iter().filter_map(ChatSourceDto::vector)
+}
+
+pub fn web_sources(sources: &[ChatSourceDto]) -> impl Iterator<Item = &WebSourceDto> {
+    sources.iter().filter_map(ChatSourceDto::web)
+}
+
+pub fn replace_sources(
+    sources: &[ChatSourceDto],
+    kind: ChatSourceKind,
+    replacement: impl IntoIterator<Item = ChatSourceDto>,
+) -> Vec<ChatSourceDto> {
+    let mut merged: Vec<ChatSourceDto> = sources
+        .iter()
+        .filter(|source| source.kind() != kind)
+        .cloned()
+        .chain(
+            replacement
+                .into_iter()
+                .filter(|source| source.kind() == kind),
+        )
+        .collect();
+    merged.sort_by_key(ChatSourceDto::kind);
+    merged
 }
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -626,7 +699,8 @@ pub struct MessageDto {
     pub content: String,
     #[serde(default)]
     pub reasoning: String,
-    pub citations: Vec<ChatCitationDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<ChatSourceDto>,
     #[serde(default)]
     pub tool_calls: Vec<ChatToolCallDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -637,8 +711,6 @@ pub struct MessageDto {
     pub plugins: Vec<ChatPluginDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub offered_tools: Vec<OfferedToolDto>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub web_sources: Vec<WebSourceDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rounds: Vec<ChatRoundDto>,
     pub tokens_in: u64,
@@ -671,6 +743,16 @@ pub struct MessageDto {
     pub recap: Option<String>,
 }
 
+impl MessageDto {
+    pub fn citations(&self) -> Vec<ChatCitationDto> {
+        vector_sources(&self.sources).cloned().collect()
+    }
+
+    pub fn web_sources(&self) -> Vec<WebSourceDto> {
+        web_sources(&self.sources).cloned().collect()
+    }
+}
+
 impl Validate for MessageDto {
     fn validate(&self) -> Result<(), AppError> {
         crate::images::validate_images(&self.images)?;
@@ -680,7 +762,10 @@ impl Validate for MessageDto {
         if let Some(event) = &self.event {
             nested("event", event.validate())?;
         }
-        nested("citations", self.citations.validate())?;
+        if self.sources.len() > CHAT_SOURCES_MAX {
+            return Err(invalid("sources", "maxItems"));
+        }
+        nested("sources", self.sources.validate())?;
         nested("toolCalls", self.tool_calls.validate())?;
         nested("offeredTools", self.offered_tools.validate())?;
         check_commands(&self.commands)?;
@@ -688,10 +773,6 @@ impl Validate for MessageDto {
             return Err(invalid("plugins", "maxItems"));
         }
         nested("plugins", self.plugins.validate())?;
-        if self.web_sources.len() > WEB_SOURCES_MAX {
-            return Err(invalid("webSources", "maxItems"));
-        }
-        nested("webSources", self.web_sources.validate())?;
         check_selections(&self.selections)?;
         check::safe_integer("tokensIn", self.tokens_in)?;
         check::safe_integer("tokensOut", self.tokens_out)?;
@@ -1387,7 +1468,6 @@ mod tests {
             "conversationId": CONVERSATION,
             "role": "user",
             "content": "x",
-            "citations": [],
             "tokensIn": 1,
             "tokensOut": 0,
             "usageEstimated": true,
@@ -1399,5 +1479,73 @@ mod tests {
         .expect("parses");
         assert_eq!(message.reasoning, "");
         assert!(message.tool_calls.is_empty());
+        assert!(message.sources.is_empty());
+    }
+
+    fn web(url: &str) -> ChatSourceDto {
+        ChatSourceDto::Web(WebSourceDto {
+            url: url.to_owned(),
+            title: url.to_owned(),
+            snippet: String::new(),
+            date: None,
+            icon: None,
+        })
+    }
+
+    fn vector(document: &str) -> ChatSourceDto {
+        ChatSourceDto::Vector(ChatCitationDto {
+            store_id: VectorStoreId::parse("0199aa11-5555-7111-8111-111111111111")
+                .expect("store id"),
+            document_id: document.to_owned(),
+            source_path: "a.md".to_owned(),
+            chunk_index: 0,
+            score: 0.5,
+            section: String::new(),
+            page: None,
+            related: None,
+        })
+    }
+
+    #[test]
+    fn replacing_one_kind_keeps_the_others_and_lists_vector_before_web() {
+        let stored = vec![web("https://old.example/"), vector("a")];
+        let merged = replace_sources(
+            &stored,
+            ChatSourceKind::Web,
+            [
+                web("https://b.example/"),
+                vector("ignored"),
+                web("https://a.example/"),
+            ],
+        );
+        assert_eq!(
+            merged,
+            [
+                vector("a"),
+                web("https://b.example/"),
+                web("https://a.example/")
+            ]
+        );
+        let message_sources = replace_sources(&merged, ChatSourceKind::Vector, [vector("c")]);
+        assert_eq!(
+            message_sources,
+            [
+                vector("c"),
+                web("https://b.example/"),
+                web("https://a.example/")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_source_carries_its_kind_on_the_wire() {
+        assert_eq!(
+            serde_json::to_value(web("https://a.example/")).expect("serialises")["kind"],
+            json!("web")
+        );
+        assert_eq!(
+            serde_json::to_value(vector("a")).expect("serialises")["kind"],
+            json!("vector")
+        );
     }
 }

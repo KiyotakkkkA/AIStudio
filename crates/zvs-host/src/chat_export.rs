@@ -4,6 +4,7 @@ use serde_json::json;
 use zvs_contract::{
     AppError, AppErrorCode, ChatToolCallStatus, ConversationDetailDto, ConversationExportDto,
     ConversationExportFormat, ExportConversationInput, MessageDto, MessageRole, Timestamp,
+    web_sources,
 };
 
 use crate::platform::clock::{Clock, SystemClock};
@@ -144,10 +145,10 @@ fn message_markdown(message: &MessageDto) -> String {
                 .join("\n"),
         );
     }
-    if !message.web_sources.is_empty() {
+    if web_sources(&message.sources).next().is_some() {
         parts.push(
             std::iter::once("Источники:".to_owned())
-                .chain(message.web_sources.iter().map(|source| {
+                .chain(web_sources(&message.sources).map(|source| {
                     let title = if source.title.trim().is_empty() {
                         source.url.as_str()
                     } else {

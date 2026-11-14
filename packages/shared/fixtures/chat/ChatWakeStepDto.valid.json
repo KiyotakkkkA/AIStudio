@@ -9,7 +9,6 @@
         "role": "event",
         "content": "Background processes ended.",
         "reasoning": "",
-        "citations": [],
         "toolCalls": [],
         "tokensIn": 20,
         "tokensOut": 0,

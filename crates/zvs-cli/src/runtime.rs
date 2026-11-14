@@ -491,6 +491,7 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         }
         Request::Shell(_)
         | Request::OpenDesktop(_)
+        | Request::OpenUrl(_)
         | Request::StopShell
         | Request::Copy(_)
         | Request::CopyInput(_)
@@ -594,6 +595,9 @@ fn dispatch(
             Request::OpenDesktop(id) => {
                 let opened = launch::open_conversation(id);
                 let _ = signals.send(Signal::App(Box::new(Msg::DesktopOpened(opened))));
+            }
+            Request::OpenUrl(url) => {
+                launch::open_url(&url);
             }
             Request::Copy(selection) => {
                 let copied_count =

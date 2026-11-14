@@ -214,7 +214,9 @@ test("retrieval cards use real step results including zero hits, and approvals a
       ],
     },
   });
-  expect(store.liveCitations).toMatchObject([{ storeId, sourcePath: "manual.md", score: 0.81 }]);
+  expect(store.liveSources).toMatchObject([
+    { kind: "vector", storeId, sourcePath: "manual.md", score: 0.81 },
+  ]);
   const approvalId = "0199bb11-5555-7111-8111-000000000002";
   events.dispatch({
     type: "approval",
@@ -277,7 +279,6 @@ test("cancel flushes a partial message, reconciles persistence, and ignores even
     conversationId: id,
     role: "assistant",
     content: "Partial answer",
-    citations: [],
     tokensIn: 4,
     tokensOut: 3,
     usageEstimated: true,

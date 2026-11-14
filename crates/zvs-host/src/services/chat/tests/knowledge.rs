@@ -164,7 +164,7 @@ async fn in_agentic_mode_a_greeting_searches_nothing_but_the_knowledge_tools_are
     let system = requests[0].system.clone().unwrap_or_default();
     assert!(system.contains(KNOWLEDGE_INSTRUCTION));
     assert!(system.contains(&format!("- {} (0 documents)", test.store)));
-    assert!(test.harness.last(conversation).citations.is_empty());
+    assert!(test.harness.last(conversation).citations().is_empty());
 }
 
 #[tokio::test]
@@ -197,7 +197,7 @@ async fn a_comparison_searches_twice_and_citations_number_on_across_the_rounds()
     let assistant = test.harness.last(conversation);
     assert_eq!(
         assistant
-            .citations
+            .citations()
             .iter()
             .map(|citation| (citation.document_id.as_str(), citation.chunk_index))
             .collect::<Vec<_>>(),
@@ -279,7 +279,7 @@ async fn an_empty_search_tells_the_model_to_say_the_knowledge_base_has_no_answer
             .contains("No passages above the relevance floor")
     );
     assert!(result.content.contains("does not contain the answer"));
-    assert!(test.harness.last(conversation).citations.is_empty());
+    assert!(test.harness.last(conversation).citations().is_empty());
 }
 
 #[tokio::test]
@@ -312,7 +312,7 @@ async fn hybrid_mode_offers_a_few_sources_up_front_and_numbers_tool_results_afte
             .contains(HYBRID_INSTRUCTION)
     );
     assert!(!requests[0].tools.is_empty());
-    let citations = test.harness.last(conversation).citations;
+    let citations = test.harness.last(conversation).citations();
     assert_eq!(citations.len(), 6);
     let result = requests[1].messages.last().expect("a tool result");
     assert!(result.content.contains("<source id=\"4\""));
@@ -326,7 +326,7 @@ async fn auto_mode_searches_up_front_and_offers_no_knowledge_tools() {
     within(test.harness.turn(conversation, "Tell me about leave")).await;
     assert_eq!(test.queries().len(), 1);
     assert_eq!(test.driver.requests()[0].tools, [super::ask_spec()]);
-    assert_eq!(test.harness.last(conversation).citations.len(), 1);
+    assert_eq!(test.harness.last(conversation).citations().len(), 1);
 }
 
 #[tokio::test]
@@ -337,7 +337,7 @@ async fn agentic_mode_without_tool_support_still_searches_up_front() {
     within(test.harness.turn(conversation, "Tell me about leave")).await;
     assert_eq!(test.queries(), ["Tell me about leave"]);
     assert!(test.driver.requests()[0].tools.is_empty());
-    assert_eq!(test.harness.last(conversation).citations.len(), 1);
+    assert_eq!(test.harness.last(conversation).citations().len(), 1);
 }
 
 #[tokio::test]
@@ -395,7 +395,7 @@ async fn reading_a_document_returns_the_span_and_reuses_the_number_of_a_cited_ch
     assert!(read.content.contains("Part 0."));
     assert!(read.content.contains("Part 2."));
     assert!(read.content.contains("chunks=\"0-2 of 3\""));
-    assert_eq!(test.harness.last(conversation).citations.len(), 1);
+    assert_eq!(test.harness.last(conversation).citations().len(), 1);
 }
 
 #[test]

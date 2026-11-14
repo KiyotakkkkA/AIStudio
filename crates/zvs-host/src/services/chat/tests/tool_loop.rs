@@ -941,9 +941,9 @@ async fn vendor_options_reach_the_driver_and_web_sources_of_every_round_are_kept
     );
     let last = test.harness.last(created);
     assert_eq!(last.content, "Итог [[2]].");
-    assert_eq!(last.web_sources, [first, second]);
+    assert_eq!(last.web_sources(), [first, second]);
     let user = &test.harness.messages(created)[0];
-    assert!(user.web_sources.is_empty());
+    assert!(user.web_sources().is_empty());
 }
 
 #[tokio::test]

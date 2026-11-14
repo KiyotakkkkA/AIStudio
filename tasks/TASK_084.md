@@ -128,10 +128,33 @@ unchanged; a new answer with both kinds shows one source list; export it; branch
 ## Handoff
 
 **Built:**
-- _Fill after implementation._
+- Contract: `ChatSourceDto` (`kind`: `vector` | `web`), `ChatSourceKind`, `CHAT_SOURCES_MAX` = 400,
+  `replace_sources`, `vector_sources`, `web_sources`, `MessageDto::{citations, web_sources}`.
+  `MessageDto.sources` replaces `citations` and `webSources` in Rust, Zod and fixtures;
+  new `chat/ChatSourceDto` fixtures.
+- Migration `0045_message_sources`: folds `citations` then `web_sources` into `sources`,
+  keeping order within each kind, then drops both columns. Tested on all four row shapes.
+- Host: the knowledge citation book writes the `vector` kind; the persist step replaces the
+  `web` kind via `replace_sources`. Carry, export, eval and compaction read through the helpers.
+- Renderer: `features/chat/sources.ts` (`sourcesOfKind`, `vectorCitations`, `webSourceList`,
+  `withStoreCitations`); `ChatStore.liveSources`; `ChatMessage` takes one `sources` prop.
+- PASSPORT: «Answer sources» entry with the recipe for adding an origin.
 
 **Deviated from plan:**
-- _Fill after implementation._
+- No `SourceSink` with dedup. Deduplicating web sources would renumber the vendor's `[[n]]`
+  markers, so each origin replaces only its own kind (`replace_sources`); vector dedup stays in
+  the existing citation book.
+- No separate renderer registry object: `ChatSources` already dispatches on a kind-tagged row
+  union, and a new kind adds a row variant there.
+- CLI: there was no source surface. Web sources are now listed after an answer (first five,
+  the rest behind Ctrl+O) and a click opens the URL; other kinds are not shown in the CLI yet.
+- `GenerateOutput.web_sources` (kernel step output, stored in run records) and the
+  `citations` key in tool-call `meta` are unchanged; they are producer data, not answer fields.
 
 **Next session should know:**
-- _Record verification results and platform exclusions._
+- Passed locally: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm format:check`,
+  `cargo fmt --all --check`, clippy `-D warnings` for zvs-contract/zvs-host/zvs-cli,
+  `cargo test` for zvs-contract, zvs-host (1882) and zvs-cli.
+- Not run: `pnpm build`, `pnpm test:e2e`, zvs-studio clippy, `cargo test` for zvs-jobd and
+  zvs-core (the run was stopped for low memory; these crates are untouched).
+- Manual check of an old dialog's markers in the app is still pending.

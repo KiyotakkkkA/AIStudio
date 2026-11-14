@@ -7,8 +7,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -55,8 +56,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -125,7 +127,6 @@
       "role": "user",
       "content": "Question",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "tokensIn": 12,
       "tokensOut": 0,
@@ -144,7 +145,6 @@
       "role": "user",
       "content": "Что это значит?",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "selections": [
         {
@@ -174,16 +174,16 @@
       "role": "assistant",
       "content": "Курс 90,24 [[1]].",
       "reasoning": "",
-      "citations": [],
-      "toolCalls": [],
-      "webSources": [
+      "sources": [
         {
+          "kind": "web",
           "url": "https://example.com/rates",
           "title": "Курсы валют",
           "snippet": "EUR 90,24",
           "date": "3 days ago"
         }
       ],
+      "toolCalls": [],
       "tokensIn": 12,
       "tokensOut": 2,
       "usageEstimated": true,
@@ -201,7 +201,6 @@
       "role": "user",
       "content": "Найди расписание на сайте",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "commands": ["browser-use"],
       "tokensIn": 12,
@@ -221,7 +220,6 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "tokensIn": 12,
       "tokensOut": 2,
@@ -241,8 +239,9 @@
       "role": "assistant",
       "content": "Поиск.\n\nНайдено.",
       "reasoning": "Нужен поиск.Готово.",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -299,7 +298,6 @@
       "role": "user",
       "content": "Найди расписание на сайте",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "commands": ["goal"],
       "tokensIn": 12,
@@ -319,7 +317,6 @@
       "role": "event",
       "content": "Background processes ended.",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "tokensIn": 20,
       "tokensOut": 0,
@@ -357,8 +354,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -407,7 +405,6 @@
       "role": "user",
       "content": "Найди расписание на сайте",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "commands": ["browser-use", "goal"],
       "plugins": [
@@ -434,8 +431,9 @@
       "role": "user",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -490,8 +488,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",

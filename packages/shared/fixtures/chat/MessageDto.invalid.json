@@ -7,8 +7,9 @@
       "role": "system",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -54,8 +55,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -101,8 +103,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",
@@ -146,7 +149,6 @@
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "role": "user",
       "content": "x",
-      "citations": [],
       "commands": ["deploy"],
       "tokensIn": 1,
       "tokensOut": 0,
@@ -165,7 +167,6 @@
       "role": "event",
       "content": "x",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "tokensIn": 0,
       "tokensOut": 0,
@@ -184,7 +185,6 @@
       "role": "user",
       "content": "x",
       "reasoning": "",
-      "citations": [],
       "toolCalls": [],
       "tokensIn": 0,
       "tokensOut": 0,
@@ -221,7 +221,6 @@
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "role": "user",
       "content": "x",
-      "citations": [],
       "commands": ["goal", "goal"],
       "tokensIn": 1,
       "tokensOut": 0,
@@ -239,7 +238,6 @@
       "conversationId": "0199aa11-2222-7111-8111-111111111111",
       "role": "user",
       "content": "x",
-      "citations": [],
       "commands": ["goal"],
       "tokensIn": 1,
       "tokensOut": 0,
@@ -265,8 +263,9 @@
       "role": "assistant",
       "content": "Hello",
       "reasoning": "",
-      "citations": [
+      "sources": [
         {
+          "kind": "vector",
           "storeId": "0199aa11-5555-7111-8111-111111111111",
           "documentId": "doc",
           "sourcePath": "docs/a.md",

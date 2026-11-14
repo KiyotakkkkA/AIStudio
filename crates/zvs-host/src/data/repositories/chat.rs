@@ -1,8 +1,8 @@
 use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use zvs_contract::{
-    ChatCitationDto, ChatGoalDto, ChatRoundDto, ChatSettings, ChatToolCallDto, OfferedToolDto,
-    RetrievalMode, Timestamp, WebSourceDto,
+    ChatGoalDto, ChatRoundDto, ChatSettings, ChatSourceDto, ChatToolCallDto, OfferedToolDto,
+    RetrievalMode, Timestamp,
 };
 
 use crate::data::schema::columns::{EnumColumn, json_text};
@@ -90,9 +90,8 @@ impl ConversationPatch {
 pub struct MessagePatch {
     pub content: Option<String>,
     pub reasoning: Option<String>,
-    pub citations: Option<Vec<ChatCitationDto>>,
+    pub sources: Option<Vec<ChatSourceDto>>,
     pub offered_tools: Option<Vec<OfferedToolDto>>,
-    pub web_sources: Option<Vec<WebSourceDto>>,
     pub rounds: Option<Vec<ChatRoundDto>>,
     pub tokens_in: Option<i64>,
     pub tokens_out: Option<i64>,
@@ -115,14 +114,11 @@ impl MessagePatch {
         if let Some(reasoning) = &self.reasoning {
             assignments.push(("reasoning", SqlValue::Text(reasoning.clone())));
         }
-        if let Some(citations) = &self.citations {
-            assignments.push(("citations", SqlValue::Text(json_text(citations)?)));
+        if let Some(sources) = &self.sources {
+            assignments.push(("sources", SqlValue::Text(json_text(sources)?)));
         }
         if let Some(offered) = &self.offered_tools {
             assignments.push(("offered_tools", SqlValue::Text(json_text(offered)?)));
-        }
-        if let Some(sources) = &self.web_sources {
-            assignments.push(("web_sources", SqlValue::Text(json_text(sources)?)));
         }
         if let Some(rounds) = &self.rounds {
             assignments.push(("rounds", SqlValue::Text(json_text(rounds)?)));
@@ -273,8 +269,8 @@ impl<'c> ChatRepository<'c> {
     pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
         self.connection
             .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, citations, selections, commands, plugins, offered_tools, web_sources, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images, recap) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)",
+                "INSERT INTO message (id, conversation_id, role, content, reasoning, sources, selections, commands, plugins, offered_tools, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images, recap) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
             )?
             .execute(params![
                 row.id,
@@ -282,12 +278,11 @@ impl<'c> ChatRepository<'c> {
                 row.role.as_str(),
                 row.content,
                 row.reasoning,
-                json_text(&row.citations)?,
+                json_text(&row.sources)?,
                 json_text(&row.selections)?,
                 json_text(&row.commands)?,
                 json_text(&row.plugins)?,
                 json_text(&row.offered_tools)?,
-                json_text(&row.web_sources)?,
                 json_text(&row.rounds)?,
                 row.tokens_in,
                 row.tokens_out,
@@ -472,14 +467,13 @@ mod tests {
             role: MessageRole::User,
             content: id.to_owned(),
             reasoning: String::new(),
-            citations: Vec::new(),
+            sources: Vec::new(),
             tool_calls: Vec::new(),
             images: Vec::new(),
             selections: Vec::new(),
             commands: Vec::new(),
             plugins: Vec::new(),
             offered_tools: Vec::new(),
-            web_sources: Vec::new(),
             rounds: Vec::new(),
             tokens_in: 1,
             tokens_out: 0,

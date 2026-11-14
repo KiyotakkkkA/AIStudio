@@ -5,7 +5,8 @@ use regex::Regex;
 use serde_json::Value;
 use zvs_contract::{
     ChatCarriedKind, ChatCarriedPartDto, ChatCarriedStatus, ChatCitationDto, ChatToolCallDto,
-    ChatToolCallStatus, MessageDto, MessageId, MessageRole, VectorStoreId,
+    ChatToolCallStatus, MessageDto, MessageId, MessageRole, VectorStoreId, vector_sources,
+    web_sources,
 };
 
 use super::chat_history::{MESSAGE_OVERHEAD, PreparedHistory, attribute, source_label, tokens};
@@ -169,7 +170,7 @@ fn citation_key(citation: &ChatCitationDto) -> (VectorStoreId, String, u64) {
 }
 
 pub fn answer_citations(message: &MessageDto) -> Vec<ChatCitationDto> {
-    let mut merged = message.citations.clone();
+    let mut merged: Vec<ChatCitationDto> = vector_sources(&message.sources).cloned().collect();
     let mut known: HashSet<(VectorStoreId, String, u64)> =
         merged.iter().map(citation_key).collect();
     for call in &message.tool_calls {
@@ -290,7 +291,7 @@ fn carried_sources(message: &MessageDto, lookup: &SourceLookup) -> Vec<CarriedSo
     for number in web {
         let Some(source) = number
             .checked_sub(1)
-            .and_then(|index| message.web_sources.get(index))
+            .and_then(|index| web_sources(&message.sources).nth(index))
         else {
             continue;
         };

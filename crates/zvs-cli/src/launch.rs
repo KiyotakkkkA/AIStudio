@@ -70,6 +70,30 @@ pub fn open_conversation(id: zvs_contract::ConversationId) -> bool {
         .is_ok()
 }
 
+#[cfg(windows)]
+pub fn open_url(url: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return false;
+    }
+    std::process::Command::new("rundll32.exe")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(url)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .is_ok()
+}
+
+#[cfg(not(windows))]
+pub fn open_url(url: &str) -> bool {
+    let _ = url;
+    false
+}
+
 #[cfg(not(windows))]
 pub fn open_conversation(id: zvs_contract::ConversationId) -> bool {
     let _ = (conversation_link(id), find_app());

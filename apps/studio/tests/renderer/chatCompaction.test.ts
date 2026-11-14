@@ -38,7 +38,6 @@ function message(id: string, role: "user" | "assistant", content: string, create
     conversationId: ID,
     role,
     content,
-    citations: [],
     tokensIn: 0,
     tokensOut: 0,
     usageEstimated: true,

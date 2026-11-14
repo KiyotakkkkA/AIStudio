@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import type {
   ChatCitationDto,
   ChatRoundDto,
+  ChatSourceDto,
   ChatToolCallDto,
   DocumentSelectionDto,
   MessageId,
@@ -23,6 +24,7 @@ import { WEB_SOURCES_TAB } from "./webSources";
 import {
   OPEN_CITATION,
   OPEN_SELECTION,
+  answerCitations,
   SELECTIONS_TAB,
   citationLocation,
   citationSources,
@@ -32,6 +34,7 @@ import {
   selectionSources,
 } from "./citations";
 import { excerptPreview } from "./selectionCopy";
+import { vectorCitations, webSourceList } from "./sources";
 import { useStore } from "../../stores/useStore";
 import MessageActions, { type MessageBranchAction } from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
@@ -43,8 +46,7 @@ export default function ChatMessage({
   recap,
   reasoning = "",
   rounds = [],
-  citations,
-  webSources = [],
+  sources: answerSources = [],
   selections: attached = [],
   stores,
   partial = false,
@@ -69,8 +71,7 @@ export default function ChatMessage({
   readonly recap?: string;
   readonly reasoning?: string;
   readonly rounds?: readonly ChatRoundDto[];
-  readonly citations: readonly ChatCitationDto[];
-  readonly webSources?: readonly WebSourceDto[];
+  readonly sources?: readonly ChatSourceDto[];
   readonly selections?: readonly DocumentSelectionDto[];
   readonly stores: readonly VectorStoreDto[];
   readonly partial?: boolean;
@@ -92,6 +93,8 @@ export default function ChatMessage({
 }) {
   const { viewer, chat } = useStore();
   const selections = documentSelections(attached);
+  const citations = answerCitations(vectorCitations(answerSources), toolCalls);
+  const webSources = webSourceList(answerSources);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const recapId = useId();

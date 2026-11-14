@@ -191,7 +191,6 @@ mod tests {
             "conversationId": "0199aa11-1111-7111-8111-111111111111",
             "role": role,
             "content": content,
-            "citations": [],
             "tokensIn": 0,
             "tokensOut": 0,
             "usageEstimated": true,

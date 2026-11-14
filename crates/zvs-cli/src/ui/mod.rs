@@ -696,39 +696,75 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
     highlight(frame, app);
 }
 
+fn chat_areas(app: &App, area: Rect) -> (Option<prompt::Panel>, [Rect; 4]) {
+    let width = usize::from(area.width.saturating_sub(2));
+    let panel = app
+        .prompts
+        .front()
+        .map(|current| prompt::panel(current, width))
+        .or_else(|| {
+            app.verification
+                .as_deref()
+                .map(|origin| prompt::verification(origin, width))
+        });
+    let bottom_height = panel
+        .as_ref()
+        .map_or_else(
+            || input_height(app, area.width),
+            |panel| rows(panel.lines.len() + 2),
+        )
+        .min(area.height.saturating_sub(4));
+    let queue_height = rows(queue_lines(app, usize::from(area.width)).len())
+        .min(area.height.saturating_sub(bottom_height + 4));
+    let areas = Layout::vertical([
+        Constraint::Fill(1),
+        Constraint::Length(queue_height),
+        Constraint::Length(bottom_height),
+        Constraint::Length(2),
+    ])
+    .areas(area);
+    (panel, areas)
+}
+
+pub fn link_at(app: &App, area: Rect, x: u16, y: u16) -> Option<String> {
+    if app.phase != Phase::Chat
+        || app.overlay.is_some()
+        || app.palette_open()
+        || app.attachments_open()
+        || app.keys_open()
+        || app.help
+        || app.modal.is_some()
+        || app.show_welcome()
+    {
+        return None;
+    }
+    let (_, [body, ..]) = chat_areas(app, area);
+    if !body.contains(ratatui::layout::Position::new(x, y)) {
+        return None;
+    }
+    let (lines, links) = transcript::layout(app, usize::from(body.width));
+    let height = usize::from(body.height);
+    let bottom = lines.len().saturating_sub(height);
+    let offset = bottom.saturating_sub(app.scroll.min(bottom));
+    let row = offset + usize::from(y - body.y);
+    let width = lines.get(row).map_or(0, Line::width);
+    if usize::from(x - body.x) >= width {
+        return None;
+    }
+    links
+        .into_iter()
+        .find(|(index, _)| *index == row)
+        .map(|(_, url)| url)
+}
+
 fn draw_screen(frame: &mut Frame<'_>, app: &App) {
     let area = frame.area();
     match app.phase {
         Phase::Connecting(message) => splash(frame, area, message, app),
         Phase::Access => access(frame, area, app),
         Phase::Chat => {
-            let width = usize::from(area.width.saturating_sub(2));
-            let panel = app
-                .prompts
-                .front()
-                .map(|current| prompt::panel(current, width))
-                .or_else(|| {
-                    app.verification
-                        .as_deref()
-                        .map(|origin| prompt::verification(origin, width))
-                });
-            let bottom_height = panel
-                .as_ref()
-                .map_or_else(
-                    || input_height(app, area.width),
-                    |panel| rows(panel.lines.len() + 2),
-                )
-                .min(area.height.saturating_sub(4));
-            let queue_height = rows(queue_lines(app, usize::from(area.width)).len())
-                .min(area.height.saturating_sub(bottom_height + 4));
-            let [body, queued, bottom, status] = Layout::vertical([
-                Constraint::Fill(1),
-                Constraint::Length(queue_height),
-                Constraint::Length(bottom_height),
-                Constraint::Length(2),
-            ])
-            .areas(area);
-            if queue_height > 0 {
+            let (panel, [body, queued, bottom, status]) = chat_areas(app, area);
+            if queued.height > 0 {
                 queue_view(frame, queued, app);
             }
             match &app.overlay {
