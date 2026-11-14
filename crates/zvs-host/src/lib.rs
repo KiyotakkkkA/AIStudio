@@ -24,6 +24,7 @@ pub mod indexing;
 pub mod integrations;
 pub mod ipc;
 pub mod kernel;
+pub mod notes;
 pub mod notifications;
 pub mod platform;
 pub mod policy;

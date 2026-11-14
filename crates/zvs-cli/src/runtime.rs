@@ -438,6 +438,30 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::Context(link.call("chat.context", &input).await)
         }
         Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
+        Request::Notes(id) => Msg::Notes(link.call("notes.list", &json!({ "id": id })).await),
+        Request::ReadNote {
+            conversation,
+            name,
+            id,
+        } => {
+            let mut input = json!({ "conversationId": conversation });
+            if let Some(name) = name {
+                input["name"] = json!(name);
+            }
+            if let Some(id) = id {
+                input["id"] = json!(id);
+            }
+            Msg::Note(link.call("notes.read", &input).await)
+        }
+        Request::RemoveNote { conversation, name } => {
+            let result: Result<(), AppError> = link
+                .call(
+                    "notes.remove",
+                    &json!({ "conversationId": conversation, "name": name }),
+                )
+                .await;
+            Msg::NoteRemoved(name, result)
+        }
         Request::Processes(owner) => Msg::Processes(
             owner,
             link.call("shells.list", &json!({ "ownerId": owner })).await,

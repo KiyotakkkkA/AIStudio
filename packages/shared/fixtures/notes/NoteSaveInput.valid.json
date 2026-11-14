@@ -1,0 +1,11 @@
+[
+  {
+    "name": "save",
+    "value": {
+      "conversationId": "0199aa11-1111-7111-8111-111111111111",
+      "name": "process-shutdown.md",
+      "content": "---\nschema_version: 1\nid: 0199aa11-2222-7111-8111-000000000001\ntitle: Остановка фоновых процессов\n---\n\n# Остановка\n",
+      "expectedHash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+    }
+  }
+]

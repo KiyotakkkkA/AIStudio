@@ -595,6 +595,14 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
         {
             copy::HINT_THEME
         } else if let Some(panel) = app.overlay.as_ref().map(|overlay| overlay.panel)
+            && matches!(panel, Panel::Notes | Panel::Note)
+        {
+            if panel == Panel::Notes {
+                copy::HINT_NOTES
+            } else {
+                copy::HINT_NOTE
+            }
+        } else if let Some(panel) = app.overlay.as_ref().map(|overlay| overlay.panel)
             && matches!(panel, Panel::Processes | Panel::ProcessOutput)
         {
             if panel == Panel::Processes {

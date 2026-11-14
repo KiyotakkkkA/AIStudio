@@ -35,6 +35,7 @@ pub mod layout;
 pub mod mail;
 pub mod mcp;
 pub mod memory;
+pub mod notes;
 pub mod notifications;
 pub mod primitives;
 pub mod process;
@@ -132,7 +133,7 @@ pub use chat::{
     PinConversationInput, PinMessageInput, RenameConversationInput, RetrievalMode, ThinkingEffort,
     TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
     UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
-    WebSourceDto, replace_sources, vector_sources, web_sources,
+    WebSourceDto, note_sources, replace_sources, vector_sources, web_sources,
 };
 pub use cli::{
     CLI_COMMAND, CLI_CONFIRM_SETTING_KEY, CLI_IMAGE_MAX, CLI_LAUNCH_ARG, CLI_LINE_MAX,
@@ -234,6 +235,13 @@ pub use memory::{
     ClearMemoryInput, CreateMemoryInput, MEMORY_ACCOUNT_MAX, MEMORY_CONTENT_MAX,
     MEMORY_CONVERSATION_MAX, MemoryChatDto, MemoryDto, MemoryListOutput, MemoryRef, MemoryScope,
     MemorySource, UpdateMemoryInput, check_memory_content,
+};
+pub use notes::{
+    NOTE_CONDITION_MAX, NOTE_CONTEXT_MAX, NOTE_ERROR_MAX, NOTE_EXTENSION, NOTE_FILE_MAX_BYTES,
+    NOTE_HASH_LEN, NOTE_NAME_MAX, NOTE_READ_WHEN_MAX, NOTE_SCHEMA_VERSION, NOTE_TIME_MAX,
+    NOTE_TITLE_MAX, NOTES_FOLDER, NOTES_LIST_MAX, NOTES_ROOT, NoteDto, NoteMetaDto, NoteReadInput,
+    NoteRef, NoteRenameInput, NoteSaveInput, NoteSourceDto, NoteSummaryDto, NotesListOutput,
+    check_note_hash, check_note_name, is_note_name, note_path,
 };
 pub use notifications::{
     NAVIGATION_STEP_DOMAIN, NOTIFICATION_SCHEME, NOTIFICATION_URL_MAX, NotificationTargetDto,

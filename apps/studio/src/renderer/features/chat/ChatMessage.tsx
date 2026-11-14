@@ -6,13 +6,15 @@ import type {
   ChatToolCallDto,
   DocumentSelectionDto,
   MessageId,
+  NoteSourceDto,
   VectorStoreDto,
   VectorStoreId,
   WebSourceDto,
 } from "@zvs/shared";
 import { ScrollArea, SlidedPanel, Tabs } from "@kiyotakkkka/zvs-uikit-lib";
-import { mdiFileEyeOutline, mdiTextBoxOutline } from "@mdi/js";
+import { mdiFileEyeOutline, mdiNoteTextOutline, mdiTextBoxOutline } from "@mdi/js";
 import IconButton from "../../ui/atoms/buttons/IconButton";
+import Icon from "../../ui/atoms/Icon";
 import ChatMarkdown from "./ChatMarkdown";
 import RecapBlock from "./RecapBlock";
 import { RECAP_HIDE, RECAP_SHOW } from "./compactionCopy";
@@ -34,11 +36,35 @@ import {
   selectionSources,
 } from "./citations";
 import { excerptPreview } from "./selectionCopy";
-import { vectorCitations, webSourceList } from "./sources";
+import { noteSourceList, vectorCitations, webSourceList } from "./sources";
+import { NOTE_SOURCE, NOTES_PANEL, OPEN_NOTE } from "./notes/notesCopy";
 import { useStore } from "../../stores/useStore";
 import MessageActions, { type MessageBranchAction } from "../../ui/molecules/MessageActions";
 import AssistantAvatar from "../../ui/atoms/AssistantAvatar";
 import GenerationStatus from "../../ui/molecules/GenerationStatus";
+
+const SELECTIONS_KEY = "selections";
+const WEB_KEY = "web";
+const NOTES_KEY = "notes";
+const SELECTION_EXCERPT = 600;
+
+const TAB_LABELS_MAPPING = new Map<string, string>([
+  [SELECTIONS_KEY, SELECTIONS_TAB],
+  [WEB_KEY, WEB_SOURCES_TAB],
+  [NOTES_KEY, NOTES_PANEL],
+])
+
+const resolveTabLabel = (key: string, defaultFn: (key: string) => string) => {
+  return TAB_LABELS_MAPPING.get(key) ?? defaultFn(key);
+}
+
+function citationPlace(citation: ChatCitationDto): string {
+  return [
+    `Фрагмент ${String(citation.chunkIndex + 1)}`,
+    ...(citation.page === null ? [] : [`стр. ${String(citation.page)}`]),
+    ...(citation.section === "" ? [] : [citation.section]),
+  ].join(" · ");
+}
 
 export default function ChatMessage({
   messageId,
@@ -95,6 +121,7 @@ export default function ChatMessage({
   const selections = documentSelections(attached);
   const citations = answerCitations(vectorCitations(answerSources), toolCalls);
   const webSources = webSourceList(answerSources);
+  const noteSources = noteSourceList(answerSources);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const recapId = useId();
@@ -112,11 +139,16 @@ export default function ChatMessage({
     setSourcesOpen(false);
     void chat.openSite(source.url);
   };
+  const openNote = (source: NoteSourceDto) => {
+    setSourcesOpen(false);
+    chat.openNote(source.id);
+  };
   const citationStoreIds = [...new Set(citations.map((citation) => citation.storeId))];
   const tabs: string[] = [
     ...(selections.length > 0 ? [SELECTIONS_KEY] : []),
     ...citationStoreIds,
     ...(webSources.length > 0 ? [WEB_KEY] : []),
+    ...(noteSources.length > 0 ? [NOTES_KEY] : []),
   ];
   const [activeTab, setActiveTab] = useState<string>(tabs[0] ?? "");
   const selectedTab = tabs.find((tab) => tab === activeTab) ?? tabs[0] ?? "";
@@ -162,11 +194,15 @@ export default function ChatMessage({
             sources={sources}
             selections={selectionSources(selections)}
             web={webSources}
-            fragments={citations.length + selections.length + webSources.length}
+            notes={noteSources}
+            fragments={
+              citations.length + selections.length + webSources.length + noteSources.length
+            }
             onOpen={() => setSourcesOpen(true)}
             onView={view}
             onViewSelection={viewSelection}
             onOpenWeb={openWeb}
+            onOpenNote={openNote}
           />
           {artifacts}
           {partial && !generating && (
@@ -238,18 +274,13 @@ export default function ChatMessage({
             </div>
           </div>
         </SlidedPanel.Header>
-        <SlidedPanel.Content className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-5">
+        <SlidedPanel.Content className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-2.5">
           <Tabs
             value={selectedTab}
             onChange={setActiveTab}
             options={tabs.map((id) => ({
               value: id,
-              label:
-                id === SELECTIONS_KEY
-                  ? SELECTIONS_TAB
-                  : id === WEB_KEY
-                    ? WEB_SOURCES_TAB
-                    : (stores.find((store) => store.id === id)?.name ?? "Хранилище"),
+              label: resolveTabLabel(id, () => stores.find((store) => store.id === id)?.name ?? "Хранилище")
             }))}
             label="Группы источников"
             classNames={{
@@ -283,6 +314,33 @@ export default function ChatMessage({
                       </p>
                       <p className="mt-2 line-clamp-4 border-l-2 border-accent-line pl-2.5 text-[12.5px]/relaxed text-main-300">
                         {excerptPreview(selection.text, SELECTION_EXCERPT)}
+                      </p>
+                    </article>
+                  ))
+                : null}
+              {selectedTab === NOTES_KEY
+                ? noteSources.map((source) => (
+                    <article
+                      key={`${source.id}:${source.hash}`}
+                      className="rounded-card border border-line bg-main-900 p-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-main-100">
+                          <span className="flex-none text-main-400">
+                            <Icon path={mdiNoteTextOutline} size={15} />
+                          </span>
+                          <span className="truncate">{source.title}</span>
+                        </h3>
+                        <IconButton
+                          label={OPEN_NOTE}
+                          tooltip="top-right"
+                          path={mdiFileEyeOutline}
+                          iconSize={16}
+                          onClick={() => openNote(source)}
+                        />
+                      </div>
+                      <p className="mt-1.5 truncate text-[12px] text-main-500">
+                        {NOTE_SOURCE} · {source.path}
                       </p>
                     </article>
                   ))
@@ -340,16 +398,4 @@ export default function ChatMessage({
       </SlidedPanel>
     </article>
   );
-}
-
-const SELECTIONS_KEY = "selections";
-const WEB_KEY = "web";
-const SELECTION_EXCERPT = 600;
-
-function citationPlace(citation: ChatCitationDto): string {
-  return [
-    `Фрагмент ${String(citation.chunkIndex + 1)}`,
-    ...(citation.page === null ? [] : [`стр. ${String(citation.page)}`]),
-    ...(citation.section === "" ? [] : [citation.section]),
-  ].join(" · ");
 }

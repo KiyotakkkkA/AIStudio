@@ -7,6 +7,7 @@ pub mod chat_carry;
 pub mod chat_goal;
 pub mod chat_history;
 pub mod chat_memory;
+pub mod chat_notes;
 pub mod chat_plugins;
 pub mod chat_prompt;
 pub mod chat_reply;
@@ -117,6 +118,7 @@ pub struct Services {
     pub scenario_runs: ScenarioRunner,
     pub chat: ChatService,
     pub memory: MemoryService,
+    pub notes: crate::notes::Notes,
     pub agentic: AgenticService,
     pub folders: FolderAccessService,
     pub explorer: ExplorerService,

@@ -18,9 +18,9 @@ use zvs_contract::{
     CreateMcpServerInput, ExecJudgeDto, ExecMode, ExecPolicyDto, FolderAccessAnswer,
     FolderGrantScope, GOAL_STEP_DOMAIN, GoalBudgetDto, GoalReason, GoalStatus, GoalUsageDto,
     HostEvent, HostEventDraft, McpOAuthState, McpServerDetailDto, McpServerDto, McpServerId,
-    McpServerStatus, PolicyRuleDto, ProviderDto, ProviderId, ProviderUsageDto, RunHandleDto, RunId,
-    RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto, SkillDto, SkillId, ThinkingEffort,
-    WAKE_STEP_DOMAIN, WorkingFolderAccess,
+    McpServerStatus, NoteDto, NoteId, NoteSummaryDto, PolicyRuleDto, ProviderDto, ProviderId,
+    ProviderUsageDto, RunHandleDto, RunId, RunOutcomeStatus, SHELL_STEP_DOMAIN, ShellOutputDto,
+    SkillDto, SkillId, ThinkingEffort, WAKE_STEP_DOMAIN, WorkingFolderAccess,
 };
 use zvs_contract::{
     AssistantPreferencesDto, COMPACTION_STEP_DOMAIN, ChatCompactionStepDto, ChatRecapStepDto,
@@ -278,6 +278,16 @@ pub enum Request {
         since: Option<u64>,
     },
     KillProcess(BackgroundShellId),
+    Notes(ConversationId),
+    ReadNote {
+        conversation: ConversationId,
+        name: Option<String>,
+        id: Option<NoteId>,
+    },
+    RemoveNote {
+        conversation: ConversationId,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -338,6 +348,9 @@ pub enum Msg {
     Processes(ConversationId, Result<Vec<BackgroundShellDto>, AppError>),
     ProcessOutput(Result<ShellOutputDto, AppError>),
     ProcessKilled(Result<BackgroundShellDto, AppError>),
+    Notes(Result<Vec<NoteSummaryDto>, AppError>),
+    Note(Result<NoteDto, AppError>),
+    NoteRemoved(String, Result<(), AppError>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -854,6 +867,27 @@ impl App {
                 self.adopt_processes(owner, result);
                 Vec::new()
             }
+            Msg::Notes(result) => {
+                match result {
+                    Ok(list) => {
+                        if let Some(overlay) = self.overlay_for(Panel::Notes) {
+                            overlay.notes = list;
+                            overlay.loading = false;
+                        }
+                    }
+                    Err(error) => {
+                        if self.overlay_for(Panel::Notes).is_some() {
+                            self.panel_failed(&error);
+                        }
+                    }
+                }
+                Vec::new()
+            }
+            Msg::Note(result) => {
+                self.adopt_note(result);
+                Vec::new()
+            }
+            Msg::NoteRemoved(name, result) => self.note_removed(&name, result),
             Msg::ProcessOutput(result) => {
                 self.adopt_output(result);
                 Vec::new()
@@ -2198,6 +2232,7 @@ impl App {
             Command::Skills => return self.open_panel(Panel::Skills),
             Command::Mcp => return self.open_panel(Panel::Mcp),
             Command::Processes => return self.open_panel(Panel::Processes),
+            Command::Notes => return self.open_panel(Panel::Notes),
             Command::Permissions => return self.open_panel(Panel::Permissions),
             Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
             Command::Theme => return self.open_panel(Panel::Theme),
@@ -2220,6 +2255,121 @@ impl App {
             theme: self.theme,
             assistant: self.assistant.as_ref(),
             auto_copy: self.auto_copy,
+        }
+    }
+
+    fn open_link(&mut self, link: String) -> Vec<Request> {
+        let Some(id) = link.strip_prefix(crate::ui::transcript::NOTE_LINK) else {
+            return vec![Request::OpenUrl(link)];
+        };
+        match (&self.conversation, NoteId::parse(id)) {
+            (Some(conversation), Some(id)) => vec![Request::ReadNote {
+                conversation: conversation.id,
+                name: None,
+                id: Some(id),
+            }],
+            _ => Vec::new(),
+        }
+    }
+
+    fn adopt_note(&mut self, result: Result<NoteDto, AppError>) {
+        match result {
+            Ok(note) => {
+                let notes = self
+                    .overlay
+                    .as_ref()
+                    .filter(|overlay| overlay.panel == Panel::Notes)
+                    .map(|overlay| overlay.notes.clone())
+                    .unwrap_or_default();
+                let mut overlay = Overlay::new(Panel::Note);
+                overlay.notes = notes;
+                overlay.note = Some(note);
+                self.overlay = Some(overlay);
+            }
+            Err(error) if error.code == zvs_contract::AppErrorCode::NotFound => {
+                self.status = Some((Tone::Info, copy::NOTE_REMOVED.to_owned()));
+            }
+            Err(error) => self.status = Some((Tone::Error, error.message)),
+        }
+    }
+
+    fn note_removed(&mut self, name: &str, result: Result<(), AppError>) -> Vec<Request> {
+        match result {
+            Ok(()) => {
+                self.status = Some((Tone::Success, copy::NOTE_REMOVED.to_owned()));
+                let reopen = self
+                    .overlay
+                    .as_ref()
+                    .is_some_and(|overlay| matches!(overlay.panel, Panel::Notes | Panel::Note));
+                if !reopen {
+                    return Vec::new();
+                }
+                let mut overlay = Overlay::new(Panel::Notes);
+                if let Some(current) = &self.overlay {
+                    overlay.notes = current
+                        .notes
+                        .iter()
+                        .filter(|note| note.name != name)
+                        .cloned()
+                        .collect();
+                }
+                self.overlay = Some(overlay);
+                self.conversation
+                    .as_ref()
+                    .map(|conversation| vec![Request::Notes(conversation.id)])
+                    .unwrap_or_default()
+            }
+            Err(error) => {
+                self.status = Some((Tone::Error, error.message));
+                Vec::new()
+            }
+        }
+    }
+
+    fn note_key(&mut self, key: Key, rows: &[overlay::Row]) -> Option<Vec<Request>> {
+        let conversation = self
+            .conversation
+            .as_ref()
+            .map(|conversation| conversation.id);
+        let overlay = self.overlay.as_mut()?;
+        match (overlay.panel, key) {
+            (Panel::Note, Key::Left) => {
+                let mut back = Overlay::new(Panel::Notes);
+                back.notes = std::mem::take(&mut overlay.notes);
+                back.loading = false;
+                let name = overlay.note.as_ref().map(|note| note.name.clone());
+                if let Some(index) = back
+                    .notes
+                    .iter()
+                    .position(|note| Some(&note.name) == name.as_ref())
+                {
+                    back.selected = index;
+                }
+                self.overlay = Some(back);
+                Some(Vec::new())
+            }
+            (Panel::Note, Key::Enter) => {
+                self.overlay = None;
+                Some(Vec::new())
+            }
+            (_, Key::Delete) => {
+                let name = if overlay.panel == Panel::Note {
+                    overlay.note.as_ref().map(|note| note.name.clone())
+                } else {
+                    rows.get(overlay.selected).map(|row| row.key.clone())
+                };
+                let (Some(name), Some(conversation)) = (name, conversation) else {
+                    return Some(Vec::new());
+                };
+                if !overlay.armed {
+                    overlay.armed = true;
+                    self.status = Some((Tone::Error, copy::NOTE_DELETE_CONFIRM.to_owned()));
+                    return Some(Vec::new());
+                }
+                overlay.armed = false;
+                Some(vec![Request::RemoveNote { conversation, name }])
+            }
+            _ => None,
         }
     }
 
@@ -2283,8 +2433,16 @@ impl App {
             | Panel::Shortcuts
             | Panel::Theme
             | Panel::ProcessOutput
+            | Panel::Note
             | Panel::Subagents
             | Panel::StopSubagents => Vec::new(),
+            Panel::Notes => match &self.conversation {
+                Some(conversation) => vec![Request::Notes(conversation.id)],
+                None => {
+                    self.status = Some((Tone::Info, copy::PROCESSES_NO_CONVERSATION.to_owned()));
+                    return Vec::new();
+                }
+            },
             Panel::Processes => match &self.conversation {
                 Some(conversation) => vec![Request::Processes(conversation.id)],
                 None => {
@@ -2433,6 +2591,17 @@ impl App {
                     auto_copy: on,
                 })]
             }
+            Action::OpenNote(name) => self
+                .conversation
+                .as_ref()
+                .map(|conversation| {
+                    vec![Request::ReadNote {
+                        conversation: conversation.id,
+                        name: Some(name),
+                        id: None,
+                    }]
+                })
+                .unwrap_or_default(),
             Action::ShowOutput(id) => {
                 let Some(shell) = self.processes.iter().find(|shell| shell.id == id).cloned()
                 else {
@@ -2709,6 +2878,14 @@ impl App {
                 _ => return Vec::new(),
             }
         }
+        if matches!(overlay.panel, Panel::Notes | Panel::Note)
+            && let Some(requests) = self.note_key(key, &rows)
+        {
+            return requests;
+        }
+        let Some(overlay) = self.overlay.as_mut() else {
+            return Vec::new();
+        };
         if overlay.panel == Panel::Processes && key == Key::Delete {
             let target = rows
                 .get(overlay.selected)
@@ -2888,7 +3065,7 @@ impl App {
                     self.selection = None;
                     let screen = ratatui::layout::Rect::new(0, 0, self.viewport.0, self.viewport.1);
                     return crate::ui::link_at(self, screen, x, y)
-                        .map(|url| vec![Request::OpenUrl(url)])
+                        .map(|link| self.open_link(link))
                         .unwrap_or_default();
                 }
                 self.selection = Some(selection);

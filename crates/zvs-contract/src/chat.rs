@@ -12,6 +12,7 @@ use crate::ids::{
     ConversationId, DocumentId, IntegrationId, MessageId, ProviderId, RunId, VectorStoreId,
 };
 use crate::integrations::{INTEGRATION_NAME_MAX, IntegrationKind};
+use crate::notes::NoteSourceDto;
 use crate::primitives::{Json, Timestamp};
 use crate::questions::QuestionRequestDto;
 use crate::runs::RunHandleDto;
@@ -297,6 +298,7 @@ impl Validate for WebSourceDto {
 wire_enum!(ChatSourceKind {
     Vector => "vector",
     Web => "web",
+    Note => "note",
 });
 
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -305,6 +307,7 @@ wire_enum!(ChatSourceKind {
 pub enum ChatSourceDto {
     Vector(ChatCitationDto),
     Web(WebSourceDto),
+    Note(NoteSourceDto),
 }
 
 impl ChatSourceDto {
@@ -312,20 +315,28 @@ impl ChatSourceDto {
         match self {
             Self::Vector(_) => ChatSourceKind::Vector,
             Self::Web(_) => ChatSourceKind::Web,
+            Self::Note(_) => ChatSourceKind::Note,
         }
     }
 
     pub const fn vector(&self) -> Option<&ChatCitationDto> {
         match self {
             Self::Vector(citation) => Some(citation),
-            Self::Web(_) => None,
+            Self::Web(_) | Self::Note(_) => None,
         }
     }
 
     pub const fn web(&self) -> Option<&WebSourceDto> {
         match self {
             Self::Web(source) => Some(source),
-            Self::Vector(_) => None,
+            Self::Vector(_) | Self::Note(_) => None,
+        }
+    }
+
+    pub const fn note(&self) -> Option<&NoteSourceDto> {
+        match self {
+            Self::Note(source) => Some(source),
+            Self::Vector(_) | Self::Web(_) => None,
         }
     }
 }
@@ -335,6 +346,7 @@ impl Validate for ChatSourceDto {
         match self {
             Self::Vector(citation) => citation.validate(),
             Self::Web(source) => source.validate(),
+            Self::Note(source) => source.validate(),
         }
     }
 }
@@ -345,6 +357,10 @@ pub fn vector_sources(sources: &[ChatSourceDto]) -> impl Iterator<Item = &ChatCi
 
 pub fn web_sources(sources: &[ChatSourceDto]) -> impl Iterator<Item = &WebSourceDto> {
     sources.iter().filter_map(ChatSourceDto::web)
+}
+
+pub fn note_sources(sources: &[ChatSourceDto]) -> impl Iterator<Item = &NoteSourceDto> {
+    sources.iter().filter_map(ChatSourceDto::note)
 }
 
 pub fn replace_sources(
@@ -982,6 +998,7 @@ wire_enum!(ChatPromptSection {
     DialogPrompt => "dialogPrompt",
     Profile => "profile",
     Memory => "memory",
+    Notes => "notes",
     Knowledge => "knowledge",
     McpGuidance => "mcpGuidance",
     Command => "command",

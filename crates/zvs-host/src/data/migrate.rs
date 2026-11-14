@@ -734,6 +734,7 @@ mod tests {
                 format!("vector:{}:{}", citation.document_id, citation.chunk_index)
             }
             zvs_contract::ChatSourceDto::Web(source) => format!("web:{}", source.url),
+            zvs_contract::ChatSourceDto::Note(source) => format!("note:{}", source.id),
         };
         let labels: Vec<Vec<String>> = parsed
             .iter()

@@ -6,6 +6,8 @@ import ChatThread from "./ChatThread";
 import RunContext from "./RunContext";
 import ChatExplorer from "./explorer/ChatExplorer";
 import ExplorerFileView from "./explorer/ExplorerFileView";
+import NotesPanel from "./notes/NotesPanel";
+import NoteView from "./notes/NoteView";
 import ViewerDock from "../../viewer/ViewerDock";
 import ChatBrowserDock from "./ChatBrowserDock";
 import { JUDGE_ROW } from "../execPolicy/execPolicyCopy";
@@ -52,9 +54,13 @@ export default observer(function ChatWorkspace() {
             <ViewerDock />
           ) : chat.isPanelShown("files") ? (
             <ExplorerFileView explorer={chat.explorer} />
+          ) : chat.isPanelShown("notes") ? (
+            <NoteView notes={chat.notes} />
           ) : null}
           {chat.activePanel === "files" ? (
             <ChatExplorer store={chat} />
+          ) : chat.activePanel === "notes" ? (
+            <NotesPanel store={chat} />
           ) : (
             <RunContext store={chat} />
           )}

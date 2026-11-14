@@ -14,6 +14,7 @@ import { IntegrationKind } from "./integrations.js";
 import { FolderGrantScope, FolderPath, WorkingFolderAccess } from "./folders.js";
 import { ToolKey } from "./tools/ToolDto.js";
 import { WebUrl } from "./sites.js";
+import { NoteSourceDto } from "./notes.js";
 import { ToolAuthorisationDto } from "./execPolicy.js";
 import { RunHandleDto } from "./runs/RunDto.js";
 import { ApprovalRequestDto, EventSeq } from "./events/HostEvent.js";
@@ -111,12 +112,13 @@ export const WebSourceDto = z.object({
 });
 export type WebSourceDto = z.infer<typeof WebSourceDto>;
 export const CHAT_SOURCES_MAX = 400;
-export const CHAT_SOURCE_KINDS = ["vector", "web"] as const;
+export const CHAT_SOURCE_KINDS = ["vector", "web", "note"] as const;
 export const ChatSourceKind = z.enum(CHAT_SOURCE_KINDS);
 export type ChatSourceKind = z.infer<typeof ChatSourceKind>;
 export const ChatSourceDto = z.discriminatedUnion("kind", [
   ChatCitationDto.extend({ kind: z.literal("vector") }),
   WebSourceDto.extend({ kind: z.literal("web") }),
+  NoteSourceDto.extend({ kind: z.literal("note") }),
 ]);
 export type ChatSourceDto = z.infer<typeof ChatSourceDto>;
 export const CHAT_COMMANDS = ["browser-use", "computer-use", "goal"] as const;
@@ -444,6 +446,7 @@ export const CHAT_PROMPT_SECTIONS = [
   "dialogPrompt",
   "profile",
   "memory",
+  "notes",
   "knowledge",
   "mcpGuidance",
   "command",

@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use zvs_contract::validate::{check, invalid, js_slice};
 use zvs_contract::{
     AppError, AppErrorCode, FILE_CHANGES_MAX, FileChangeKind, FileChangesDto, FileDiffDto,
-    ToolTier, Validate,
+    NoteSourceDto, ToolTier, Validate, note_path,
 };
 
 use super::commit::{Fault, commit, snapshot};
@@ -24,7 +24,10 @@ use crate::access::{AccessRequest, Effect, Gating};
 use crate::chat_files::within_quota;
 use crate::conversations::{ConversationFolders, is_owner};
 use crate::kernel::{NodeDef, NodeRegistry, PermissionRequirement, PlainNode, StepContext};
-use crate::platform::ids::new_id;
+use crate::notes::writes::check_plan;
+use crate::notes::{note_at, parse as parse_note};
+use crate::platform::clock::{SharedClock, SystemClock};
+use crate::platform::ids::{IdGenerator, new_id, system_ids};
 use crate::platform::long_path::extended;
 use crate::policy::ReviewedAction;
 use crate::workspace::{CHANGES_DENIED, FolderAccess, FolderAccessService, FolderTarget};
@@ -148,6 +151,8 @@ pub struct FileToolOptions {
     pub ledger: ReadLedger,
     pub fault: Option<Fault>,
     pub roots: VirtualRoots,
+    pub clock: SharedClock,
+    pub ids: IdGenerator,
 }
 
 impl FileToolOptions {
@@ -157,6 +162,8 @@ impl FileToolOptions {
             ledger: ReadLedger::new(),
             fault: None,
             roots: VirtualRoots::default(),
+            clock: std::sync::Arc::new(SystemClock),
+            ids: system_ids(),
         }
     }
 }
@@ -432,6 +439,8 @@ pub struct FsReadOutput {
     pub images: Vec<zvs_contract::ImageAttachmentDto>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub image_owner: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<NoteSourceDto>,
 }
 
 impl Validate for FsReadOutput {
@@ -450,6 +459,7 @@ fn read_one(
     budget: &mut ReadBudget,
     ledger: &ReadLedger,
     run: &str,
+    read: &mut Option<Vec<u8>>,
 ) -> (String, FsReadFile) {
     let shown = path.display();
     let entry = |status: &str, lines: u64, truncated: bool| FsReadFile {
@@ -501,6 +511,7 @@ fn read_one(
         Decoded::Text { text, .. } => text,
     };
     ledger.record(run, path, &content_hash(&bytes));
+    *read = Some(bytes);
     let lines: Vec<&str> = if text.is_empty() {
         Vec::new()
     } else {
@@ -612,14 +623,24 @@ impl PlainNode for FsReadNode {
         let loader = crate::images::ImageLoader::new(crate::artifacts::ArtifactStore::new(
             self.0.options.conversations.root().to_path_buf(),
         ));
-        let mut located: Vec<Option<PathBuf>> = Vec::with_capacity(input.paths.len());
+        let mut found_roots: Vec<Option<Located>> = Vec::with_capacity(input.paths.len());
         for target in &input.paths {
-            located.push(
-                self.0
-                    .located(&input.conversation_id, &target.path)?
-                    .map(|found| found.path),
-            );
+            found_roots.push(self.0.located(&input.conversation_id, &target.path)?);
         }
+        let note_names: Vec<Option<String>> = found_roots
+            .iter()
+            .map(|found| {
+                found
+                    .as_ref()
+                    .filter(|found| found.kind == RootKind::Chat)
+                    .and_then(|found| note_at(&found.base, &found.path))
+                    .flatten()
+            })
+            .collect();
+        let located: Vec<Option<PathBuf>> = found_roots
+            .into_iter()
+            .map(|found| found.map(|found| found.path))
+            .collect();
         let targets: Vec<FolderTarget> = input
             .paths
             .iter()
@@ -649,15 +670,30 @@ impl PlainNode for FsReadNode {
             };
             let mut sections = Vec::with_capacity(resolved.len());
             let mut files = Vec::with_capacity(resolved.len());
+            let mut notes: Vec<NoteSourceDto> = Vec::new();
             let image_paths: Vec<String> = resolved.iter().zip(&input.paths).filter(|(_, request)| request.view_image).map(|(path, _)| path_text(path)).collect();
             let images = if image_paths.is_empty() { Vec::new() } else { loader.import(&input.conversation_id, &image_paths)? };
-            for (path, request) in resolved.iter().zip(&input.paths) {
+            for ((path, request), note) in resolved.iter().zip(&input.paths).zip(&note_names) {
                 if request.view_image {
                     sections.push(format!("<file path=\"{}\" untrusted=\"true\">\n[image attached for viewing]\n</file>", path.display()));
                     files.push(FsReadFile { path: path_text(path), status: "image".to_owned(), lines: 0, truncated: false });
                     continue;
                 }
-                let (section, file) = read_one(path, request, &mut budget, &ledger, &run);
+                let mut read = None;
+                let (section, file) = read_one(path, request, &mut budget, &ledger, &run, &mut read);
+                if let (Some(name), Some(bytes)) = (note, read.as_deref())
+                    && let Ok(parsed) = parse_note(bytes)
+                {
+                    let source = NoteSourceDto {
+                        id: parsed.id,
+                        title: parsed.fields.title,
+                        path: note_path(name),
+                        hash: content_hash(bytes),
+                    };
+                    if !notes.contains(&source) {
+                        notes.push(source);
+                    }
+                }
                 sections.push(section);
                 files.push(file);
             }
@@ -666,6 +702,7 @@ impl PlainNode for FsReadNode {
                 files,
                 image_owner: if images.is_empty() { String::new() } else { input.conversation_id },
                 images,
+                notes,
             })
         })
         .await
@@ -936,6 +973,34 @@ pub struct FsApplyOutput {
     pub text: String,
     pub changes: Vec<FileDiffDto>,
     pub paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<AppliedNote>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppliedNote {
+    pub path: String,
+    pub id: String,
+}
+
+fn applied_notes(planned: &Plan, bases: &[PathBuf]) -> Vec<AppliedNote> {
+    planned
+        .files
+        .iter()
+        .filter_map(|file| {
+            let after = file.after.as_deref()?;
+            let name = bases
+                .iter()
+                .find_map(|base| note_at(base, &file.path))
+                .flatten()?;
+            let note = parse_note(after).ok()?;
+            Some(AppliedNote {
+                path: note_path(&name),
+                id: note.id.to_string(),
+            })
+        })
+        .collect()
 }
 
 impl Validate for FsApplyOutput {
@@ -1064,7 +1129,7 @@ fn unchanged_since_plan(planned: &Plan) -> Result<(), AppError> {
     Ok(())
 }
 
-fn summary(changes: &[FileDiffDto]) -> String {
+fn summary(changes: &[FileDiffDto], notes: &[AppliedNote]) -> String {
     if changes.is_empty() {
         return "No file changed: the batch leaves every file as it was.".to_owned();
     }
@@ -1086,6 +1151,9 @@ fn summary(changes: &[FileDiffDto]) -> String {
             FileChangeKind::Delete => format!("deleted {} (-{})", change.path, change.removed),
         });
     }
+    for note in notes {
+        lines.push(format!("note {} id {}", note.path, note.id));
+    }
     lines.join("\n")
 }
 
@@ -1095,6 +1163,7 @@ pub struct FsApply {
     conversation_id: String,
     planned: Plan,
     folder: Option<FolderAccess>,
+    notes: Vec<AppliedNote>,
 }
 
 #[async_trait]
@@ -1175,7 +1244,16 @@ impl NodeDef for FsApplyNode {
             })
             .collect();
         let changes = resolved_changes(&input.changes, &resolved);
-        let planned = blocking(move || plan(&changes, &RealDisk)).await?;
+        let note_bases = bases.clone();
+        let clock = tools.options.clock.clone();
+        let ids = tools.options.ids.clone();
+        let planned = blocking(move || {
+            let mut planned = plan(&changes, &RealDisk)?;
+            check_plan(&mut planned, &note_bases, &clock, &ids)?;
+            Ok(planned)
+        })
+        .await?;
+        let notes = applied_notes(&planned, &bases);
         let run = context.run_id.to_string();
         check_fresh(&planned, &tools.options.ledger, &run, &bases)?;
         for base in &bases {
@@ -1196,6 +1274,7 @@ impl NodeDef for FsApplyNode {
             conversation_id: input.conversation_id,
             planned,
             folder,
+            notes,
         })
     }
 
@@ -1232,12 +1311,14 @@ impl NodeDef for FsApplyNode {
             conversation_id,
             planned,
             folder,
+            notes,
         } = admitted.into_inner();
         if planned.files.is_empty() {
             return Ok(FsApplyOutput {
-                text: summary(&[]),
+                text: summary(&[], &[]),
                 changes: Vec::new(),
                 paths: Vec::new(),
+                notes: Vec::new(),
             });
         }
         if let Some(folder) = &folder {
@@ -1284,7 +1365,8 @@ impl NodeDef for FsApplyNode {
             }
         }
         Ok(FsApplyOutput {
-            text: summary(&planned.changes),
+            text: summary(&planned.changes, &notes),
+            notes,
             paths: planned
                 .files
                 .iter()

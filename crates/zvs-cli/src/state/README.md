@@ -79,11 +79,20 @@ once (`Transcript::add_recap`).
 (`preferences.json`, watched like the theme). With auto-copy off a mouse selection stays on
 screen; Ctrl+C copies it and Esc drops it.
 
-**Web sources.** An answer's `web` sources (`MessageDto::web_sources`, or the `persist` step
-of a live turn) become `Entry::Sources` after the answer; the first five are listed and
+**Answer sources.** An answer's `web` and `note` sources (`transcript::shown_sources` over
+`MessageDto.sources`, or the `persist` step of a live turn) become `Entry::Sources` after the
+answer; the first five are listed and
 the rest wait for the details toggle (Ctrl+O). A left click without a drag asks
-`ui::link_at` for the row under the pointer; a source row yields `Request::OpenUrl`, which the
-runtime opens with the system handler (`launch::open_url`, `http`/`https` only).
+`ui::link_at` for the row under the pointer; a web row yields `Request::OpenUrl`, which the
+runtime opens with the system handler (`launch::open_url`, `http`/`https` only), and a note row
+(`zvs-note:<id>`) yields `Request::ReadNote`.
+
+**Notes.** `/notes` (Alt+N) needs an open dialog and asks `notes.list`; each row is a note
+(title, update date) or an invalid file (`ошибка` and the host's reason). Enter reads the note
+(`notes.read`) into `Panel::Note`, which lists its fields and body as lines; ← returns to the
+list. Delete arms a confirmation and a second Delete sends `notes.remove`, after which the list
+reloads. Editing stays in the desktop app. A `note` source after an answer opens the current
+note by id through the same read; a note that no longer exists shows «Заметка удалена».
 
 **Keymap.** `Keymap::from_json` starts from the defaults and overlays the file's bindings:
 a known shortcut id with a chord string that parses rebinds it, `null` unbinds it, and

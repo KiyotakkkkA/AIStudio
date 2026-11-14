@@ -997,6 +997,32 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::memory::ClearMemoryInput>,
     ),
     (
+        "notes/NoteSourceDto",
+        round_trip::<zvs_contract::notes::NoteSourceDto>,
+    ),
+    (
+        "notes/NoteMetaDto",
+        round_trip::<zvs_contract::notes::NoteMetaDto>,
+    ),
+    (
+        "notes/NoteSummaryDto",
+        round_trip::<zvs_contract::notes::NoteSummaryDto>,
+    ),
+    ("notes/NoteDto", round_trip::<zvs_contract::notes::NoteDto>),
+    ("notes/NoteRef", round_trip::<zvs_contract::notes::NoteRef>),
+    (
+        "notes/NoteReadInput",
+        round_trip::<zvs_contract::notes::NoteReadInput>,
+    ),
+    (
+        "notes/NoteSaveInput",
+        round_trip::<zvs_contract::notes::NoteSaveInput>,
+    ),
+    (
+        "notes/NoteRenameInput",
+        round_trip::<zvs_contract::notes::NoteRenameInput>,
+    ),
+    (
         "agentic/AgenticPermissionMode",
         round_trip::<zvs_contract::agentic::AgenticPermissionMode>,
     ),

@@ -215,6 +215,8 @@ fn empty_text(overlay: &Overlay) -> &'static str {
         copy::MCP_EMPTY
     } else if overlay.panel == Panel::Processes && overlay.filter.is_empty() {
         copy::PROCESSES_EMPTY
+    } else if overlay.panel == Panel::Notes && overlay.filter.is_empty() {
+        copy::NOTES_EMPTY
     } else {
         copy::NOTHING_FOUND
     }

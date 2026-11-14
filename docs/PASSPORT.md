@@ -719,7 +719,8 @@ Core concepts:
   (`ChatSourceDto`, one `sources` column), whatever the origin. Each entry is tagged by `kind`
   and keeps that origin's payload unchanged: `vector` is a `ChatCitationDto` (attached-store
   retrieval and the knowledge tools' citation book), `web` is a `WebSourceDto` (vendor web
-  search). The list is ordered by kind (`ChatSourceKind` order), and within a kind by the order
+  search), `note` is a `NoteSourceDto` (a dialog note read in the turn, below). The list is
+  ordered by kind (`ChatSourceKind` order), and within a kind by the order
   the origin produced. Inline markers count within their kind: `[n]` is the n-th `vector`
   source (then the tool-call citations, see above), `[[n]]` is the n-th `web` source; the
   vendor's web numbering is therefore never deduplicated or reordered. Each origin writes only
@@ -729,6 +730,41 @@ Core concepts:
   renderer). Adding an origin means a new `ChatSourceDto` variant with its validation, a
   fixture, the producer's `replace_sources` call, and a row kind in `ChatSources`; no new
   column, field or migration. The list holds at most `CHAT_SOURCES_MAX` = 400 entries.
+- **Dialog notes** (TASK_085, `zvs-host/src/notes.rs`, `services/chat_notes.rs`). A note is a
+  Markdown file `chat:notes/<topic>.md` (physically `conversations/<id>/work/notes/`, a flat
+  folder; nested paths and non-`.md` files are refused for writes) holding knowledge whose
+  reconstruction would take substantial work. YAML frontmatter carries `schema_version` (1),
+  `id` (UUID), `title` (≤ 200), `created_at`, `updated_at` (UTC, seconds), `context` (≤ 2 000),
+  `read_when` (≤ 600), `update_when`, `delete_when` (≤ 2 000 each), then a non-empty body; the
+  whole file is ≤ 128 KiB, malformed YAML, duplicate or unknown keys and unknown schema
+  versions are refused, nothing is truncated. The model uses the existing file tools — no
+  `notes.*` model tools. `fs.apply` validates every planned file in the namespace (through
+  `chat:` or the conversation-owned absolute path alike) inside its own transaction (`notes::writes::check_plan`, after planning, before the quota and approval):
+  the host assigns `schema_version`, `id` and the dates, keeps `id` and `created_at` on edits
+  and renames (a move target inherits the identity of the deleted note with the same id),
+  moves `updated_at` only when a field or the body changes, refuses a create whose name
+  differs only in case from another note, and fails the whole batch on any invalid note. The
+  result lists each written note's canonical path and id. The owned-folder rule makes these
+  writes approval-free; `off`, disabled tools and minimum tiers are unchanged. There is no
+  cache or index: every listing scans the folder, a missing folder means no notes and is not
+  created, and a scan never rewrites a file; an invalid file stays listed with its error and
+  is left out of the prompt. **Prompt.** `PromptParts.notes` (`ChatPromptSection::Notes`,
+  counted by the context meter) appears whenever `fs.read` is offered: fixed English
+  guidance plus one JSON line per valid note (`path`, `title`, `read_when`, `<`/`>` escaped)
+  inside `<notes shown total>`, never a body, at most `NOTES_PROMPT_TOKENS` = 2 000 tokens with
+  whole entries in path order and a pointer to `fs.list` for the rest. It is rebuilt before
+  every model request: in `prepare`, in the context preview, and by `NotesTurn::refresh` at the
+  top of every tool-loop round (continuations, goal rounds, after loop compaction), which
+  swaps the section text inside the system prompt. Subagents get no section. **Sources.** A
+  successful `fs.read` of a valid note returns `FsReadOutput.notes` (`id`, `title`, path, hash
+  of the bytes read); the answering turn's `NotesTurn` keeps them deduplicated by id and hash
+  and replaces the message's `note` kind. Directory entries, listings, search hits, writes,
+  failed reads and subagent reads never count, and notes are never cited in the answer text.
+  **Management.** `notes.list`, `notes.read` (by name or id; `NOT_FOUND` renders «Заметка
+  удалена»), `notes.save` (with the content hash the editor loaded; a changed file is a
+  `CONFLICT`), `notes.rename` and `notes.remove` go through `Services.notes`; list, read and
+  remove are console channels scoped to the dialog. Deletion is final; branching copies
+  `work/`, so a branch gets its own copies.
 - **Message queue** (`services/chat/queue.rs`, 2026-11-02). While a dialog has a running turn
   (or an active goal), a message from the person goes to a per-dialog queue held in host
   memory (`chat.queue.*`, at most `CHAT_QUEUE_MAX` = 10, lost on restart); every change is

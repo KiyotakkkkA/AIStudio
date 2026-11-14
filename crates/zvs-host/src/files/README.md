@@ -44,7 +44,9 @@ user changed in the meantime.
      Binary or non-UTF-8 files cannot be changed (`BINARY_REFUSED`). Text keeps its original
      format: content is edited with LF and re-encoded with the file's BOM and CRLF choice. The
      result is a list of `PlannedFile { path, before, after }` plus a `FileDiffDto` per file.
-2. **Check** the chat-folder quota for chat paths and the read ledger for existing files.
+2. **Check** dialog notes (`../notes/README.md`: every planned file under `chat:notes/` is
+   validated and gets its host-managed identity and dates; one invalid note fails the batch),
+   then the chat-folder quota for chat paths and the read ledger for existing files.
 3. **Approve.** Steps 1 and 2 run in `prepare`; `access` declares `Effect::Files` with the
    combined diff and any uncovered folders, and the access pipeline (`../access`) reviews it
    through the execution policy or asks the user, folders and diff in one modal. `execute`
@@ -62,6 +64,13 @@ user changed in the meantime.
    - on the first failure, every file already applied is restored from its `before` bytes and
      created folders are removed; `CommitFailure` reports which file failed and whether the
      restore succeeded.
+
+## Note reads
+
+`fs.read` of a valid note under a chat base adds a `NoteSourceDto` (id, title,
+`chat:notes/<name>`, SHA-256 of the bytes read) to `FsReadOutput.notes`; the chat tool loop
+turns these into the answer's `note` sources. `fs.apply` reports each written note's canonical
+path and id in `FsApplyOutput.notes` and in its summary text.
 
 ## Diff algorithm (`diff.rs`)
 

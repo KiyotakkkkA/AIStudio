@@ -60,3 +60,26 @@ fn the_quota_counts_the_folder_after_the_changes() {
     )
     .expect("a rewrite replaces the old size");
 }
+
+#[test]
+fn a_branch_gets_its_own_copy_of_the_notes() {
+    const BRANCH: &str = "01a17431-1de8-713c-9981-dbd5ddd5b80c";
+    let root = tempfile::tempdir().expect("the data folder");
+    let store = ArtifactStore::new(root.path().join("conversations"));
+    let source = chat_dir(&store, CHAT)
+        .expect("the chat folder")
+        .join("notes");
+    std::fs::create_dir_all(&source).expect("the notes folder");
+    std::fs::write(source.join("topic.md"), "original").expect("writes");
+    copy_chat_dir(&store, CHAT, BRANCH).expect("copies");
+    let copied = chat_dir(&store, BRANCH)
+        .expect("the branch folder")
+        .join("notes");
+    std::fs::write(copied.join("topic.md"), "changed in the branch").expect("writes");
+    std::fs::write(copied.join("extra.md"), "only in the branch").expect("writes");
+    assert_eq!(
+        std::fs::read_to_string(source.join("topic.md")).expect("reads"),
+        "original"
+    );
+    assert!(!source.join("extra.md").exists());
+}

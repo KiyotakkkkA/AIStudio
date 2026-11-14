@@ -1,0 +1,28 @@
+[
+  {
+    "name": "valid",
+    "value": {
+      "name": "process-shutdown.md",
+      "path": "chat:notes/process-shutdown.md",
+      "size": 512,
+      "modifiedAt": 1763121600000,
+      "id": "0199aa11-2222-7111-8111-000000000001",
+      "title": "Остановка фоновых процессов",
+      "updatedAt": "2026-11-14T12:30:00Z",
+      "error": null
+    }
+  },
+  {
+    "name": "invalid",
+    "value": {
+      "name": "broken.md",
+      "path": "chat:notes/broken.md",
+      "size": 12,
+      "modifiedAt": 1763121600000,
+      "id": null,
+      "title": null,
+      "updatedAt": null,
+      "error": "Не заполнено поле title"
+    }
+  }
+]

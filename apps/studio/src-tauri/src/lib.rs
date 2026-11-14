@@ -1231,7 +1231,13 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
             workers.clone(),
         )
     })?;
+    let notes = zvs_host::notes::Notes::new(
+        artifacts.folders().clone(),
+        clock.clone(),
+        zvs_host::platform::ids::system_ids(),
+    );
     let chat = ChatService::new(ChatServiceOptions {
+        notes: Some(notes.clone()),
         browser: Some(browser_settings.clone()),
         images: Some(zvs_host::images::ImageLoader::new(artifacts.clone())),
         tools: Some(tools.clone()),
@@ -1462,6 +1468,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         scenarios,
         scenario_runs,
         memory: chat.memory(),
+        notes: notes.clone(),
         agentic,
         chat,
         explorer: explorer.clone(),

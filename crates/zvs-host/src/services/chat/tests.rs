@@ -2,6 +2,7 @@ mod compact;
 mod images;
 mod knowledge;
 mod memory;
+mod notes;
 mod profile;
 mod tool_loop;
 mod wake;
@@ -258,6 +259,7 @@ pub(super) struct HarnessOptions {
     pub shells: Option<crate::background::BackgroundShells>,
     pub wake_delay: Option<Duration>,
     pub images: Option<crate::images::ImageLoader>,
+    pub notes: Option<crate::notes::Notes>,
 }
 
 impl Default for HarnessOptions {
@@ -280,6 +282,7 @@ impl Default for HarnessOptions {
             shells: None,
             wake_delay: None,
             images: None,
+            notes: None,
         }
     }
 }
@@ -341,6 +344,7 @@ impl Harness {
         }
         let chat = ChatService::new(ChatServiceOptions {
             images: options.images,
+            notes: options.notes,
             tools: options.tools,
             skills: options.skills,
             mcp: options.mcp,

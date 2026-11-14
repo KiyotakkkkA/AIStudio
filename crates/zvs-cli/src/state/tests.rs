@@ -2394,3 +2394,124 @@ fn without_auto_copy_a_selection_waits_for_ctrl_c_and_esc_drops_it() {
     assert_eq!(app.selection, None);
     assert!(app.run.is_some());
 }
+
+const NOTES: &str =
+    include_str!("../../../../packages/shared/fixtures/notes/NoteSummaryDto.valid.json");
+const NOTE: &str = include_str!("../../../../packages/shared/fixtures/notes/NoteDto.valid.json");
+
+fn notes() -> Vec<zvs_contract::NoteSummaryDto> {
+    let cases: Vec<Value> = serde_json::from_str(NOTES).expect("fixture");
+    cases
+        .iter()
+        .map(|case| serde_json::from_value(case["value"].clone()).expect("parses"))
+        .collect()
+}
+
+#[test]
+fn notes_need_a_dialog_and_list_valid_and_invalid_files() {
+    let mut app = ready();
+    assert!(command(&mut app, "/notes").is_empty());
+    assert_eq!(
+        app.status.as_ref().unwrap().1,
+        copy::PROCESSES_NO_CONVERSATION
+    );
+    let mut app = ready();
+    let dialog = conversation();
+    let id = dialog.id;
+    app.conversation = Some(dialog);
+    assert_eq!(command(&mut app, "/notes"), vec![Request::Notes(id)]);
+    app.update(Msg::Notes(Ok(notes())));
+    let overlay = app.overlay.as_ref().expect("panel");
+    assert_eq!(overlay.panel, Panel::Notes);
+    let rows = overlay.rows(&app.view());
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].title, "Остановка фоновых процессов");
+    assert!(rows[1].meta.starts_with(copy::NOTE_INVALID));
+    assert_eq!(
+        app.update(Msg::Key(Key::Enter)),
+        vec![Request::ReadNote {
+            conversation: id,
+            name: Some("process-shutdown.md".to_owned()),
+            id: None,
+        }]
+    );
+    app.update(Msg::Note(Ok(first(NOTE))));
+    let overlay = app.overlay.as_ref().expect("the note");
+    assert_eq!(overlay.panel, Panel::Note);
+    let lines: Vec<String> = overlay
+        .rows(&app.view())
+        .into_iter()
+        .map(|row| row.title)
+        .collect();
+    assert_eq!(lines[0], "Остановка фоновых процессов");
+    assert!(lines.iter().any(|line| line == "# Остановка"));
+    app.update(Msg::Key(Key::Left));
+    assert_eq!(app.overlay.as_ref().expect("the list").panel, Panel::Notes);
+}
+
+#[test]
+fn deleting_a_note_asks_twice_and_refreshes_the_list() {
+    let mut app = ready();
+    let dialog = conversation();
+    let id = dialog.id;
+    app.conversation = Some(dialog);
+    command(&mut app, "/notes");
+    app.update(Msg::Notes(Ok(notes())));
+    assert!(app.update(Msg::Key(Key::Delete)).is_empty());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::NOTE_DELETE_CONFIRM);
+    assert_eq!(
+        app.update(Msg::Key(Key::Delete)),
+        vec![Request::RemoveNote {
+            conversation: id,
+            name: "process-shutdown.md".to_owned(),
+        }]
+    );
+    assert_eq!(
+        app.update(Msg::NoteRemoved("process-shutdown.md".to_owned(), Ok(()))),
+        vec![Request::Notes(id)]
+    );
+    let overlay = app.overlay.as_ref().expect("the list");
+    assert_eq!(overlay.panel, Panel::Notes);
+    assert_eq!(overlay.notes.len(), 1);
+}
+
+#[test]
+fn a_note_source_of_a_deleted_note_reports_it() {
+    let mut app = ready();
+    app.conversation = Some(conversation());
+    app.update(Msg::Note(Err(AppError::new(
+        zvs_contract::AppErrorCode::NotFound,
+        "Заметка не найдена",
+    ))));
+    assert!(app.overlay.is_none());
+    assert_eq!(app.status.as_ref().unwrap().1, copy::NOTE_REMOVED);
+}
+
+#[test]
+fn answers_list_web_and_note_sources_but_not_store_fragments() {
+    let message: zvs_contract::MessageDto = serde_json::from_value(json!({
+        "id": "0199aa11-3333-7111-8111-111111111111",
+        "conversationId": "0199aa11-1111-7111-8111-111111111111",
+        "role": "assistant",
+        "content": "Ответ",
+        "sources": [
+            { "kind": "vector", "storeId": "0199aa11-5555-7111-8111-111111111111", "documentId": "d", "sourcePath": "a.md", "chunkIndex": 0, "score": 0.5, "section": "", "page": null, "related": null },
+            { "kind": "note", "id": "0199aa11-2222-7111-8111-000000000001", "title": "Остановка", "path": "chat:notes/a.md", "hash": "a".repeat(64) },
+            { "kind": "web", "url": "https://example.com/", "title": "Пример", "snippet": "", "date": null }
+        ],
+        "tokensIn": 0,
+        "tokensOut": 0,
+        "usageEstimated": true,
+        "durationMs": 0,
+        "runId": null,
+        "partial": false,
+        "createdAt": 1
+    }))
+    .expect("a message");
+    let transcript = transcript::Transcript::from_messages(&[message], &[]);
+    let Some(Entry::Sources(sources)) = transcript.entries.last() else {
+        panic!("the answer lists its sources");
+    };
+    assert_eq!(sources.len(), 2);
+    assert!(matches!(sources[0], zvs_contract::ChatSourceDto::Note(_)));
+}

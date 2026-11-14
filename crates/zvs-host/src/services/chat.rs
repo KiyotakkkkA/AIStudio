@@ -43,6 +43,7 @@ use super::chat_history::{
 use super::chat_memory::{
     MEMORY_FAILED, MEMORY_TOOL, MemoryRefs, apply_memory_call, memory_section, memory_tool,
 };
+use super::chat_notes::{NotesTurn, notes_section};
 use super::chat_plugins::{ChatPlugins, active_plugins, plugin_note, resolve_plugins};
 use super::chat_prompt::{
     PromptParts, compacted_entries, history_entries, in_tool_block, model_history,
@@ -82,8 +83,8 @@ use crate::data::schema::{CompactionRow, ConversationRow, FolderGrantRow, Memory
 use crate::data::{DataError, Database, Repositories};
 use crate::drivers::ai::ports::SharedTextDriver;
 use crate::drivers::ai::{ChatMessage, GenerateRequest, TextDelta, ToolCall, TurnUsage};
-use crate::files::FILE_TOOLS;
 use crate::files::roots::SKILL_READ_ONLY;
+use crate::files::{FILE_TOOLS, FS_READ};
 use crate::kernel::knowledge_nodes::{KNOWLEDGE_SEARCH, KNOWLEDGE_TOOLS, KnowledgeResult};
 use crate::kernel::nodes::{GenerateMessage, GenerateNodeInput, GenerateOutput};
 use crate::kernel::{
@@ -188,6 +189,7 @@ pub struct ChatServiceOptions {
     pub wake_delay: std::time::Duration,
     pub images: Option<crate::images::ImageLoader>,
     pub browser: Option<crate::browser::BrowserSettings>,
+    pub notes: Option<crate::notes::Notes>,
 }
 
 impl ChatServiceOptions {
@@ -209,6 +211,7 @@ impl ChatServiceOptions {
             wake_delay: WAKE_DELAY,
             images: None,
             browser: None,
+            notes: None,
         }
     }
 }
@@ -243,6 +246,7 @@ struct Inner {
     queues: queue::Queues,
     images: Option<crate::images::ImageLoader>,
     browser: Option<crate::browser::BrowserSettings>,
+    notes: Option<crate::notes::Notes>,
 }
 
 #[derive(Clone)]
@@ -480,6 +484,62 @@ impl Inner {
                 .find(|tool| tool.key == MEMORY_TOOL)
                 .map(|tool| tool.name.as_str()),
         ))
+    }
+
+    fn notes_folder(&self, conversation_id: &str) -> Option<std::path::PathBuf> {
+        self.notes
+            .as_ref()
+            .and_then(|notes| notes.folder(conversation_id))
+    }
+
+    fn notes_prompt(&self, conversation_id: &str, offered: &[OfferedTool]) -> String {
+        if self.notes.is_none() || conversation_id.is_empty() {
+            return String::new();
+        }
+        notes_section(self.notes_folder(conversation_id).as_deref(), offered).text
+    }
+
+    fn record_note_sources(
+        &self,
+        context: &StepContext,
+        sink: &CallSink,
+        notes: &NotesTurn,
+        output: &Value,
+    ) {
+        let CallSink::Message(assistant_id) = sink else {
+            return;
+        };
+        let Some(sources) = notes.record(output) else {
+            return;
+        };
+        let saved = self
+            .read(|repositories| Ok(repositories.chat.get_message(assistant_id)?))
+            .and_then(|message| {
+                let Some(message) = message else {
+                    return Ok(());
+                };
+                self.update_message(
+                    assistant_id,
+                    &MessagePatch {
+                        sources: Some(replace_sources(
+                            &message.sources,
+                            ChatSourceKind::Note,
+                            sources.into_iter().map(ChatSourceDto::Note),
+                        )),
+                        ..MessagePatch::default()
+                    },
+                )
+            });
+        if let Err(error) = saved {
+            self.log(
+                LogLevel::Warn,
+                "Could not save note sources",
+                &[
+                    ("runId", json!(context.run_id.to_string())),
+                    ("error", json!(error.message)),
+                ],
+            );
+        }
     }
 
     fn profile(&self) -> Result<ProfileSettings, AppError> {
@@ -1074,6 +1134,8 @@ pub struct ChatGenerateRequest {
     pub goal: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub active_requires: Vec<(String, Vec<String>)>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
 }
 
 impl Validate for ChatGenerateRequest {
@@ -1812,6 +1874,7 @@ impl PlainNode for PrepareNode {
         }
         let (memory, memory_refs) =
             inner.memory_prompt(&input.conversation_id, tools_usable, &mut offered)?;
+        let notes = inner.notes_prompt(&input.conversation_id, &offered);
         if !deferred.is_empty() {
             offered.push(search_tool(&offered, &deferred));
         }
@@ -1839,6 +1902,7 @@ impl PlainNode for PrepareNode {
             dialog: details.system_prompt.clone(),
             profile,
             memory,
+            notes: notes.clone(),
             knowledge: prompt,
             mcp_guidance: guidance,
             command: command_note,
@@ -2011,6 +2075,7 @@ impl PlainNode for PrepareNode {
             memory: memory_refs,
             goal: goal_turn,
             active_requires: active_requires(&active),
+            notes,
         })
     }
 }
@@ -2039,6 +2104,7 @@ struct CallOptions<'a> {
     skills: &'a Mutex<SkillTurn>,
     hook: &'a dyn RoundHook,
     delegation: Option<&'a Delegation>,
+    notes: &'a NotesTurn,
 }
 
 fn knowledge_text(output: &Value, book: &mut Vec<ChatCitationDto>) -> Option<KnowledgeText> {
@@ -2415,19 +2481,28 @@ impl GenerateChatNode {
                     };
                     if let Some((formatted, citations)) = formatted {
                         if let CallSink::Message(assistant_id) = sink
-                            && let Err(error) = inner.update_message(
-                                assistant_id,
-                                &MessagePatch {
-                                    sources: Some(
-                                        citations
-                                            .iter()
-                                            .cloned()
-                                            .map(ChatSourceDto::Vector)
-                                            .collect(),
-                                    ),
-                                    ..MessagePatch::default()
-                                },
-                            )
+                            && let Err(error) = inner
+                                .read(|repositories| {
+                                    Ok(repositories.chat.get_message(assistant_id)?)
+                                })
+                                .and_then(|message| {
+                                    let current =
+                                        message.map(|message| message.sources).unwrap_or_default();
+                                    inner.update_message(
+                                        assistant_id,
+                                        &MessagePatch {
+                                            sources: Some(replace_sources(
+                                                &current,
+                                                ChatSourceKind::Vector,
+                                                citations
+                                                    .iter()
+                                                    .cloned()
+                                                    .map(ChatSourceDto::Vector),
+                                            )),
+                                            ..MessagePatch::default()
+                                        },
+                                    )
+                                })
                         {
                             inner.log(
                                 LogLevel::Warn,
@@ -2463,6 +2538,9 @@ impl GenerateChatNode {
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
                         .observe(&tool.key, &observed, &result.output);
+                    if tool.key == FS_READ {
+                        inner.record_note_sources(context, sink, options.notes, &result.output);
+                    }
                     settle(
                         ChatToolCallStatus::Succeeded,
                         None,
@@ -2520,6 +2598,7 @@ impl GenerateChatNode {
             memory,
             goal,
             active_requires,
+            notes,
         } = request;
         let budget = usize::try_from(tool_calls).unwrap_or(CHAT_TOOL_CALLS);
         let driver = providers.text(&base.provider_id)?;
@@ -2613,6 +2692,7 @@ impl GenerateChatNode {
             conversation: &conversation_id,
             memory: Mutex::new(memory),
             skills: Mutex::new(SkillTurn::with_requires(&active_requires)),
+            notes: NotesTurn::new(self.0.notes_folder(&conversation_id), tools.clone(), notes),
         };
         let compactor = ConversationId::parse(&conversation_id).map(|id| ChatCompactor {
             inner: &self.0,
@@ -2684,10 +2764,15 @@ struct ChatLoopHost<'a> {
     conversation: &'a str,
     memory: Mutex<MemoryRefs>,
     skills: Mutex<SkillTurn>,
+    notes: NotesTurn,
 }
 
 #[async_trait]
 impl LoopHost for ChatLoopHost<'_> {
+    fn system(&self, current: &str) -> Option<String> {
+        self.notes.refresh(current)
+    }
+
     fn image_loader(&self) -> Option<(crate::images::ImageLoader, String, bool)> {
         self.node
             .0
@@ -2727,6 +2812,7 @@ impl LoopHost for ChatLoopHost<'_> {
                     skills: &self.skills,
                     hook: call.hook,
                     delegation: self.delegation,
+                    notes: &self.notes,
                 },
             )
             .await
@@ -2891,6 +2977,7 @@ impl ChatService {
             compactions: Mutex::new(HashMap::new()),
             images: options.images,
             browser: options.browser,
+            notes: options.notes,
             database: options.database,
             tools: options.tools,
             skills: options.skills,
@@ -3862,6 +3949,7 @@ impl ChatService {
         let (memory, _) = self
             .inner
             .memory_prompt(&conversation_id, tools_usable, &mut offered)?;
+        let notes = self.inner.notes_prompt(&conversation_id, &offered);
         if !deferred.is_empty() {
             offered.push(search_tool(&offered, &deferred));
         }
@@ -3879,6 +3967,7 @@ impl ChatService {
             dialog,
             profile,
             memory,
+            notes,
             knowledge,
             mcp_guidance,
             command,

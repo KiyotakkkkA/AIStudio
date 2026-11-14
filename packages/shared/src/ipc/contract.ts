@@ -103,6 +103,14 @@ import {
 } from "../shells.js";
 import { NotificationTargetDto } from "../notifications.js";
 import {
+  NoteDto,
+  NoteReadInput,
+  NoteRef,
+  NoteRenameInput,
+  NoteSaveInput,
+  NoteSummaryDto,
+} from "../notes.js";
+import {
   ArtifactApplicationDto,
   ArtifactBrowsersDto,
   ArtifactRef,
@@ -428,6 +436,11 @@ export const contract = defineContract({
   "memory.update": { input: UpdateMemoryInput, output: MemoryDto },
   "memory.remove": { input: MemoryRef, output: z.void() },
   "memory.clear": { input: ClearMemoryInput, output: z.void() },
+  "notes.list": { input: ConversationRef, output: z.array(NoteSummaryDto) },
+  "notes.read": { input: NoteReadInput, output: NoteDto },
+  "notes.save": { input: NoteSaveInput, output: NoteDto },
+  "notes.rename": { input: NoteRenameInput, output: NoteDto },
+  "notes.remove": { input: NoteRef, output: z.void() },
   "workspace.list": { input: ExplorerListInput, output: ExplorerListingDto },
   "workspace.read": { input: ExplorerReadInput, output: ExplorerFileDto },
   "workspace.watch": { input: ConversationRef, output: ExplorerWatchDto },

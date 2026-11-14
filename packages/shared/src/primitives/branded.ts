@@ -90,3 +90,6 @@ export type AgenticSessionId = z.infer<typeof AgenticSessionId>;
 
 export const BackgroundShellId = brandedId("BackgroundShellId");
 export type BackgroundShellId = z.infer<typeof BackgroundShellId>;
+
+export const NoteId = brandedId("NoteId");
+export type NoteId = z.infer<typeof NoteId>;

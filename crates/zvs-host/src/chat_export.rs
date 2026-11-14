@@ -4,7 +4,7 @@ use serde_json::json;
 use zvs_contract::{
     AppError, AppErrorCode, ChatToolCallStatus, ConversationDetailDto, ConversationExportDto,
     ConversationExportFormat, ExportConversationInput, MessageDto, MessageRole, Timestamp,
-    web_sources,
+    note_sources, web_sources,
 };
 
 use crate::platform::clock::{Clock, SystemClock};
@@ -156,6 +156,17 @@ fn message_markdown(message: &MessageDto) -> String {
                     };
                     format!("- [{title}]({})", source.url)
                 }))
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
+    if note_sources(&message.sources).next().is_some() {
+        parts.push(
+            std::iter::once("Заметки:".to_owned())
+                .chain(
+                    note_sources(&message.sources)
+                        .map(|note| format!("- {} (`{}`)", note.title.trim(), note.path)),
+                )
                 .collect::<Vec<_>>()
                 .join("\n"),
         );

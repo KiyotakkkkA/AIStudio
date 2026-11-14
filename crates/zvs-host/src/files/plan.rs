@@ -261,6 +261,37 @@ fn change(
     }
 }
 
+pub fn replace_after(plan: &mut Plan, index: usize, after: Vec<u8>) {
+    let Some(file) = plan.files.get_mut(index) else {
+        return;
+    };
+    file.after = Some(after);
+    let path = path_text(&file.path);
+    let after_text = text_of(file.after.as_ref());
+    let Some(position) = plan.changes.iter().position(|entry| entry.path == path) else {
+        return;
+    };
+    let entry = &plan.changes[position];
+    let before = match &entry.from {
+        Some(from) => plan
+            .files
+            .iter()
+            .find(|file| path_text(&file.path) == *from)
+            .and_then(|file| file.before.as_ref()),
+        None => plan.files[index].before.as_ref(),
+    };
+    let before_text = text_of(before);
+    let from = entry.from.clone().map(PathBuf::from);
+    let fresh = change(
+        Path::new(&path),
+        from.as_deref(),
+        entry.kind,
+        &before_text,
+        &after_text,
+    );
+    plan.changes[position] = fresh;
+}
+
 pub fn plan(changes: &[Change], disk: &dyn Disk) -> Result<Plan, AppError> {
     let mut overlay = Overlay {
         disk,

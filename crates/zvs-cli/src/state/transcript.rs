@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 use zvs_contract::{
-    ChatCompactionDto, ChatToolCallDto, DeltaKind, HostEventDraft, McpServerDetailDto, MessageDto,
-    MessageRole, RunId, SUBAGENT_DOMAIN, WebSourceDto,
+    ChatCompactionDto, ChatSourceDto, ChatToolCallDto, DeltaKind, HostEventDraft,
+    McpServerDetailDto, MessageDto, MessageRole, RunId, SUBAGENT_DOMAIN,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,7 +25,15 @@ pub enum Entry {
     Compaction(String),
     Shell(Box<ShellRun>),
     Server(Box<McpServerDetailDto>),
-    Sources(Vec<WebSourceDto>),
+    Sources(Vec<ChatSourceDto>),
+}
+
+pub fn shown_sources(sources: &[ChatSourceDto]) -> Vec<ChatSourceDto> {
+    sources
+        .iter()
+        .filter(|source| matches!(source, ChatSourceDto::Web(_) | ChatSourceDto::Note(_)))
+        .cloned()
+        .collect()
 }
 
 pub fn compaction_text(compaction: &ChatCompactionDto) -> String {
@@ -84,7 +92,7 @@ pub const AGENT_DELEGATE: &str = "agent.delegate";
 pub struct Live {
     pub segments: Vec<Segment>,
     pub children: BTreeMap<String, Vec<ChatToolCallDto>>,
-    pub web_sources: Vec<WebSourceDto>,
+    pub sources: Vec<ChatSourceDto>,
 }
 
 pub fn subagent_run(call: &ChatToolCallDto) -> Option<&str> {
@@ -133,7 +141,7 @@ impl Live {
         Self {
             segments,
             children: BTreeMap::new(),
-            web_sources: Vec::new(),
+            sources: Vec::new(),
         }
     }
 
@@ -208,13 +216,13 @@ pub struct Transcript {
     pub live: Option<Live>,
 }
 
-fn persisted_web_sources(step: &serde_json::Map<String, Value>) -> Option<Vec<WebSourceDto>> {
+fn persisted_sources(step: &serde_json::Map<String, Value>) -> Option<Vec<ChatSourceDto>> {
     if step.get("nodeId").and_then(Value::as_str) != Some("persist") {
         return None;
     }
     serde_json::from_value::<MessageDto>(step.get("output")?.clone())
         .ok()
-        .map(|message| message.web_sources())
+        .map(|message| shown_sources(&message.sources))
 }
 
 fn tool_call(step: &serde_json::Map<String, Value>) -> Option<ChatToolCallDto> {
@@ -263,9 +271,9 @@ impl Transcript {
                             reasoning: message.reasoning.clone(),
                         });
                     }
-                    let web = message.web_sources();
-                    if !web.is_empty() {
-                        transcript.entries.push(Entry::Sources(web));
+                    let shown = shown_sources(&message.sources);
+                    if !shown.is_empty() {
+                        transcript.entries.push(Entry::Sources(shown));
                     }
                     if let Some(recap) = &message.recap {
                         transcript.entries.push(Entry::Recap(recap.clone()));
@@ -339,8 +347,8 @@ impl Transcript {
             HostEventDraft::Step { step } => {
                 if let Some(call) = tool_call(step) {
                     live.tool(call);
-                } else if let Some(web) = persisted_web_sources(step) {
-                    live.web_sources = web;
+                } else if let Some(sources) = persisted_sources(step) {
+                    live.sources = sources;
                 } else if step.get("domain").and_then(Value::as_str) == Some(SUBAGENT_DOMAIN) {
                     live.child(step);
                 }
@@ -363,8 +371,8 @@ impl Transcript {
                 }
             }
         }
-        if !live.web_sources.is_empty() {
-            self.entries.push(Entry::Sources(live.web_sources));
+        if !live.sources.is_empty() {
+            self.entries.push(Entry::Sources(live.sources));
         }
     }
 

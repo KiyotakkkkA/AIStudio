@@ -1,4 +1,7 @@
-import type { ChatCitationDto, WebSourceDto } from "@zvs/shared";
+import type { ChatCitationDto, NoteSourceDto, WebSourceDto } from "@zvs/shared";
+import { mdiNoteTextOutline } from "@mdi/js";
+import Icon from "../../ui/atoms/Icon";
+import { NOTE_SOURCE } from "./notes/notesCopy";
 import {
   SOURCES_SHOWN,
   SOURCES_TITLE,
@@ -15,7 +18,8 @@ import { webSourceDetail } from "./webSources";
 type SourceRow =
   | { readonly kind: "selection"; readonly key: string; readonly source: SelectionSource }
   | { readonly kind: "citation"; readonly key: string; readonly source: CitationSource }
-  | { readonly kind: "web"; readonly key: string; readonly source: WebSourceDto };
+  | { readonly kind: "web"; readonly key: string; readonly source: WebSourceDto }
+  | { readonly kind: "note"; readonly key: string; readonly source: NoteSourceDto };
 
 const LINK =
   "cursor-pointer text-left text-accent-medium underline decoration-accent-line underline-offset-3 hover:decoration-accent-medium";
@@ -24,20 +28,24 @@ export default function ChatSources({
   sources,
   selections,
   web,
+  notes = [],
   fragments,
   onOpen,
   onView,
   onViewSelection,
   onOpenWeb,
+  onOpenNote,
 }: {
   readonly sources: readonly CitationSource[];
   readonly selections: readonly SelectionSource[];
   readonly web: readonly WebSourceDto[];
+  readonly notes?: readonly NoteSourceDto[];
   readonly fragments: number;
   readonly onOpen: () => void;
   readonly onView: (citation: ChatCitationDto) => void;
   readonly onViewSelection: (selection: DocumentQuote) => void;
   readonly onOpenWeb: (source: WebSourceDto) => void;
+  readonly onOpenNote?: (source: NoteSourceDto) => void;
 }) {
   const rows: SourceRow[] = [
     ...selections.map((source) => ({ kind: "selection" as const, key: source.key, source })),
@@ -45,6 +53,11 @@ export default function ChatSources({
     ...web.map((source, index) => ({
       kind: "web" as const,
       key: `web:${String(index)}:${source.url}`,
+      source,
+    })),
+    ...notes.map((source) => ({
+      kind: "note" as const,
+      key: `note:${source.id}:${source.hash}`,
       source,
     })),
   ];
@@ -57,7 +70,20 @@ export default function ChatSources({
       <ul className="m-0 flex list-disc flex-col gap-1 pl-5 marker:text-main-500">
         {shown.map((row) => (
           <li key={row.key} className="text-[13px] leading-snug">
-            {row.kind === "web" ? (
+            {row.kind === "note" ? (
+              <button
+                type="button"
+                title={row.source.path}
+                className={LINK}
+                onClick={() => onOpenNote?.(row.source)}
+              >
+                <span className="mr-1.5 inline-block align-[-2px] text-main-400">
+                  <Icon path={mdiNoteTextOutline} size={13} />
+                </span>
+                {row.source.title}
+                <span className="inline-block pl-1 text-main-500">— {NOTE_SOURCE}</span>
+              </button>
+            ) : row.kind === "web" ? (
               <button
                 type="button"
                 title={row.source.url}

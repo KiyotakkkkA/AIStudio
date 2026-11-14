@@ -15,6 +15,7 @@ import {
   type ChatRoundDto,
   FolderApprovalDto,
   type FileDiffDto,
+  type NoteId,
   type ProcessPlanDto,
   MessageDto,
   VectorSearchHitDto,
@@ -73,6 +74,7 @@ import ChatStatsStore from "./stats/ChatStatsStore";
 import { dialogArtifacts, type DialogArtifact } from "./artifacts";
 import SiteIcons from "./SiteIcons";
 import ExplorerStore from "./explorer/ExplorerStore";
+import NotesStore from "./notes/NotesStore";
 import TerminalStore from "../terminal/TerminalStore";
 import BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
 import {
@@ -96,7 +98,7 @@ const LAST_CONVERSATION_KEY = "chat.conversation.last";
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов.";
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
-export type SidePanel = "context" | "files" | "browser";
+export type SidePanel = "context" | "files" | "browser" | "notes";
 export const BROWSER_NAVIGATE_TOOL = "browser.navigate";
 export const BROWSER_DOCK_MIN_WIDTH = 560;
 const BROWSER_DOCK_DEFAULT_WIDTH = 820;
@@ -183,6 +185,7 @@ export default class ChatStore {
   readonly queue: QueueStore;
   readonly subagents = new SubagentSteps();
   readonly explorer: ExplorerStore;
+  readonly notes: NotesStore;
   readonly terminal: TerminalStore;
   readonly backgroundShells: BackgroundShellStore;
   readonly artifacts: ArtifactActions;
@@ -220,6 +223,7 @@ export default class ChatStore {
     private readonly events: EventRouter,
   ) {
     this.explorer = new ExplorerStore(ipc, events);
+    this.notes = new NotesStore(ipc);
     this.terminal = new TerminalStore(ipc, events);
     this.backgroundShells = new BackgroundShellStore(ipc, events);
     this.artifacts = new ArtifactActions(ipc);
@@ -271,6 +275,7 @@ export default class ChatStore {
         ipc: false,
         events: false,
         explorer: false,
+        notes: false,
         terminal: false,
         backgroundShells: false,
         artifacts: false,
@@ -912,6 +917,12 @@ export default class ChatStore {
   openPanel(panel: SidePanel) {
     this.sidePanel = panel;
     this.panelOpen = true;
+  }
+  openNote(id: NoteId) {
+    const conversationId = this.active?.id;
+    if (conversationId === undefined) return;
+    this.openPanel("notes");
+    void this.notes.openById(conversationId, id);
   }
   closePanel() {
     this.panelOpen = false;
@@ -1955,6 +1966,7 @@ export default class ChatStore {
     const follow = this.followPending;
     this.followPending = false;
     const id = this.active?.id;
+    if (id !== undefined && this.notes.conversationId === id) void this.notes.refresh();
     this.refreshing = this.refreshCompleted();
     if (follow && id !== undefined) void this.followLive(id);
   }
@@ -2099,6 +2111,7 @@ export default class ChatStore {
     this.stopWakes?.();
     this.stopWakes = undefined;
     this.explorer.dispose();
+    this.notes.dispose();
     this.terminal.dispose();
     this.backgroundShells.dispose();
   }

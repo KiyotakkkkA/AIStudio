@@ -3,8 +3,9 @@ use ratatui::text::{Line, Span};
 use serde_json::Value;
 use unicode_width::UnicodeWidthStr;
 use zvs_contract::{
-    ChatToolCallDto, ChatToolCallStatus, McpCapabilityDto, McpCapabilityKind, McpOAuthState,
-    McpServerDetailDto, McpServerStatus, McpStartup, McpTransport, McpValue, WebSourceDto,
+    ChatSourceDto, ChatToolCallDto, ChatToolCallStatus, McpCapabilityDto, McpCapabilityKind,
+    McpOAuthState, McpServerDetailDto, McpServerStatus, McpStartup, McpTransport, McpValue,
+    NoteSourceDto, WebSourceDto,
 };
 
 use super::text::{markdown, truncate, wrap};
@@ -870,6 +871,22 @@ fn source_line(index: usize, source: &WebSourceDto, width: usize) -> Line<'stati
     ])
 }
 
+pub const NOTE_LINK: &str = "zvs-note:";
+
+fn note_line(index: usize, note: &NoteSourceDto, width: usize) -> Line<'static> {
+    let number = format!("    {}. ✎ ", index + 1);
+    let kind = format!(" · {}", copy::NOTE_SOURCE);
+    let room = width.saturating_sub(number.width() + kind.width()).max(8);
+    Line::from(vec![
+        Span::styled(number, theme::muted()),
+        Span::styled(
+            truncate(note.title.trim(), room),
+            theme::accent().add_modifier(Modifier::UNDERLINED),
+        ),
+        Span::styled(kind, theme::faint()),
+    ])
+}
+
 fn compaction_mark(text: &str, width: usize) -> Vec<Line<'static>> {
     let room = width.saturating_sub(4).max(8);
     let label = format!(" {text} ");
@@ -926,8 +943,17 @@ pub fn layout(app: &App, width: usize) -> (Vec<Line<'static>>, Vec<(usize, Strin
                 sources.len().min(SOURCES_SHOWN)
             };
             for (index, source) in sources.iter().take(shown).enumerate() {
-                links.push((lines.len(), source.url.clone()));
-                lines.push(source_line(index, source, width));
+                match source {
+                    ChatSourceDto::Web(source) => {
+                        links.push((lines.len(), source.url.clone()));
+                        lines.push(source_line(index, source, width));
+                    }
+                    ChatSourceDto::Note(note) => {
+                        links.push((lines.len(), format!("{NOTE_LINK}{}", note.id)));
+                        lines.push(note_line(index, note, width));
+                    }
+                    ChatSourceDto::Vector(_) => {}
+                }
             }
             if shown < sources.len() {
                 lines.push(Line::from(Span::styled(

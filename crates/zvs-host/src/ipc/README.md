@@ -18,7 +18,7 @@ payload)`.
 - One file (or folder, for large domains such as `chat/`, `runs/`, `mcp/`, `vector_stores/`)
   per channel prefix: `accounts`, `agentic`, `artifacts`, `browser_*`, `chat`, `cli`,
   `computer`, `documents`, `downloads`, `exec_policy`, `folders`, `graph_relations`,
-  `integrations`, `mcp`, `memory`, `notifications`, `providers`, `runs`, `runtimes`,
+  `integrations`, `mcp`, `memory`, `notes`, `notifications`, `providers`, `runs`, `runtimes`,
   `scenarios`, `secrets`, `settings`, `shells`, `sites`, `skills`, `storage`, `system`,
   `terminal`, `toolchain`, `tools`, `vector_stores`, `voice`, `workspace`.
 

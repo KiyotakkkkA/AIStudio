@@ -2,7 +2,7 @@
 task: TASK_085
 title: Dialog notes — durable Markdown knowledge, on-demand reading and answer sources
 phase: B — Dialog notes
-status: todo
+status: done
 depends_on: [TASK_039_EXTRA_1, TASK_045_EXTRA_1, TASK_045_EXTRA_5, TASK_084]
 unblocks: []
 estimate: 8 h
@@ -233,10 +233,44 @@ outside the app and repair it. Compact and branch the dialog. Check `/notes` in 
 ## Handoff
 
 **Built:**
-- _Fill after implementation._
+- Contract: `zvs_contract::notes` (limits, `is_note_name`, `NoteSourceDto`, `NoteMetaDto`,
+  `NoteSummaryDto`, `NoteDto`, `NoteRef`, `NoteReadInput`, `NoteSaveInput`, `NoteRenameInput`),
+  `NoteId`, `ChatSourceDto::Note` / `ChatSourceKind::Note`, `note_sources`,
+  `ChatPromptSection::Notes`; Zod mirrors in `packages/shared/src/notes.ts`; fixtures under
+  `fixtures/notes/` and a `note` case in `chat/ChatSourceDto`.
+- Host: `notes.rs` (format, `scan`, the `Notes` service) and `notes/writes.rs` (`prepare`,
+  `check_plan`), YAML through `serde_yaml_ng` =0.10.0. `fs.apply` validates the namespace inside
+  its plan (`plan::replace_after` recomputes the diff) and returns `notes` (path, id);
+  `fs.read` returns `notes` sources for valid notes. `FileToolOptions` gained `clock` and `ids`.
+- Prompt: `services/chat_notes.rs` — `notes_section` (≤ 2 000 tokens, JSON lines, overflow line)
+  in `PromptParts.notes`, the request path and the context preview; `NotesTurn` refreshes the
+  section at the top of every tool-loop round (`LoopHost::system`) and records note sources,
+  which replace the message's `note` kind. The knowledge book now replaces only the `vector`
+  kind instead of overwriting the whole list.
+- IPC: `notes.list` / `notes.read` / `notes.remove` (console, dialog-scoped), `notes.save` /
+  `notes.rename` (studio); handlers in `ipc/notes.rs`, `Services.notes`, wired in Tauri and the
+  test services.
+- Desktop: «Заметки» side panel (`features/chat/notes/`: `NotesStore`, `NotesPanel`, `NoteView`,
+  `notesCopy`), the skills Markdown editor reused through `fileName`/`label` props, note rows
+  and a «Заметки» tab in the answer's sources, `chat.openNote(id)`, the «Заметки» stats label.
+- CLI: `/notes` (Alt+N), `Panel::Notes` and `Panel::Note`, delete with a second Delete, note
+  rows after an answer (`zvs-note:<id>` links), «Заметка удалена» for a deleted note.
+- Export lists note sources; PASSPORT «Dialog notes»; READMEs for `notes/`, `files/`,
+  `services/chat/`, `ipc/`, CLI `state/`.
 
 **Deviated from plan:**
-- _Fill after implementation._
+- No `SourceSink` exists after TASK_084, so note sources follow its pattern: a per-turn
+  `NotesTurn` collects them and writes the `note` kind through `replace_sources`.
+- Notes have no single-file revision snapshots for editor saves; `fs.apply` writes keep their
+  usual batch snapshots.
+- The note view shows the metadata and the Markdown body; invalid notes show the raw text with
+  the host's error. Editing works on the whole file text, frontmatter included.
 
 **Next session should know:**
-- _Record verification results and platform exclusions._
+- Passed locally: `pnpm typecheck`, `pnpm lint`, the renderer and shared fixture tests touched
+  here, `cargo fmt --all --check`, `cargo test` for zvs-contract and zvs-cli and the zvs-host
+  notes, file-tool, chat-notes and branch tests, clippy `-D warnings` for zvs-contract,
+  zvs-host and zvs-cli (before the absolute-path fix in `notes::note_at`), `pnpm format:check`.
+- Not run: the full `cargo test` for zvs-host and its rerun after `note_at` (stopped for low
+  memory), the full `pnpm test`, `pnpm build`, `pnpm test:e2e` (the new `e2e/notes.spec.ts`
+  needs a release build), zvs-studio clippy, and the manual checks in the app.

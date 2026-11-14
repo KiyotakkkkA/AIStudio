@@ -41,6 +41,7 @@ export * from "./process.js";
 export * from "./questions.js";
 export * from "./folders.js";
 export * from "./memory.js";
+export * from "./notes.js";
 export * from "./agentic.js";
 export * from "./providers/index.js";
 export * from "./accounts.js";

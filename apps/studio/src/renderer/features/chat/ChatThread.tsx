@@ -16,6 +16,7 @@ import {
   mdiDatabaseOutline,
   mdiDockLeft,
   mdiFolderOutline,
+  mdiNoteTextOutline,
   mdiPinOutline,
   mdiTuneVariant,
   mdiWeb,
@@ -58,6 +59,7 @@ import { toolTitle } from "./toolCallCopy";
 import { SHOW_CONVERSATIONS } from "./conversationListCopy";
 import Alert from "../../ui/molecules/Alert";
 import PanelButton from "./PanelButton";
+import { NOTES_PANEL } from "./notes/notesCopy";
 import IconDropdownButton from "../../ui/atoms/buttons/IconDropdownButton";
 import { ActionMenu, ActionMenuItem } from "../../ui/molecules/ActionMenu";
 import { EXPORT, EXPORT_FORMATS } from "./ConversationExport";
@@ -222,6 +224,14 @@ export default observer(function ChatThread({
               path={mdiFolderOutline}
               active={store.isPanelShown("files")}
               onClick={() => store.showPanel("files")}
+            />
+          )}
+          {store.active === null ? null : (
+            <PanelButton
+              label={NOTES_PANEL}
+              path={mdiNoteTextOutline}
+              active={store.isPanelShown("notes")}
+              onClick={() => store.showPanel("notes")}
             />
           )}
           {browserSettings.enabled ? (

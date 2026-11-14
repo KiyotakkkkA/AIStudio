@@ -2,6 +2,7 @@ import type {
   ChatCitationDto,
   ChatSourceDto,
   ChatSourceKind,
+  NoteSourceDto,
   VectorStoreId,
   WebSourceDto,
 } from "@zvs/shared";
@@ -27,6 +28,10 @@ export function vectorCitations(sources: readonly ChatSourceDto[]): ChatCitation
 
 export function webSourceList(sources: readonly ChatSourceDto[]): WebSourceDto[] {
   return sourcesOfKind(sources, "web").map(withoutKind);
+}
+
+export function noteSourceList(sources: readonly ChatSourceDto[]): NoteSourceDto[] {
+  return sourcesOfKind(sources, "note").map(withoutKind);
 }
 
 export function withStoreCitations(

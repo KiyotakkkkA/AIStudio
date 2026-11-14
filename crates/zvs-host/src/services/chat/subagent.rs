@@ -752,6 +752,7 @@ impl PlainNode for SubagentNode {
             conversation: &input.conversation_id,
             memory: Mutex::new(MemoryRefs::default()),
             skills: Mutex::new(SkillTurn::default()),
+            notes: crate::services::chat_notes::NotesTurn::default(),
         };
         let hook = SubagentHook::new(inner.clock.clone(), input.budget);
         let mut out = LoopTranscript::default();

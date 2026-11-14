@@ -1,0 +1,24 @@
+[
+  {
+    "name": "meta without body",
+    "value": {
+      "name": "a.md",
+      "path": "chat:notes/a.md",
+      "hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      "content": "",
+      "modifiedAt": 1,
+      "meta": {
+        "id": "0199aa11-2222-7111-8111-000000000001",
+        "title": "Остановка фоновых процессов",
+        "createdAt": "2026-11-14T12:00:00Z",
+        "updatedAt": "2026-11-14T12:30:00Z",
+        "context": "Проверка отмены фоновой сборки.",
+        "readWhen": "Перед изменением запуска процессов.",
+        "updateWhen": "При изменении механизма запуска.",
+        "deleteWhen": "После замены механизма."
+      },
+      "body": null,
+      "error": null
+    }
+  }
+]

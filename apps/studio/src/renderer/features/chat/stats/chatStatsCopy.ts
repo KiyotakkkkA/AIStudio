@@ -71,6 +71,7 @@ export const SECTION_LABELS: Readonly<Record<ChatPromptSection, string>> = {
   dialogPrompt: "Промпт диалога",
   profile: "Профиль",
   memory: "Память",
+  notes: "Заметки",
   knowledge: "Хранилища",
   mcpGuidance: "Инструкции MCP-серверов",
   command: "Команда",

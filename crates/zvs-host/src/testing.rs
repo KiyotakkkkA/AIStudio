@@ -550,7 +550,13 @@ pub fn test_services(system: SystemService) -> TestServices {
     let subagents = crate::services::SubagentService::new(database.shared(), clock.clone());
     let assistant = crate::services::AssistantService::new(database.shared(), clock.clone());
     let browser_settings = crate::browser::BrowserSettings::new(settings.clone());
+    let notes = crate::notes::Notes::new(
+        crate::conversations::ConversationFolders::new(workspace.join("conversations")),
+        clock.clone(),
+        crate::platform::ids::system_ids(),
+    );
     let chat = crate::services::ChatService::new(crate::services::ChatServiceOptions {
+        notes: Some(notes.clone()),
         browser: Some(browser_settings.clone()),
         images: Some(crate::images::ImageLoader::new(test_artifacts(
             workspace.join("conversations"),
@@ -647,6 +653,7 @@ pub fn test_services(system: SystemService) -> TestServices {
             scenarios,
             scenario_runs,
             memory: chat.memory(),
+            notes: notes.clone(),
             agentic,
             chat,
             explorer: crate::workspace::ExplorerService::with_debounce(

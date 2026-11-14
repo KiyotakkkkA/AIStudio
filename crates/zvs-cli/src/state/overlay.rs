@@ -2,8 +2,8 @@ use zvs_contract::{
     AccountFamily, AssistantPreferencesDto, BackgroundShellDto, BackgroundShellId,
     BackgroundShellStatus, ChatContextDto, CliTheme, ConversationDto, ConversationId, ExecJudgeDto,
     ExecMode, ExecPolicyDto, McpOAuthState, McpServerDto, McpServerId, McpServerStatus,
-    ModelCapability, ProviderDto, ProviderUsageDto, SkillDto, SkillId, SkillSource, SkillStatus,
-    ThinkingEffort,
+    ModelCapability, NoteDto, NoteSummaryDto, ProviderDto, ProviderUsageDto, SkillDto, SkillId,
+    SkillSource, SkillStatus, ThinkingEffort,
 };
 
 use super::ModelChoice;
@@ -23,6 +23,8 @@ pub enum Panel {
     Mcp,
     Processes,
     ProcessOutput,
+    Notes,
+    Note,
     Subagents,
     StopSubagents,
     Permissions,
@@ -56,6 +58,7 @@ pub enum Action {
     ResetShortcuts,
     SetTheme(CliTheme),
     ShowOutput(BackgroundShellId),
+    OpenNote(String),
     ShowSubagent(String),
     StopSubagent(zvs_contract::RunId),
     SetAutoCompact(bool),
@@ -147,6 +150,8 @@ pub struct Overlay {
     pub processes: Vec<BackgroundShellDto>,
     pub output: Option<ProcessOutput>,
     pub subagents: Vec<zvs_contract::ChatToolCallDto>,
+    pub notes: Vec<NoteSummaryDto>,
+    pub note: Option<NoteDto>,
 }
 
 pub const OUTPUT_LINES_MAX: usize = 2000;
@@ -266,6 +271,71 @@ fn output_rows(overlay: &Overlay) -> Vec<Row> {
             .enumerate()
             .map(|(index, line)| Row::new(format!("line{index}"), " ", line)),
     );
+    rows
+}
+
+fn note_rows(overlay: &Overlay) -> Vec<Row> {
+    overlay
+        .notes
+        .iter()
+        .map(|note| {
+            let row = Row::new(
+                note.name.clone(),
+                "✎",
+                note.title.clone().unwrap_or_else(|| note.name.clone()),
+            )
+            .action(Action::OpenNote(note.name.clone()));
+            match &note.error {
+                Some(error) => row
+                    .meta(format!("{} · {}", copy::NOTE_INVALID, note.name))
+                    .tone(Tone::Bad)
+                    .detail([note.path.clone(), error.clone()]),
+                None => row
+                    .meta(note.updated_at.clone().unwrap_or_default())
+                    .detail([note.path.clone()]),
+            }
+        })
+        .collect()
+}
+
+fn note_view_rows(overlay: &Overlay) -> Vec<Row> {
+    let Some(note) = &overlay.note else {
+        return Vec::new();
+    };
+    let mut rows = Vec::new();
+    let mut push = |text: String, tone: Tone| {
+        let key = format!("line{}", rows.len());
+        rows.push(Row::new(key, " ", text).tone(tone));
+    };
+    match (&note.meta, &note.body) {
+        (Some(meta), Some(body)) => {
+            push(meta.title.clone(), Tone::Accent);
+            push(note.path.clone(), Tone::Faint);
+            for (label, value) in [
+                (copy::NOTE_CONTEXT, &meta.context),
+                (copy::NOTE_READ_WHEN, &meta.read_when),
+                (copy::NOTE_UPDATE_WHEN, &meta.update_when),
+                (copy::NOTE_DELETE_WHEN, &meta.delete_when),
+                (copy::NOTE_UPDATED, &meta.updated_at),
+            ] {
+                push(format!("{label}: {value}"), Tone::Faint);
+            }
+            push(String::new(), Tone::Plain);
+            for line in body.trim().lines() {
+                push(line.to_owned(), Tone::Plain);
+            }
+        }
+        _ => {
+            push(note.path.clone(), Tone::Faint);
+            if let Some(error) = &note.error {
+                push(error.clone(), Tone::Bad);
+            }
+            push(String::new(), Tone::Plain);
+            for line in note.content.lines() {
+                push(line.to_owned(), Tone::Plain);
+            }
+        }
+    }
     rows
 }
 
@@ -934,6 +1004,7 @@ impl Overlay {
                     | Panel::Theme
                     | Panel::Subagents
                     | Panel::StopSubagents
+                    | Panel::Note
             ),
             armed: false,
             capturing: None,
@@ -945,6 +1016,8 @@ impl Overlay {
             processes: Vec::new(),
             output: None,
             subagents: Vec::new(),
+            notes: Vec::new(),
+            note: None,
         }
     }
 
@@ -959,6 +1032,8 @@ impl Overlay {
             Panel::Mcp => copy::MCP_TITLE,
             Panel::Processes => copy::PROCESSES_TITLE,
             Panel::ProcessOutput => copy::PROCESS_OUTPUT_TITLE,
+            Panel::Notes => copy::NOTES_TITLE,
+            Panel::Note => copy::NOTE_TITLE,
             Panel::Subagents | Panel::StopSubagents => copy::SUBAGENTS_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
             Panel::Shortcuts => copy::SHORTCUTS_TITLE,
@@ -976,6 +1051,7 @@ impl Overlay {
             Panel::Context => "▤",
             Panel::Skills => "✦",
             Panel::Mcp => "⧉",
+            Panel::Notes | Panel::Note => "✎",
             Panel::Processes | Panel::ProcessOutput | Panel::Subagents | Panel::StopSubagents => {
                 "⚙"
             }
@@ -1008,6 +1084,8 @@ impl Overlay {
             | Panel::Shortcuts
             | Panel::Theme
             | Panel::ProcessOutput
+            | Panel::Notes
+            | Panel::Note
             | Panel::Subagents
             | Panel::StopSubagents => Vec::new(),
         }
@@ -1024,6 +1102,8 @@ impl Overlay {
             Panel::Mcp => server_rows(self),
             Panel::Processes => process_rows(self),
             Panel::ProcessOutput => output_rows(self),
+            Panel::Notes => note_rows(self),
+            Panel::Note => note_view_rows(self),
             Panel::Subagents | Panel::StopSubagents => self
                 .subagents
                 .iter()

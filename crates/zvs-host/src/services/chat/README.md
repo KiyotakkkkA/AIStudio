@@ -21,6 +21,7 @@ pieces split out of `chat.rs`: the message queue, ended-process wake-ups, and su
 | `tool_arguments.rs`                                                | Repairing and validating tool-call arguments against the schema                              |
 | `chat_reply.rs`                                                    | Buffering streamed text, reasoning and tool-call deltas into persisted rounds                |
 | `chat_ask.rs`, `chat_goal.rs`, `chat_memory.rs`, `chat_plugins.rs` | The ask-user tool, `/goal`, memory tools, plugin tools                                       |
+| `chat_notes.rs`                                                    | The `Notes` prompt section and `NotesTurn`: per-round refresh and note sources               |
 
 ## Pipeline: `send`
 

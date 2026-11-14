@@ -81,6 +81,7 @@ branded_ids!(
     MemoryId,
     AgenticSessionId,
     BackgroundShellId,
+    NoteId,
 );
 
 pub fn is_wire_uuid(value: &str) -> bool {

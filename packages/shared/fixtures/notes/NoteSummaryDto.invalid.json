@@ -1,0 +1,28 @@
+[
+  {
+    "name": "both id and error",
+    "value": {
+      "name": "a.md",
+      "path": "chat:notes/a.md",
+      "size": 1,
+      "modifiedAt": 1,
+      "id": "0199aa11-2222-7111-8111-000000000001",
+      "title": "T",
+      "updatedAt": null,
+      "error": "x"
+    }
+  },
+  {
+    "name": "neither id nor error",
+    "value": {
+      "name": "a.md",
+      "path": "chat:notes/a.md",
+      "size": 1,
+      "modifiedAt": 1,
+      "id": null,
+      "title": null,
+      "updatedAt": null,
+      "error": null
+    }
+  }
+]

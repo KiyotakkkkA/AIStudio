@@ -17,6 +17,7 @@ pub mod graph_relations;
 pub mod integrations;
 pub mod mcp;
 pub mod memory;
+pub mod notes;
 pub mod notifications;
 mod policy;
 pub mod providers;
@@ -67,6 +68,7 @@ pub fn register(server: &mut IpcServer) {
     cli::register(server);
     folders::register(server);
     memory::register(server);
+    notes::register(server);
     agentic::register(server);
     workspace::register(server);
     terminal::register(server);
@@ -287,6 +289,11 @@ mod tests {
                 "memory.list",
                 "memory.remove",
                 "memory.update",
+                "notes.list",
+                "notes.read",
+                "notes.remove",
+                "notes.rename",
+                "notes.save",
                 "notifications.clear",
                 "notifications.pending",
                 "providers.adapters",

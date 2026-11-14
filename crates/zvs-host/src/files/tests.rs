@@ -32,6 +32,7 @@ use crate::services::SystemService;
 use crate::testing::{TestServices, temporary_directory, test_services};
 use crate::workspace::canonical;
 
+mod notes;
 mod roots;
 
 #[derive(Default)]

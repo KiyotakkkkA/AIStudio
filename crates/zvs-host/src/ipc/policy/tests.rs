@@ -51,6 +51,9 @@ const CONSOLE_CHANNELS: &[&str] = &[
     "mcp.signIn",
     "mcp.start",
     "mcp.stop",
+    "notes.list",
+    "notes.read",
+    "notes.remove",
     "providers.get",
     "providers.list",
     "providers.usage",
@@ -161,6 +164,9 @@ fn console_channels_that_name_a_dialog_or_run_are_scoped() {
         "cli.images.import",
         "shells.kill",
         "shells.list",
+        "notes.list",
+        "notes.read",
+        "notes.remove",
     ] {
         assert_ne!(
             policy(channel).expect("a row").scope,

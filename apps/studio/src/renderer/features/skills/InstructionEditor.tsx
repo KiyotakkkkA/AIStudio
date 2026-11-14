@@ -19,12 +19,16 @@ const SURFACE = "m-0 px-3.25 py-2.75 font-mono text-[12px] leading-[1.75] whites
 export interface InstructionEditorProps {
   readonly value: string;
   readonly invalid?: boolean;
+  readonly fileName?: string;
+  readonly label?: string;
   readonly onChange: (value: string) => void;
 }
 
 export default function InstructionEditor({
   value,
   invalid = false,
+  fileName = "SKILL.md",
+  label = "Инструкции SKILL.md",
   onChange,
 }: InstructionEditorProps) {
   const [scroll, setScroll] = useState({ top: 0, left: 0 });
@@ -37,7 +41,7 @@ export default function InstructionEditor({
       }`}
     >
       <div className="flex h-7.5 flex-none items-center gap-2 border-b border-line px-2.75">
-        <span className="font-mono text-[10.5px] text-main-500">SKILL.md</span>
+        <span className="min-w-0 truncate font-mono text-[10.5px] text-main-500">{fileName}</span>
         <span className="flex-1" />
         <Chip>markdown</Chip>
         <Chip>{linesWord(lines.length)}</Chip>
@@ -74,7 +78,7 @@ export default function InstructionEditor({
             ))}
           </pre>
           <textarea
-            aria-label="Инструкции SKILL.md"
+            aria-label={label}
             spellCheck={false}
             value={value}
             wrap="off"

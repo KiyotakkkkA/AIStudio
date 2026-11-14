@@ -13,6 +13,7 @@ pub struct PromptParts {
     pub dialog: String,
     pub profile: String,
     pub memory: String,
+    pub notes: String,
     pub knowledge: String,
     pub mcp_guidance: String,
     pub command: String,
@@ -28,11 +29,12 @@ pub struct PromptParts {
 }
 
 impl PromptParts {
-    pub fn sections(&self) -> [(ChatPromptSection, &str); 15] {
+    pub fn sections(&self) -> [(ChatPromptSection, &str); 16] {
         [
             (ChatPromptSection::DialogPrompt, &self.dialog),
             (ChatPromptSection::Profile, &self.profile),
             (ChatPromptSection::Memory, &self.memory),
+            (ChatPromptSection::Notes, &self.notes),
             (ChatPromptSection::Knowledge, &self.knowledge),
             (ChatPromptSection::McpGuidance, &self.mcp_guidance),
             (ChatPromptSection::Command, &self.command),

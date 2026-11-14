@@ -12,6 +12,7 @@ import * as processes from "../src/process.js";
 import * as questions from "../src/questions.js";
 import * as folders from "../src/folders.js";
 import * as memory from "../src/memory.js";
+import * as notes from "../src/notes.js";
 import * as agentic from "../src/agentic.js";
 import * as explorer from "../src/explorer.js";
 import * as terminal from "../src/terminal.js";
@@ -281,6 +282,14 @@ const schemas: Record<string, z.ZodType> = {
   "memory/UpdateMemoryInput": memory.UpdateMemoryInput,
   "memory/MemoryRef": memory.MemoryRef,
   "memory/ClearMemoryInput": memory.ClearMemoryInput,
+  "notes/NoteSourceDto": notes.NoteSourceDto,
+  "notes/NoteMetaDto": notes.NoteMetaDto,
+  "notes/NoteSummaryDto": notes.NoteSummaryDto,
+  "notes/NoteDto": notes.NoteDto,
+  "notes/NoteRef": notes.NoteRef,
+  "notes/NoteReadInput": notes.NoteReadInput,
+  "notes/NoteSaveInput": notes.NoteSaveInput,
+  "notes/NoteRenameInput": notes.NoteRenameInput,
   "questions/QuestionKind": questions.QuestionKind,
   "questions/QuestionOptionDto": questions.QuestionOptionDto,
   "questions/QuestionDto": questions.QuestionDto,

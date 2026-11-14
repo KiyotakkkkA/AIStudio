@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { ChatSourceDto, MessageDto, VectorStoreId } from "@zvs/shared";
 import {
+  noteSourceList,
   sourcesOfKind,
   vectorCitations,
   webSourceList,
@@ -44,9 +45,32 @@ test("each kind keeps its own order, so markers count within their kind", () => 
 test("a store's live hits replace only that store's citations", () => {
   const sources = [vector(first, "a"), vector(second, "b"), web("https://one.example/")];
   const updated = withStoreCitations(sources, first, vectorCitations([vector(first, "c")]));
-  expect(updated.map((source) => (source.kind === "web" ? source.url : source.documentId))).toEqual(
-    ["b", "https://one.example/", "c"],
-  );
+  expect(
+    updated.map((source) =>
+      source.kind === "web" ? source.url : source.kind === "vector" ? source.documentId : source.id,
+    ),
+  ).toEqual(["b", "https://one.example/", "c"]);
+});
+
+test("note sources stay out of the vector and web marker counts", () => {
+  const note = ChatSourceDto.parse({
+    kind: "note",
+    id: "0199aa11-4444-7111-8111-000000000001",
+    title: "Остановка процессов",
+    path: "chat:notes/shutdown.md",
+    hash: "a".repeat(64),
+  });
+  const sources = [vector(first, "a"), note, web("https://one.example/")];
+  expect(vectorCitations(sources)).toHaveLength(1);
+  expect(webSourceList(sources)).toHaveLength(1);
+  expect(noteSourceList(sources)).toEqual([
+    {
+      id: "0199aa11-4444-7111-8111-000000000001",
+      title: "Остановка процессов",
+      path: "chat:notes/shutdown.md",
+      hash: "a".repeat(64),
+    },
+  ]);
 });
 
 test("a message without sources parses to an empty list", () => {

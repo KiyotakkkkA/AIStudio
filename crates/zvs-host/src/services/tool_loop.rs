@@ -163,6 +163,10 @@ pub(crate) trait LoopHost: Send + Sync {
     fn yields(&self) -> bool {
         false
     }
+
+    fn system(&self, _current: &str) -> Option<String> {
+        None
+    }
 }
 
 #[derive(Debug, Default)]
@@ -370,6 +374,13 @@ impl ToolLoop<'_> {
                 } else {
                     crate::images::text_references(&mut messages);
                 }
+            }
+            if let Some(system) = template
+                .system
+                .as_deref()
+                .and_then(|system| host.system(system))
+            {
+                template.system = Some(system);
             }
             let last = wrapped || budget.spent(round, executed);
             if last && !specs.is_empty() {
