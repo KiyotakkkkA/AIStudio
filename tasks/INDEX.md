@@ -295,6 +295,15 @@ Phase A   077 ── 078 ── 082        077 ── 079 ── 080 ── 082 
           077 ── 078 ── 083
 ```
 
+## Phase B — Dialog notes
+
+Independent of TASK_083 and its approval/audit changes. Builds on the completed memory,
+file-tool and per-dialog storage tasks. TASK_084 lands first; TASK_085 adds notes as a source
+kind on top of it.
+
+- [ ] **TASK_084** — Unified answer sources: one `ChatSourceDto` union, `sources` column and kind registry replacing per-origin `citations`/`webSources`
+- [ ] **TASK_085** — Dialog notes: durable Markdown knowledge, on-demand reading, management panel and answer sources without inline note citations *(after TASK_039_EXTRA_1, TASK_045_EXTRA_1, TASK_045_EXTRA_5, TASK_084; no TASK_083 dependency)*
+
 ## Milestones
 
 | Milestone            | After    | What you can do                                      |
