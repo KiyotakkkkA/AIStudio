@@ -145,11 +145,7 @@ pub const POLICY: &[ChannelPolicy] = &[
     studio("chat.conversations.branch", Effect::Act),
     console("chat.conversations.create", Effect::Act, Scope::Any),
     studio("chat.conversations.export", Effect::Act),
-    console(
-        "chat.conversations.get",
-        Effect::Loosen,
-        Scope::Dialog("id"),
-    ),
+    console("chat.conversations.get", Effect::Read, Scope::Dialog("id")),
     console("chat.conversations.list", Effect::Read, Scope::Any),
     studio("chat.conversations.pin", Effect::Act),
     studio("chat.conversations.remove", Effect::Act),

@@ -124,30 +124,6 @@ fn loosening(
     }
 }
 
-async fn open_dialog(services: &Services, connection: u64, dialog: &str) -> Result<(), AppError> {
-    let access = &services.cli_connections;
-    if !access.released(dialog) {
-        let Some(id) = ConversationId::parse(dialog) else {
-            return Ok(());
-        };
-        let Ok(detail) = services.chat.get(&id) else {
-            return Ok(());
-        };
-        access
-            .confirm(
-                connection,
-                CliChangeDto::OpenDialog {
-                    conversation_id: id,
-                    title: detail.conversation.title,
-                },
-            )
-            .await?;
-        access.release(dialog);
-    }
-    access.adopt(connection, dialog);
-    Ok(())
-}
-
 pub async fn admit(
     services: &Services,
     connection: u64,
@@ -158,11 +134,9 @@ pub async fn admit(
     access.ensure_open(connection)?;
     if let Some(dialog) = dialog(services, row.scope, payload)?
         && !access.owns(connection, &dialog)
+        && row.channel != OPEN_DIALOG
     {
-        if row.channel != OPEN_DIALOG {
-            return Err(refused());
-        }
-        open_dialog(services, connection, &dialog).await?;
+        return Err(refused());
     }
     if row.effect == Effect::Loosen
         && let Some(change) = loosening(services, row.channel, payload)?
@@ -173,17 +147,19 @@ pub async fn admit(
 }
 
 pub fn settle(services: &Services, connection: u64, channel: &str, envelope: &Value) {
-    if channel != CREATE_DIALOG {
+    if envelope.get("ok").and_then(Value::as_bool) != Some(true) {
         return;
     }
-    if let Some(id) = envelope
-        .get("data")
+    let data = match channel {
+        CREATE_DIALOG | OPEN_DIALOG => envelope.get("data"),
+        _ => return,
+    };
+    if let Some(id) = data
         .and_then(|data| data.get("id"))
         .and_then(Value::as_str)
         .and_then(ConversationId::parse)
     {
         let id = id.to_string();
-        services.cli_connections.release(&id);
         services.cli_connections.adopt(connection, &id);
     }
 }

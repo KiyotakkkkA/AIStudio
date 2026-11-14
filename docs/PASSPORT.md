@@ -432,8 +432,7 @@ so the rules below treat the console as a less trusted caller than the studio wi
 - **Loosening from the console needs the studio window (TASK_081, 2026-11-13).** For a console
   caller the host holds every call that would loosen access: `execPolicy.set` to a less strict
   mode or a different judge, `execPolicy.allowRule`, `runs.approve` with `always`,
-  `folders.answer` with `always`, and the first opening of an existing dialog
-  (`chat.conversations.get`). The studio window is brought forward and shows a confirmation
+  `folders.answer` with `always`. The studio window is brought forward and shows a confirmation
   naming the change and its source (`cli.consents.list`, `cli.consents.answer`, and a `step`
   event with domain `cli` on every change). The change applies only on confirmation. A decline,
   a closed connection or 60 s without an answer fail the call with `PermissionDenied`.
@@ -442,10 +441,11 @@ so the rules below treat the console as a less trusted caller than the studio wi
   `consent` notice and the console shows «Ожидает подтверждения в приложении». The setting
   `cli.confirmLoosening` («Параметры → Командная строка», studio-only, on by default) can let
   mode and judge changes through without a confirmation. `no-restrictions`, allow rules,
-  `always` answers and opening a dialog are confirmed either way.
+  `always` answers are confirmed either way.
 - **A connection reaches its own dialogs only.** A connection owns the dialogs it created
-  (`chat.conversations.create`) or opened (`chat.conversations.get`). Opening is confirmed
-  once per dialog until the app restarts; later connections open that dialog without asking.
+  (`chat.conversations.create`) or successfully opened (`chat.conversations.get`). Opening an
+  existing dialog is always allowed without studio confirmation, regardless of the execution
+  policy or `cli.confirmLoosening` setting (2026-11-14); failed opens do not grant ownership.
   A call that names another dialog, or a run or background process of another dialog, is
   refused with `CLI_DIALOG_REFUSED`. A connection receives events only for runs whose subject
   is one of its dialogs, so approvals and questions raised in the studio's other dialogs never

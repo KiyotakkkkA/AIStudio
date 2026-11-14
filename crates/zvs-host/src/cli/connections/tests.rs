@@ -233,15 +233,3 @@ fn a_connection_sees_only_streams_of_its_dialogs_and_resolves_each_once() {
     assert!(rig.connections.owns(first, &dialog));
     assert!(!rig.connections.owns(second, &dialog));
 }
-
-#[test]
-fn a_released_dialog_stays_released_after_its_connection_closes() {
-    let rig = rig(CLI_CONSENT_TIMEOUT);
-    let (notify, _) = recording();
-    let (id, _) = rig.connections.open(CliClient::default(), notify);
-    rig.connections.release("d");
-    rig.connections.adopt(id, "d");
-    rig.connections.close(id);
-    assert!(rig.connections.released("d"));
-    assert!(!rig.connections.owns(id, "d"));
-}

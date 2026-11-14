@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::chat::CONVERSATION_TITLE_MAX;
 use crate::enums::wire_enum;
 use crate::errors::AppError;
 use crate::events::HostEvent;
 use crate::exec_policy::{AllowRuleScope, ExecMode};
 use crate::folders::{WorkingFolderAccess, check_folder_path};
-use crate::ids::{ConversationId, is_wire_uuid};
+use crate::ids::is_wire_uuid;
 use crate::primitives::Timestamp;
 use crate::validate::{Validate, check, invalid, nested, no_refinements};
 
@@ -119,32 +118,14 @@ impl Validate for CliInstallDto {
     rename_all_fields = "camelCase"
 )]
 pub enum CliChangeDto {
-    Mode {
-        from: ExecMode,
-        to: ExecMode,
-    },
+    Mode { from: ExecMode, to: ExecMode },
     Judge,
-    AllowRule {
-        scope: AllowRuleScope,
-    },
+    AllowRule { scope: AllowRuleScope },
     AlwaysApproval,
     AlwaysFolder,
-    OpenDialog {
-        conversation_id: ConversationId,
-        title: String,
-    },
 }
 
-impl Validate for CliChangeDto {
-    fn validate(&self) -> Result<(), AppError> {
-        match self {
-            Self::OpenDialog { title, .. } => {
-                check::max_len("title", title, CONVERSATION_TITLE_MAX)
-            }
-            _ => Ok(()),
-        }
-    }
-}
+no_refinements!(CliChangeDto);
 
 fn check_image(image: Option<&String>) -> Result<(), AppError> {
     image.map_or(Ok(()), |image| {

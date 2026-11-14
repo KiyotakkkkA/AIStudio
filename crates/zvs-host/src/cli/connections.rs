@@ -51,7 +51,6 @@ struct Held {
 struct State {
     next: u64,
     connections: BTreeMap<u64, Entry>,
-    released: HashSet<String>,
     consents: BTreeMap<String, Held>,
 }
 
@@ -204,14 +203,6 @@ impl CliConnections {
         if adopted {
             self.changed();
         }
-    }
-
-    pub fn released(&self, dialog: &str) -> bool {
-        self.state().released.contains(dialog)
-    }
-
-    pub fn release(&self, dialog: &str) {
-        self.state().released.insert(dialog.to_owned());
     }
 
     pub fn sees(

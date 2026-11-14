@@ -339,55 +339,37 @@ async fn a_connection_reaches_only_the_dialogs_it_created_or_opened() {
 }
 
 #[tokio::test]
-async fn opening_a_studio_dialog_asks_once_until_restart() {
+async fn opening_a_dialog_without_a_studio_window_adopts_it_without_confirmation() {
     let rig = rig();
-    let first = rig.console();
     let studio = rig.create(Caller::Studio).await;
-    let waiting = rig.spawn(first, "chat.conversations.get", json!({ "id": studio }));
-    let consent = rig.held().await;
-    assert!(matches!(
-        &consent.change,
-        CliChangeDto::OpenDialog { conversation_id, .. } if conversation_id.to_string() == studio
-    ));
-    rig.host
-        .cli_connections
-        .answer(&consent.id, true)
-        .expect("answers");
-    assert_eq!(waiting.await.expect("joins")["ok"], json!(true));
-    let Caller::Cli { connection } = first else {
-        panic!("a console caller");
-    };
-    assert!(rig.host.cli_connections.owns(connection, &studio));
-
-    let second = rig.console();
-    let opened = rig
-        .call(second, "chat.conversations.get", json!({ "id": studio }))
-        .await;
-    assert_eq!(opened["ok"], json!(true), "{opened}");
-    assert!(rig.host.cli_connections.pending().is_empty());
-}
-
-#[tokio::test]
-async fn a_declined_open_leaves_the_dialog_closed_to_the_console() {
-    let rig = rig();
-    let console = rig.console();
-    let studio = rig.create(Caller::Studio).await;
-    let waiting = rig.spawn(console, "chat.conversations.get", json!({ "id": studio }));
-    let consent = rig.held().await;
-    rig.host
-        .cli_connections
-        .answer(&consent.id, false)
-        .expect("answers");
-    denied(&waiting.await.expect("joins"), CLI_CONSENT_DECLINED);
-    denied(
-        &rig.call(
-            console,
-            "chat.queue.list",
-            json!({ "conversationId": studio }),
+    for strict in [true, false] {
+        rig.call(
+            Caller::Studio,
+            "settings.set",
+            json!({ "key": CLI_CONFIRM_SETTING_KEY, "value": strict }),
         )
-        .await,
-        CLI_DIALOG_REFUSED,
-    );
+        .await;
+        for mode in ["always-ask", "safety-ask", "auto-bypass", "no-restrictions"] {
+            let policy = rig
+                .call(
+                    Caller::Studio,
+                    "execPolicy.set",
+                    json!({ "mode": mode, "judge": null }),
+                )
+                .await;
+            assert_eq!(policy["ok"], json!(true), "{policy}");
+            let console = rig.console();
+            let opened = rig
+                .call(console, OPEN_DIALOG, json!({ "id": studio }))
+                .await;
+            assert_eq!(opened["ok"], json!(true), "{opened}");
+            let Caller::Cli { connection } = console else {
+                unreachable!()
+            };
+            assert!(rig.host.cli_connections.owns(connection, &studio));
+            assert!(rig.host.cli_connections.pending().is_empty());
+        }
+    }
 }
 
 #[tokio::test]

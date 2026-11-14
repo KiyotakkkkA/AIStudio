@@ -27,8 +27,6 @@ export function cliChangeText(change: CliChangeDto): string {
       return CLI_CONSENT_ALWAYS_APPROVAL;
     case "alwaysFolder":
       return CLI_CONSENT_ALWAYS_FOLDER;
-    case "openDialog":
-      return `Открытие диалога «${change.title}» в консоли.`;
   }
 }
 

@@ -11,7 +11,7 @@ the policy table in `../ipc/policy.rs` (PASSPORT §7). The pipe itself is opened
 | File             | Contents                                                                                      |
 | ---------------- | --------------------------------------------------------------------------------------------- |
 | `connection.rs`  | `serve`, `CliDispatch`, framing, the outgoing queue and the per-connection event filter       |
-| `connections.rs` | `CliConnections`: open connections, owned dialogs, released dialogs, held confirmations       |
+| `connections.rs` | `CliConnections`: open connections, owned dialogs, held confirmations                         |
 | `gate.rs`        | `admit`, `settle`, `sees`: dialog scope and loosening checks for a `Caller::Cli`              |
 | `mod.rs`         | CLI operations behind `cli.*` channels: open a session, link an account, add an MCP server, … |
 | `notices.rs`     | `CliNotices`: broadcast of out-of-band notices (account verification shown / hidden)          |
@@ -53,15 +53,15 @@ the policy table in `../ipc/policy.rs` (PASSPORT §7). The pipe itself is opened
 2. The row's `scope` names the dialog the call reaches: a conversation id field, a run id
    (its `subjectId`), a background process id (its owner) or an owner id. A dialog the
    connection does not own is refused with `CLI_DIALOG_REFUSED`. The exception is
-   `chat.conversations.get`: it opens the dialog after a confirmation, once per dialog until
-   the app restarts (`CliConnections::release`).
+   `chat.conversations.get`: opening an existing dialog is always allowed without a studio
+   confirmation, including when no studio sink is attached.
 3. For a `loosen` row the payload decides whether this call loosens: a less strict mode or
    another judge for `execPolicy.set`, any `execPolicy.allowRule`, `always` on `runs.approve`
    and `folders.answer`. Such a call waits in `CliConnections::confirm` until the studio
    answers.
 
-After a successful `chat.conversations.create` the new dialog becomes the connection's
-(`gate::settle`).
+After a successful `chat.conversations.create` or `chat.conversations.get` the dialog becomes
+the connection's (`gate::settle`). Failed calls do not grant ownership.
 
 ## Held confirmations (`CliConnections::confirm`)
 

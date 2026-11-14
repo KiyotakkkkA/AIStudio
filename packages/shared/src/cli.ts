@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { AllowRuleScope, ExecMode } from "./execPolicy.js";
 import { FolderPath, WorkingFolderAccess } from "./folders.js";
-import { ConversationId } from "./primitives/branded.js";
 import { Timestamp } from "./primitives/time.js";
 
 export const CLI_COMMAND = "aistudio";
@@ -37,11 +36,6 @@ export const CliChangeDto = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("allowRule"), scope: AllowRuleScope }),
   z.object({ kind: z.literal("alwaysApproval") }),
   z.object({ kind: z.literal("alwaysFolder") }),
-  z.object({
-    kind: z.literal("openDialog"),
-    conversationId: ConversationId,
-    title: z.string().max(200),
-  }),
 ]);
 export type CliChangeDto = z.infer<typeof CliChangeDto>;
 

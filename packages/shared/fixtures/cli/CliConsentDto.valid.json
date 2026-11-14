@@ -31,22 +31,6 @@
     }
   },
   {
-    "name": "open dialog",
-    "value": {
-      "id": "9b2f7a3e-4c1d-4e8a-9f2b-6d5c4b3a2e10",
-      "connectionId": 2,
-      "change": {
-        "kind": "openDialog",
-        "conversationId": "1f0e2d3c-4b5a-4968-8776-655443322110",
-        "title": "Отчёт"
-      },
-      "recognised": true,
-      "image": null,
-      "createdAt": 1760000000000,
-      "expiresAt": 1760000060000
-    }
-  },
-  {
     "name": "always folder",
     "value": {
       "id": "9b2f7a3e-4c1d-4e8a-9f2b-6d5c4b3a2e10",

@@ -131,7 +131,6 @@ fn loosening_console_channels_are_named() {
     assert_eq!(
         loosening,
         [
-            "chat.conversations.get",
             "execPolicy.allowRule",
             "execPolicy.set",
             "folders.answer",
