@@ -100,14 +100,14 @@ fn transcript_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new(lines).scroll((rows(offset), 0)), area);
 }
 
-fn input_height(app: &App) -> u16 {
-    let count = app
-        .input
-        .text()
-        .split('\n')
-        .count()
-        .clamp(1, INPUT_MAX_LINES);
-    rows(count + 2)
+fn input_layout(app: &App, width: u16) -> (Vec<std::ops::Range<usize>>, (usize, usize)) {
+    app.input
+        .visual_layout(usize::from(width.saturating_sub(4)), app.shell_mode())
+}
+
+fn input_height(app: &App, width: u16) -> u16 {
+    let (lines, _) = input_layout(app, width);
+    rows(lines.len().clamp(1, INPUT_MAX_LINES) + 2)
 }
 
 pub fn queue_lines(app: &App, width: usize) -> Vec<Line<'static>> {
@@ -211,7 +211,7 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let text = app.input.text();
-    let (row, column) = app.input.lines_before_cursor();
+    let (wrapped, (row, column)) = input_layout(app, area.width);
     let visible = usize::from(inner.height.max(1));
     let first = row.saturating_sub(visible - 1);
     let lines: Vec<Line<'static>> = if text.is_empty() {
@@ -220,47 +220,49 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
             Span::styled(copy::INPUT_PLACEHOLDER, theme::faint()),
         ])]
     } else {
-        text.split('\n')
+        wrapped
+            .into_iter()
             .enumerate()
             .skip(first)
-            .map(|(index, line)| {
+            .map(|(index, range)| {
                 let prompt = match (index, shell) {
                     (0, true) => "$ ",
                     (0, false) => "› ",
                     _ => "  ",
                 };
-                let body = if index == 0 && shell {
-                    line.strip_prefix('!').unwrap_or(line)
-                } else {
-                    line
-                };
                 let mut spans = vec![Span::styled(prompt, lead)];
                 if shell {
-                    spans.push(Span::styled(body.to_owned(), theme::text()));
+                    spans.push(Span::styled(text[range].to_owned(), theme::text()));
                 } else {
-                    let start = text
-                        .split('\n')
-                        .take(index)
-                        .map(|line| line.len() + 1)
-                        .sum();
-                    spans.extend(app.input.pieces(start, start + line.len()).into_iter().map(
+                    let mut offset = 0;
+                    spans.extend(app.input.pieces(0, text.len()).into_iter().filter_map(
                         |(piece, attachment)| {
-                            Span::styled(
-                                piece.to_owned(),
-                                attachment.map_or_else(theme::text, |attachment| {
-                                    let color = if attachment.image() {
-                                        theme::colors().ok
-                                    } else {
-                                        theme::colors().accent
-                                    };
-                                    Style::new()
-                                        .fg(color)
-                                        .bg(theme::colors().accent_soft)
-                                        .add_modifier(Modifier::BOLD)
-                                }),
-                            )
+                            let start = range.start.max(offset);
+                            let end = range.end.min(offset + piece.len());
+                            offset += piece.len();
+                            (start < end).then(|| {
+                                Span::styled(
+                                    text[start..end].to_owned(),
+                                    attachment.map_or_else(theme::text, |attachment| {
+                                        let color = if attachment.image() {
+                                            theme::colors().ok
+                                        } else {
+                                            theme::colors().accent
+                                        };
+                                        Style::new()
+                                            .fg(color)
+                                            .bg(theme::colors().accent_soft)
+                                            .add_modifier(Modifier::BOLD)
+                                    }),
+                                )
+                            })
                         },
                     ));
+                }
+                if app.input.selected_all() {
+                    for span in spans.iter_mut().skip(1) {
+                        span.style = span.style.bg(theme::colors().selection_bg);
+                    }
                 }
                 Line::from(spans)
             })
@@ -268,8 +270,7 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     };
     frame.render_widget(Paragraph::new(lines), inner);
     if app.prompts.is_empty() && !app.help && app.modal.is_none() && app.overlay.is_none() {
-        let shift = usize::from(shell && row == 0);
-        let x = inner.x + rows(column + 2 - shift).min(inner.width.saturating_sub(1));
+        let x = inner.x + rows(column + 2).min(inner.width.saturating_sub(1));
         let y = inner.y + rows(row - first);
         frame.set_cursor_position((x, y));
     }
@@ -713,7 +714,10 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
                 });
             let bottom_height = panel
                 .as_ref()
-                .map_or_else(|| input_height(app), |panel| rows(panel.lines.len() + 2))
+                .map_or_else(
+                    || input_height(app, area.width),
+                    |panel| rows(panel.lines.len() + 2),
+                )
                 .min(area.height.saturating_sub(4));
             let queue_height = rows(queue_lines(app, usize::from(area.width)).len())
                 .min(area.height.saturating_sub(bottom_height + 4));

@@ -45,7 +45,7 @@ pub fn typed_later(rest: &[Event]) -> bool {
             event,
             Event::Key(later)
                 if later.kind != KeyEventKind::Release
-                    && !later.modifiers.contains(KeyModifiers::CONTROL)
+                    && !later.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
                     && matches!(later.code, KeyCode::Char(value) if !value.is_control())
         )
     })
@@ -57,12 +57,23 @@ pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
     let shift = event.modifiers.contains(KeyModifiers::SHIFT);
     let shifted = shift || alt;
     Some(match event.code {
+        KeyCode::Char('\u{7f}') if !pasting => Key::DeleteWord,
         KeyCode::Char(value) if control && !alt => match value.to_ascii_lowercase() {
             'c' | 'd' => Key::Interrupt,
             'j' | 'm' if pasting => Key::Newline,
             'j' | 'm' => Key::Enter,
-            _ => Key::Chord(Chord::character(value, true, false, shift)?),
+            _ => {
+                let chord = Chord::character(value, true, false, shift)?;
+                if chord == Chord::ctrl('a') {
+                    Key::SelectAll
+                } else if chord == Chord::ctrl('w') {
+                    Key::DeleteWord
+                } else {
+                    Key::Chord(chord)
+                }
+            }
         },
+        KeyCode::Char('d') if alt && !control && !shift => return None,
         KeyCode::Char(value) if alt && !control && !pasting && !value.is_control() => {
             Key::Chord(Chord::character(value, false, true, shift)?)
         }
@@ -79,8 +90,11 @@ pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
         KeyCode::Enter | KeyCode::Char('\r' | '\n') if shifted || pasting => Key::Newline,
         KeyCode::Enter | KeyCode::Char('\r' | '\n') => Key::Enter,
         KeyCode::Char(value) => Key::Char(value),
+        KeyCode::Backspace if control && !alt => Key::DeleteWord,
         KeyCode::Backspace => Key::Backspace,
-        KeyCode::Delete => Key::Delete,
+        KeyCode::Delete if !control => Key::Delete,
+        KeyCode::Left if control && !alt => Key::WordLeft,
+        KeyCode::Right if control && !alt => Key::WordRight,
         KeyCode::Left => Key::Left,
         KeyCode::Right => Key::Right,
         KeyCode::Up | KeyCode::BackTab => Key::Up,
@@ -479,6 +493,7 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
         | Request::OpenDesktop(_)
         | Request::StopShell
         | Request::Copy(_)
+        | Request::CopyInput(_)
         | Request::SaveShortcuts(_)
         | Request::SaveTheme(_)
         | Request::SavePreferences(_) => Msg::Tick,
@@ -583,6 +598,10 @@ fn dispatch(
             Request::Copy(selection) => {
                 let copied_count =
                     copy_to_clipboard(&selected_text(screen, &selection)).unwrap_or(0);
+                let _ = signals.send(Signal::App(Box::new(Msg::Copied(Some(copied_count)))));
+            }
+            Request::CopyInput(text) => {
+                let copied_count = copy_to_clipboard(&text).unwrap_or(0);
                 let _ = signals.send(Signal::App(Box::new(Msg::Copied(Some(copied_count)))));
             }
             Request::SaveShortcuts(value) => {
@@ -943,6 +962,36 @@ async fn send_attachments(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn control_backspace_is_layout_independent_and_control_delete_is_ignored() {
+        for code in [
+            KeyCode::Backspace,
+            KeyCode::Char('w'),
+            KeyCode::Char('ц'),
+            KeyCode::Char('Ц'),
+        ] {
+            assert_eq!(
+                key(KeyEvent::new(code, KeyModifiers::CONTROL), true),
+                Some(Key::DeleteWord)
+            );
+        }
+        assert_eq!(
+            key(KeyEvent::new(KeyCode::Delete, KeyModifiers::CONTROL), false),
+            None
+        );
+        assert_eq!(
+            key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::ALT), true),
+            None
+        );
+        assert_ne!(
+            key(
+                KeyEvent::new(KeyCode::Char('h'), KeyModifiers::CONTROL),
+                false
+            ),
+            Some(Key::DeleteWord)
+        );
+    }
 
     #[tokio::test]
     async fn attachments_import_then_merge_stores_before_sending_references() {

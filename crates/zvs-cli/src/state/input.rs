@@ -8,6 +8,8 @@ pub struct Input {
     browsing: Option<usize>,
     draft: String,
     tokens: Vec<Token>,
+    selected_all: bool,
+    visual_column: Option<usize>,
 }
 
 impl Input {
@@ -19,11 +21,35 @@ impl Input {
         self.cursor
     }
 
+    pub const fn selected_all(&self) -> bool {
+        self.selected_all
+    }
+
+    pub fn select_all(&mut self) {
+        self.visual_column = None;
+        self.selected_all = !self.text.is_empty();
+        self.cursor = self.text.len();
+    }
+
+    pub fn deselect(&mut self) {
+        self.selected_all = false;
+        self.visual_column = None;
+    }
+
+    fn delete_selection(&mut self) -> bool {
+        if !self.selected_all {
+            return false;
+        }
+        self.clear();
+        true
+    }
+
     pub fn is_empty(&self) -> bool {
         self.text.trim().is_empty()
     }
 
     pub fn set(&mut self, text: &str) {
+        self.deselect();
         self.tokens.clear();
         self.text = text.to_owned();
         self.cursor = self.text.len();
@@ -35,6 +61,8 @@ impl Input {
     }
 
     pub fn insert(&mut self, value: &str) {
+        self.visual_column = None;
+        self.delete_selection();
         let value = value.replace("\r\n", "\n").replace('\r', "\n");
         for token in &mut self.tokens {
             if token.start >= self.cursor {
@@ -96,6 +124,7 @@ impl Input {
     }
 
     pub fn attach(&mut self, attachment: Attachment, start: usize) {
+        let start = if self.delete_selection() { 0 } else { start };
         self.remove(start, self.cursor);
         self.cursor = start;
         let label = format!("{} {}", attachment.icon(), attachment.label().reference());
@@ -153,6 +182,10 @@ impl Input {
     }
 
     pub fn backspace(&mut self) {
+        self.visual_column = None;
+        if self.delete_selection() {
+            return;
+        }
         if let Some(at) = self.previous_boundary() {
             self.remove(at, self.cursor);
             self.cursor = at;
@@ -160,21 +193,195 @@ impl Input {
     }
 
     pub fn delete(&mut self) {
+        self.visual_column = None;
+        if self.delete_selection() {
+            return;
+        }
         if let Some(end) = self.next_boundary() {
             self.remove(self.cursor, end);
         }
     }
 
     pub fn left(&mut self) {
+        self.visual_column = None;
+        if self.selected_all {
+            self.deselect();
+            self.cursor = 0;
+            return;
+        }
         if let Some(at) = self.previous_boundary() {
             self.cursor = at;
         }
     }
 
     pub fn right(&mut self) {
+        self.visual_column = None;
+        if self.selected_all {
+            self.deselect();
+            self.cursor = self.text.len();
+            return;
+        }
         if let Some(at) = self.next_boundary() {
             self.cursor = at;
         }
+    }
+
+    fn word_start(&self) -> usize {
+        let mut before = self.text[..self.cursor].char_indices().rev().peekable();
+        while before.peek().is_some_and(|(_, c)| c.is_whitespace()) {
+            before.next();
+        }
+        let Some((mut start, first)) = before.next() else {
+            return 0;
+        };
+        let word = |c: char| c.is_alphanumeric() || c == '_';
+        for (at, character) in before {
+            if character.is_whitespace() || word(character) != word(first) {
+                break;
+            }
+            start = at;
+        }
+        self.tokens
+            .iter()
+            .find(|token| token.start < start && start < token.end)
+            .map_or(start, |token| token.start)
+    }
+
+    pub fn word_left(&mut self) {
+        self.visual_column = None;
+        if self.selected_all {
+            self.left();
+        } else {
+            self.cursor = self.word_start();
+        }
+    }
+
+    pub fn word_right(&mut self) {
+        self.visual_column = None;
+        if self.selected_all {
+            self.right();
+            return;
+        }
+        let mut after = self.text[self.cursor..].char_indices().peekable();
+        let word = |c: char| c.is_alphanumeric() || c == '_';
+        if let Some((_, first)) = after.peek().copied()
+            && !first.is_whitespace()
+        {
+            while after
+                .peek()
+                .is_some_and(|(_, c)| !c.is_whitespace() && word(*c) == word(first))
+            {
+                after.next();
+            }
+        }
+        while after.peek().is_some_and(|(_, c)| c.is_whitespace()) {
+            after.next();
+        }
+        self.cursor = after
+            .peek()
+            .map_or(self.text.len(), |(at, _)| self.cursor + at);
+        if let Some(token) = self
+            .tokens
+            .iter()
+            .find(|token| token.start < self.cursor && self.cursor < token.end)
+        {
+            self.cursor = token.end;
+        }
+    }
+
+    pub fn delete_word(&mut self) {
+        self.visual_column = None;
+        if self.delete_selection() {
+            return;
+        }
+        let start = self.word_start();
+        self.remove(start, self.cursor);
+        self.cursor = start;
+        self.browsing = None;
+    }
+
+    pub fn visual_layout(
+        &self,
+        width: usize,
+        shell: bool,
+    ) -> (Vec<std::ops::Range<usize>>, (usize, usize)) {
+        use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+        let width = width.max(1);
+        let mut lines = Vec::new();
+        let mut offset = 0;
+        for (index, line) in self.text.split('\n').enumerate() {
+            let skip = usize::from(index == 0 && shell && line.starts_with('!'));
+            let mut start = offset + skip;
+            let mut used = 0;
+            for (at, character) in line[skip..].char_indices() {
+                let at = offset + skip + at;
+                let cells = character.width().unwrap_or(0);
+                if used > 0 && used + cells > width {
+                    lines.push(start..at);
+                    start = at;
+                    used = 0;
+                }
+                used += cells;
+            }
+            let end = offset + line.len();
+            lines.push(start..end);
+            if used >= width {
+                lines.push(end..end);
+            }
+            offset = end + 1;
+        }
+        let cursor = self.cursor.max(lines[0].start);
+        let row = lines
+            .iter()
+            .rposition(|line| line.start <= cursor && cursor <= line.end)
+            .unwrap_or(0);
+        let column = self.text[lines[row].start..cursor].width();
+        (lines, (row, column))
+    }
+
+    pub fn move_visual(&mut self, down: bool, width: usize, shell: bool) -> bool {
+        use unicode_width::UnicodeWidthChar;
+
+        self.selected_all = false;
+        let (lines, (row, column)) = self.visual_layout(width, shell);
+        let target = if down {
+            row.checked_add(1).filter(|next| *next < lines.len())
+        } else {
+            row.checked_sub(1)
+        };
+        let Some(target) = target else {
+            return false;
+        };
+        let column = *self.visual_column.get_or_insert(column);
+        let range = &lines[target];
+        let mut used = 0;
+        let mut cursor = range.start;
+        for (at, character) in self.text[range.clone()].char_indices() {
+            let cells = character.width().unwrap_or(0);
+            if used + cells > column {
+                break;
+            }
+            used += cells;
+            cursor = range.start + at + character.len_utf8();
+        }
+        if cursor == range.end
+            && lines
+                .get(target + 1)
+                .is_some_and(|next| next.start == cursor)
+            && let Some((at, _)) = self.text[range.clone()].char_indices().last()
+        {
+            cursor = range.start + at;
+        }
+        if let Some(token) = self
+            .tokens
+            .iter()
+            .find(|token| token.start < cursor && cursor < token.end)
+        {
+            cursor = if down { token.end } else { token.start };
+        }
+        self.cursor = cursor;
+        true
     }
 
     fn line_start(&self) -> usize {
@@ -188,10 +395,12 @@ impl Input {
     }
 
     pub fn home(&mut self) {
+        self.deselect();
         self.cursor = self.line_start();
     }
 
     pub fn end(&mut self) {
+        self.deselect();
         self.cursor = self.line_end();
     }
 
@@ -225,6 +434,7 @@ impl Input {
     }
 
     pub fn up(&mut self) -> bool {
+        self.deselect();
         if self.on_first_line() {
             return false;
         }
@@ -236,6 +446,7 @@ impl Input {
     }
 
     pub fn down(&mut self) -> bool {
+        self.deselect();
         if self.on_last_line() {
             return false;
         }
@@ -246,6 +457,7 @@ impl Input {
     }
 
     pub fn take(&mut self) -> String {
+        self.deselect();
         let had_attachments = !self.tokens.is_empty();
         self.tokens.clear();
         let text = std::mem::take(&mut self.text);
@@ -259,6 +471,7 @@ impl Input {
     }
 
     pub fn history_back(&mut self) {
+        self.deselect();
         if !self.tokens.is_empty() {
             return;
         }
@@ -279,6 +492,7 @@ impl Input {
     }
 
     pub fn history_forward(&mut self) {
+        self.deselect();
         if !self.tokens.is_empty() {
             return;
         }

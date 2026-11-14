@@ -198,15 +198,16 @@ impl Chord {
     }
 
     pub const fn reserved(self) -> bool {
-        matches!(
-            self,
-            Self {
-                ctrl: true,
-                alt: false,
-                key: ChordKey::Char('c' | 'd' | 'h' | 'i' | 'j' | 'm' | '['),
-                ..
-            }
-        )
+        (self.alt && !self.ctrl && !self.shift && matches!(self.key, ChordKey::Char('d')))
+            || matches!(
+                self,
+                Self {
+                    ctrl: true,
+                    alt: false,
+                    key: ChordKey::Char('a' | 'c' | 'd' | 'h' | 'i' | 'j' | 'm' | 'w' | '['),
+                    ..
+                }
+            )
     }
 }
 
@@ -348,7 +349,10 @@ impl Shortcut {
             Self::Processes => Chord::alt('b'),
             Self::Permissions => Chord::alt('p'),
             Self::Connect => Chord::alt('c'),
-            Self::Desktop => Chord::alt('d'),
+            Self::Desktop => Chord {
+                shift: true,
+                ..Chord::alt('d')
+            },
             Self::Theme => Chord::alt('t'),
             Self::Compact => Chord::alt('z'),
             Self::Config => Chord::alt('o'),

@@ -221,16 +221,21 @@ pub const EFFORT_UNSUPPORTED: &str = "Модель не поддерживает
 
 pub const KEYS_TITLE: &str = "Клавиши";
 pub const KEYS: &[(&str, &str)] = &[
+    ("/", KEY_COMMANDS),
+    ("@", KEY_ATTACH),
+    ("?", KEY_HELP),
+    ("!", KEY_SHELL),
     ("Enter", "отправить сообщение"),
     ("Shift+Enter", "новая строка"),
+    ("Ctrl+A", KEY_SELECT_ALL),
+    ("Ctrl+← / Ctrl+→", KEY_WORD_MOVE),
+    ("Ctrl+Backspace", KEY_DELETE_WORD),
     ("↑ / ↓", "история ввода"),
     ("Esc", "остановить ответ"),
     ("Esc Esc", "выйти"),
     ("Колесо, PgUp / PgDn", "прокрутка"),
     ("Выделение мышью", "скопировать текст"),
-    ("! в начале строки", "выполнить команду в рабочей папке"),
-    ("Ctrl+C", "выйти"),
-    ("?", "показать сочетания клавиш"),
+    ("Ctrl+C", "скопировать выделение или выйти"),
 ];
 
 pub const SHORTCUTS_TITLE: &str = "Сочетания клавиш";
@@ -238,6 +243,11 @@ pub const KEYS_COMPOSE: &str = "Ввод";
 pub const KEYS_SESSION: &str = "Сеанс";
 pub const KEYS_TRANSCRIPT: &str = "Просмотр";
 pub const KEY_COMMANDS: &str = "Команды";
+pub const KEY_ATTACH: &str = "Добавить вложение";
+pub const KEY_HELP: &str = "Показать сочетания клавиш";
+pub const KEY_SELECT_ALL: &str = "Выделить весь ввод";
+pub const KEY_WORD_MOVE: &str = "Перейти по словам";
+pub const KEY_DELETE_WORD: &str = "Удалить слово слева";
 pub const KEY_SHELL: &str = "Команда в рабочей папке";
 pub const KEY_NEWLINE: &str = "Новая строка";
 pub const KEY_QUEUE: &str = "Выбор в очереди";

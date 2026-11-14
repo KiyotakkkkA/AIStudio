@@ -46,6 +46,10 @@ pub const OUTPUT_POLL_TICKS: u64 = 10;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Char(char),
+    SelectAll,
+    WordLeft,
+    WordRight,
+    DeleteWord,
     Enter,
     Newline,
     Backspace,
@@ -257,6 +261,7 @@ pub enum Request {
     Shell(String),
     StopShell,
     Copy(Selection),
+    CopyInput(String),
     SaveShortcuts(serde_json::Value),
     SaveTheme(CliTheme),
     Compact {
@@ -521,7 +526,12 @@ impl App {
                 copy::KEYS_COMPOSE,
                 vec![
                     (fixed("/"), copy::KEY_COMMANDS),
+                    (fixed("@"), copy::KEY_ATTACH),
+                    (fixed("?"), copy::KEY_HELP),
                     (fixed("!"), copy::KEY_SHELL),
+                    (fixed("Ctrl+A"), copy::KEY_SELECT_ALL),
+                    (fixed("Ctrl+← / Ctrl+→"), copy::KEY_WORD_MOVE),
+                    (fixed("Ctrl+Backspace"), copy::KEY_DELETE_WORD),
                     (fixed("Shift+Enter"), copy::KEY_NEWLINE),
                     (fixed("↑ / ↓"), copy::KEY_HISTORY),
                     (fixed("Tab"), copy::KEY_COMPLETE),
@@ -2928,6 +2938,15 @@ impl App {
             };
         }
         self.selection = None;
+        if key == Key::Interrupt
+            && self.input.selected_all()
+            && self.prompts.is_empty()
+            && self.overlay.is_none()
+        {
+            let text = self.input.text().to_owned();
+            self.input.deselect();
+            return vec![Request::CopyInput(text)];
+        }
         if key != Key::Esc {
             self.escape_armed = false;
         }
@@ -2994,6 +3013,10 @@ impl App {
                 return Vec::new();
             }
         }
+        if key == Key::Esc && self.input.selected_all() {
+            self.input.deselect();
+            return Vec::new();
+        }
         if self.attachments_open() {
             let count = self.attachment_choices().len();
             match key {
@@ -3058,6 +3081,13 @@ impl App {
         }
         match key {
             Key::Enter => return self.submit(),
+            Key::SelectAll => self.input.select_all(),
+            Key::WordLeft => self.input.word_left(),
+            Key::WordRight => self.input.word_right(),
+            Key::DeleteWord => {
+                self.input.delete_word();
+                self.palette.reset();
+            }
             Key::Esc if self.queue_editing.is_some() => {
                 if let Some((_, saved)) = self.queue_editing.take() {
                     self.input = saved;
@@ -3080,12 +3110,20 @@ impl App {
             Key::Home => self.input.home(),
             Key::End => self.input.end(),
             Key::Up => {
-                if !self.input.up() {
+                let width = usize::from(self.viewport.0.saturating_sub(4));
+                let shell = self.shell_mode();
+                if !self.input.move_visual(false, width, shell)
+                    && self.input.visual_layout(width, shell).0.len() == 1
+                {
                     self.input.history_back();
                 }
             }
             Key::Down => {
-                if !self.input.down() {
+                let width = usize::from(self.viewport.0.saturating_sub(4));
+                let shell = self.shell_mode();
+                if !self.input.move_visual(true, width, shell)
+                    && self.input.visual_layout(width, shell).0.len() == 1
+                {
                     self.input.history_forward();
                 }
             }
