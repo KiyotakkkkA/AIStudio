@@ -114,7 +114,7 @@ function Submenu({
           setOpen(!expanded);
         }}
       >
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 items-center gap-2 pr-0.5">
           <Icon path={icon} size={16} className="flex-none text-main-400" />
           <span className="min-w-0 flex-1 truncate">{label}</span>
           <span

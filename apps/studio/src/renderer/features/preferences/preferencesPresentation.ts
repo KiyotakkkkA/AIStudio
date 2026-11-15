@@ -105,17 +105,17 @@ export const NOTIFICATIONS_ROW: ToggleRowCopy = {
 export const NOTIFICATION_KIND_ROWS: readonly ToggleRowCopy[] = [
   {
     key: "notifications.approval",
-    label: "Запрос подтверждения",
+    label: "Уведомление: Запрос подтверждения",
     hint: "Инструмент ожидает разрешения на выполнение.",
   },
   {
     key: "notifications.turn",
-    label: "Завершение ответа",
+    label: "Уведомление: Завершение ответа",
     hint: "Модель завершила ответ в диалоге.",
   },
   {
     key: "notifications.download",
-    label: "Завершение загрузки",
+    label: "Уведомление: Завершение загрузки",
     hint: "Модель или компонент загружены.",
   },
 ];

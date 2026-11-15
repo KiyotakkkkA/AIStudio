@@ -372,17 +372,21 @@ const AppearanceSection = observer(function AppearanceSection() {
 
 const ToggleSettingRow = observer(function ToggleSettingRow({
   row,
+  disabled = false,
+  checked: checkedOverride,
 }: {
   readonly row: ToggleRowCopy;
+  readonly disabled?: boolean;
+  readonly checked?: boolean;
 }) {
   const { appSettings } = useStore();
-  const checked = appSettings.values[row.key];
+  const checked = checkedOverride ?? appSettings.values[row.key];
   return (
     <SettingRow id={row.key} label={row.label} hint={row.hint} error={appSettings.errors[row.key]}>
       <Toggle
         label={checked ? TOGGLE_ON : TOGGLE_OFF}
         checked={checked}
-        disabled={appSettings.pending[row.key] !== undefined}
+        disabled={disabled || appSettings.pending[row.key] !== undefined}
         onChange={(value) => void appSettings.set(row.key, value)}
       />
     </SettingRow>
@@ -773,14 +777,23 @@ const NotificationsSection = observer(function NotificationsSection() {
   return (
     <div>
       <PreferenceContainer title="События приложения">
-        <ToggleSettingRow row={NOTIFICATIONS_ROW} />
-        {appSettings.values[NOTIFICATIONS_ROW.key] ? (
-          <NestedSettings>
-            {NOTIFICATION_KIND_ROWS.map((row) => (
-              <ToggleSettingRow key={row.key} row={row} />
-            ))}
-          </NestedSettings>
-        ) : null}
+        <ToggleSettingRow
+          row={NOTIFICATIONS_ROW}
+          disabled={NOTIFICATION_KIND_ROWS.some(
+            (row) => appSettings.pending[row.key] !== undefined,
+          )}
+        />
+        {NOTIFICATION_KIND_ROWS.map((row) => (
+          <ToggleSettingRow
+            key={row.key}
+            row={row}
+            checked={appSettings.values[NOTIFICATIONS_ROW.key] && appSettings.values[row.key]}
+            disabled={
+              !appSettings.values[NOTIFICATIONS_ROW.key] ||
+              appSettings.pending[NOTIFICATIONS_ROW.key] !== undefined
+            }
+          />
+        ))}
       </PreferenceContainer>
     </div>
   );
@@ -806,12 +819,15 @@ const MemorySection = observer(function MemorySection() {
   return (
     <div className="flex flex-col gap-4">
       <PreferenceContainer title="Управление памятью">
-        <ToggleSettingRow row={ENABLED_ROW} />
-        {enabled && (
-          <NestedSettings>
-            <ToggleSettingRow row={MODEL_ROW} />
-          </NestedSettings>
-        )}
+        <ToggleSettingRow
+          row={ENABLED_ROW}
+          disabled={appSettings.pending[MODEL_ROW.key] !== undefined}
+        />
+        <ToggleSettingRow
+          row={MODEL_ROW}
+          checked={enabled && appSettings.values[MODEL_ROW.key]}
+          disabled={!enabled || appSettings.pending[ENABLED_ROW.key] !== undefined}
+        />
       </PreferenceContainer>
       <PreferenceContainer title={MEMORY_RECORDS_ROW.label}>
         <SettingRow

@@ -13,20 +13,20 @@ export const PANEL_OFF = "Использование памяти отключе
 
 export const ENABLED_ROW = {
   key: "memory.enabled",
-  label: "Память",
+  label: "Разрешить использовать факты о вас",
   hint: "Использование сохранённых фактов при формировании ответа.",
 } as const;
 
 export const MODEL_ROW = {
   key: "memory.model",
-  label: "Сохранение моделью",
+  label: "Разрешить изменять факты о вас",
   hint: "Добавление, изменение и удаление записей памяти моделью.",
 } as const;
 
 export const MEMORY_RECORDS_ROW = {
   key: "memory.records",
-  label: "Сохранённые записи",
-  hint: "Просмотр, добавление и удаление записей общей памяти и памяти диалогов.",
+  label: "Сохранённые факты",
+  hint: "Просмотр, добавление и удаление фактов из общей памяти и памяти диалогов.",
 } as const;
 
 export const SCOPE_TABS_LABEL = "Область памяти";

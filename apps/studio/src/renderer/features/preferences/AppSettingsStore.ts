@@ -30,6 +30,15 @@ const APP_SETTING_DEFAULTS: Record<AppSettingKey, boolean> = {
   "cli.confirmLoosening": true,
 };
 
+const APP_SETTING_DEPENDENTS: Partial<Record<AppSettingKey, readonly AppSettingKey[]>> = {
+  "memory.enabled": ["memory.model"],
+  "notifications.enabled": [
+    "notifications.approval",
+    "notifications.turn",
+    "notifications.download",
+  ],
+};
+
 function failureCopy(key: AppSettingKey, error: unknown): string {
   if (key === "app.autostart" && isIpcError(error) && error.code === AppErrorCode.NATIVE_ERROR)
     return AUTOSTART_FAILED;
@@ -62,6 +71,12 @@ export default class AppSettingsStore {
       }
       this.loaded = true;
     });
+    for (const parent of APP_SETTING_KEYS) {
+      if (this.values[parent]) continue;
+      for (const dependent of APP_SETTING_DEPENDENTS[parent] ?? []) {
+        await this.set(dependent, false);
+      }
+    }
   }
 
   async takePendingTarget(): Promise<NotificationTargetDto | null> {
@@ -73,21 +88,44 @@ export default class AppSettingsStore {
   }
 
   async set(key: AppSettingKey, value: boolean) {
+    const parent = APP_SETTING_KEYS.find((candidate) =>
+      APP_SETTING_DEPENDENTS[candidate]?.includes(key),
+    );
+    if (
+      parent !== undefined &&
+      (this.pending[parent] !== undefined || (value && !this.values[parent]))
+    )
+      return;
     if (this.values[key] === value || this.pending[key] !== undefined) return;
-    const previous = this.values[key];
-    this.values[key] = value;
-    this.pending[key] = value;
-    delete this.errors[key];
+    const dependents = value ? [] : (APP_SETTING_DEPENDENTS[key] ?? []);
+    const changes: readonly [AppSettingKey, boolean][] = [
+      ...dependents
+        .filter((dependent) => this.values[dependent])
+        .map((dependent): [AppSettingKey, boolean] => [dependent, false]),
+      [key, value],
+    ];
+    if (changes.some(([changed]) => this.pending[changed] !== undefined)) return;
+    const previous = { ...this.values };
+    for (const [changed, next] of changes) {
+      this.values[changed] = next;
+      this.pending[changed] = next;
+      delete this.errors[changed];
+    }
     try {
-      await this.ipc.call("settings.set", { key, value });
-    } catch (error) {
-      runInAction(() => {
-        this.values[key] = previous;
-        this.errors[key] = failureCopy(key, error);
-      });
+      for (const [index, [changed, next]] of changes.entries()) {
+        try {
+          await this.ipc.call("settings.set", { key: changed, value: next });
+        } catch (error) {
+          runInAction(() => {
+            for (const [unsaved] of changes.slice(index)) this.values[unsaved] = previous[unsaved];
+            this.errors[changed] = failureCopy(changed, error);
+          });
+          break;
+        }
+      }
     } finally {
       runInAction(() => {
-        delete this.pending[key];
+        for (const [changed] of changes) delete this.pending[changed];
       });
     }
   }
