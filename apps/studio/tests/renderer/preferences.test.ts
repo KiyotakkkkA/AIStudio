@@ -16,12 +16,20 @@ import {
   SECTION_LABELS,
   SETTING_SAVE_FAILED,
   CLI_ROW_LABELS,
+  APP_ROW_LABELS,
+  appRows,
   cliRows,
+  releaseChannelLabel,
   fontSizeLabel,
   fontStack,
   interfaceZoom,
 } from "../../src/renderer/features/preferences/preferencesPresentation.ts";
-import { CLI_CHANNEL, CLI_VERSION } from "../../src/renderer/app/appEnv.ts";
+import {
+  APP_CHANNEL,
+  APP_VERSION,
+  CLI_CHANNEL,
+  CLI_VERSION,
+} from "../../src/renderer/app/appEnv.ts";
 
 function settings(seed: Record<string, Json> = {}) {
   const stored = new Map<string, Json>(Object.entries(seed));
@@ -86,7 +94,22 @@ test("fonts and sizes map to a font stack and an interface zoom", () => {
 test("the about section describes the CLI from the app environment", () => {
   const rows = cliRows();
   expect(rows.map((row) => row.label)).toEqual([CLI_ROW_LABELS.version]);
-  expect(rows[0]?.value).toBe(`${CLI_CHANNEL} v${CLI_VERSION}`);
+  expect(rows[0]?.value).toBe(`v${CLI_VERSION} · ${releaseChannelLabel(CLI_CHANNEL)}`);
+});
+
+test("installation details show the app version and release channel from the app environment", () => {
+  expect(appRows()).toEqual([
+    {
+      label: APP_ROW_LABELS.version,
+      value: `v${APP_VERSION} · ${releaseChannelLabel(APP_CHANNEL)}`,
+    },
+  ]);
+});
+
+test("release channel labels handle case and preserve unknown channel identifiers", () => {
+  expect(releaseChannelLabel("pre-release")).toBe(releaseChannelLabel("PRE-RELEASE"));
+  expect(releaseChannelLabel("stable")).toBe(releaseChannelLabel("RELEASE"));
+  expect(releaseChannelLabel("custom-channel")).toBe("custom-channel");
 });
 
 function appSettings(seed: Record<string, Json> = {}) {
@@ -110,7 +133,7 @@ test("the application group lists its sections in order and the extensions group
   ).toEqual([
     [
       "Приложение",
-      ["Общие", "Профиль", "Внешний вид", "Уведомления", "Память", "Данные", "О системе"],
+      ["Общие", "Профиль", "Внешний вид", "Уведомления", "Память", "Данные", "О приложении"],
     ],
     [
       "Расширения",

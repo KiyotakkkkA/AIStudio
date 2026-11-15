@@ -66,9 +66,9 @@ import {
   type PreferenceSection,
 } from "../../stores/UiStore";
 import {
-  APP_EDITION,
+  APP_DESCRIPTION,
   APP_NAME,
-  APP_VERSION_LABEL,
+  APP_ROW_LABELS,
   DIAGNOSTICS_TITLE,
   FONT_FAMILY_HINT,
   FONT_FAMILY_LABEL,
@@ -86,6 +86,7 @@ import {
   FX_OPTIONS,
   FX_OS_NOTE,
   GENERAL_ROWS,
+  INSTALLATION_TITLE,
   NOTIFICATION_KIND_ROWS,
   NOTIFICATIONS_ROW,
   PREFERENCE_GROUPS,
@@ -241,21 +242,24 @@ const InfoTableRows = observer(function InfoTableRows({
 }) {
   const { ui } = useStore();
   return (
-    <dl className="m-0 grid grid-cols-[minmax(10rem,auto)_1fr] gap-x-6 gap-y-2.5 text-[13px]">
+    <dl className="m-0 divide-y divide-line text-[13px]">
       {rows.map((row) => {
         const id = aboutSettingId(group, row.label);
         return (
-          <div key={row.label} className="contents">
+          <div
+            key={row.label}
+            className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-3.5"
+          >
             <dt
               data-setting={id}
               data-setting-highlighted={ui.preferenceTarget === id || undefined}
-              className="rounded-control text-main-500"
+              className="rounded-control text-main-400"
             >
               {row.label}
             </dt>
             <dd
               data-setting-highlighted={ui.preferenceTarget === id || undefined}
-              className="m-0 min-w-0 rounded-control wrap-break-word text-main-100"
+              className="m-0 min-w-0 rounded-control text-right wrap-break-word text-main-100 select-text"
             >
               {row.value}
             </dd>
@@ -1248,34 +1252,27 @@ const DataSection = observer(function DataSection() {
 
 const AboutSection = observer(function AboutSection() {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3.5 rounded-card bg-main-850 px-4 py-3.5">
-        <AppLogo size={40} />
-        <div className="flex min-w-0 flex-col leading-tight">
-          <span className="text-[15px] font-semibold tracking-[-0.01em] text-main-50">
+    <div className="flex flex-col gap-7">
+      <div
+        data-setting={aboutSettingId("app", APP_ROW_LABELS.name)}
+        className="flex items-center gap-5 rounded-card border border-line bg-main-850 p-6"
+      >
+        <AppLogo size={64} />
+        <div className="flex min-w-0 flex-col gap-2">
+          <span className="text-[22px] leading-tight font-semibold tracking-[-0.02em] text-main-50">
             {APP_NAME}
           </span>
-          <span className="font-mono text-[12px] text-main-500">
-            {APP_VERSION_LABEL} · {APP_EDITION.toLowerCase()}
-          </span>
+          <p className="m-0 text-[13px] leading-relaxed text-main-400">{APP_DESCRIPTION}</p>
         </div>
       </div>
-      <section className="flex flex-col gap-3">
-        <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          Приложение
-        </h3>
+      <PreferenceContainer title={INSTALLATION_TITLE}>
         <InfoTableRows group="app" rows={appRows()} />
-      </section>
+        <div className="border-t border-line">
+          <InfoTableRows group="cli" rows={cliRows()} />
+        </div>
+      </PreferenceContainer>
       <section className="flex flex-col gap-3">
-        <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          {SECTION_LABELS.cli}
-        </h3>
-        <InfoTableRows group="cli" rows={cliRows()} />
-      </section>
-      <section className="flex flex-col gap-3">
-        <h3 className="m-0 text-[10.5px] font-semibold tracking-[0.12em] text-main-500 uppercase">
-          {DIAGNOSTICS_TITLE}
-        </h3>
+        <h3 className="m-0 text-[13px] font-medium text-main-100">{DIAGNOSTICS_TITLE}</h3>
         <HostCheck />
       </section>
     </div>
@@ -1360,7 +1357,7 @@ function PreferencesWorkspace() {
       </nav>
       <div ref={content} className="flex min-w-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1 p-7">
-          <div className="mx-auto w-full max-w-240">
+          <div className={`mx-auto w-full ${section === "about" ? "max-w-200" : "max-w-240"}`}>
             <header className="mb-8 flex flex-col gap-2">
               <h2 className="m-0 text-[28px] leading-tight font-semibold tracking-[-0.02em] text-main-50">
                 {SECTION_LABELS[section]}

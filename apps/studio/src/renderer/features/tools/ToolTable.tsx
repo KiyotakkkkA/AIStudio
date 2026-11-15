@@ -14,6 +14,7 @@ import {
 } from "./toolPresentation";
 import { TableSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
+import ToolStatusIndicator from "./ToolStatusIndicator";
 
 const HEAD = "text-[10px] font-semibold tracking-[0.07em] text-main-500 uppercase";
 
@@ -76,20 +77,29 @@ function ToolTable({ store }: { readonly store: ToolStore }) {
                       : "hover:bg-main-850"
                   }`}
                 >
-                  <div className={`flex min-w-0 flex-1 flex-col ${dimmed ? "opacity-55" : ""}`}>
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate font-mono text-[12.5px] font-medium text-main-50">
-                        {tool.key}
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className={`flex min-w-0 flex-1 flex-col ${dimmed ? "opacity-55" : ""}`}>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate font-mono text-[12.5px] font-medium text-main-50">
+                          {tool.key}
+                        </span>
                       </span>
-                      {tool.available ? null : <Chip>недоступен</Chip>}
-                    </span>
-                    <span className="truncate text-[11px] text-main-400" title={tool.description}>
-                      {tool.description.length > 0
-                        ? tool.description
-                        : tool.destructive
-                          ? "Разрушающее действие."
-                          : tool.displayName}
-                    </span>
+                      <span className="truncate text-[11px] text-main-400" title={tool.description}>
+                        {tool.description.length > 0
+                          ? tool.description
+                          : tool.destructive
+                            ? "Разрушающее действие."
+                            : tool.displayName}
+                      </span>
+                    </div>
+                    <ToolStatusIndicator
+                      tool={tool}
+                      server={
+                        tool.source === "mcp"
+                          ? (store.servers.find((server) => server.id === tool.sourceRef) ?? null)
+                          : null
+                      }
+                    />
                   </div>
                   <span className={`flex w-26 flex-none ${dimmed ? "opacity-55" : ""}`}>
                     <Chip tone={tool.source === "builtin" ? "accent" : "neutral"}>

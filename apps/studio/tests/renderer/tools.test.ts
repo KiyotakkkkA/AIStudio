@@ -219,12 +219,21 @@ test("a JSON Schema renders as readable fields with required marks and defaults"
 test("an offline source explains why its tools are unavailable", () => {
   const files = SERVERS[1]!;
   expect(unavailability(REGISTRY[4]!, files)).toEqual({
+    tone: "err",
     title: "Источник офлайн: filesystem — ошибка подключения",
     detail: "spawn npx ENOENT",
   });
   expect(unavailability(REGISTRY[5]!, files)?.title).toBe("Сервер-источник не подключён");
   expect(unavailability(REGISTRY[4]!, null)?.title).toBe("MCP-сервер удалён");
   expect(unavailability(REGISTRY[0]!, null)).toBeNull();
+});
+
+test("tool status distinguishes connection errors from unavailable sources", () => {
+  const files = SERVERS[1]!;
+  expect(unavailability(REGISTRY[5]!, files)?.tone).toBe("err");
+  expect(unavailability(REGISTRY[4]!, null)?.tone).toBe("warn");
+  expect(unavailability({ ...REGISTRY[0]!, available: false }, null)?.tone).toBe("warn");
+  expect(unavailability(REGISTRY[4]!, { ...files, status: "stopped" })?.tone).toBe("warn");
 });
 
 test("presentation formats last use", () => {

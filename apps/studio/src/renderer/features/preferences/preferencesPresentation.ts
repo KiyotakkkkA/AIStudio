@@ -16,10 +16,24 @@ import { BROWSER_SECTION_HINT } from "../browser/browserSettingsCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
 export const APP_NAME = "ZVS AI Studio";
-export const APP_VERSION_LABEL = `${APP_CHANNEL} v${APP_VERSION}`;
-export const APP_EDITION = "Локальная установка";
+export const APP_DESCRIPTION = "Ваше личное рабочее пространство.";
+export const INSTALLATION_TITLE = "Сведения об установке";
 
-const CLI_VERSION_LABEL = `${CLI_CHANNEL} v${CLI_VERSION}`;
+const RELEASE_CHANNEL_LABELS: Readonly<Record<string, string>> = {
+  "PRE-RELEASE": "Предварительная версия",
+  RELEASE: "Стабильная версия",
+  STABLE: "Стабильная версия",
+  BETA: "Бета-версия",
+  ALPHA: "Альфа-версия",
+  DEV: "Версия для разработки",
+};
+
+export function releaseChannelLabel(channel: string): string {
+  return RELEASE_CHANNEL_LABELS[channel.toUpperCase()] ?? channel;
+}
+
+export const APP_VERSION_LABEL = `v${APP_VERSION} · ${releaseChannelLabel(APP_CHANNEL)}`;
+const CLI_VERSION_LABEL = `v${CLI_VERSION} · ${releaseChannelLabel(CLI_CHANNEL)}`;
 
 export const SETTINGS_MANAGE = "Управление";
 export const PREFERENCES_TITLE = "Параметры";
@@ -38,7 +52,7 @@ export const SECTION_LABELS: Record<PreferenceSection, string> = {
   notifications: "Уведомления",
   memory: "Память",
   data: "Данные",
-  about: "О системе",
+  about: "О приложении",
   browser: "Браузер",
   device: DEVICE_TITLE,
   components: "Компоненты",
@@ -66,7 +80,7 @@ export const SECTION_HINTS: Record<PreferenceSection, string> = {
   notifications: "Системные уведомления о событиях приложения.",
   memory: "Сохранённые сведения, полученные в диалогах.",
   data: "Место на диске, занятое данными приложения, и очистка кэша.",
-  about: "Версия приложения, сведения о консольной версии и диагностика.",
+  about: "Справка об установленном приложении",
   components: "Среды выполнения для MCP-серверов.",
   cli: "Настройка утилиты командной строки.",
   voice: "Настройка распознавания голоса и управление голосовым вводом.",
@@ -206,8 +220,7 @@ export interface InfoRow {
 
 export const APP_ROW_LABELS = {
   name: "Приложение",
-  version: "Версия",
-  edition: "Сборка",
+  version: "Версия приложения",
 } as const;
 
 export function appRows(): InfoRow[] {
@@ -215,7 +228,7 @@ export function appRows(): InfoRow[] {
 }
 
 export const CLI_ROW_LABELS = {
-  version: "Версия",
+  version: "Версия терминала",
 } as const;
 
 export function cliRows(): InfoRow[] {

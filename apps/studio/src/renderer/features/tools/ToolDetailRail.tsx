@@ -1,4 +1,4 @@
-import { mdiAlertCircleOutline, mdiGraphOutline, mdiWrenchOutline } from "@mdi/js";
+import { mdiGraphOutline, mdiWrenchOutline } from "@mdi/js";
 import { observer } from "mobx-react-lite";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { useNavigate } from "react-router-dom";
@@ -26,7 +26,6 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
   const navigate = useNavigate();
   const tool = store.selected;
   const tier = store.selectedTier;
-  const problem = store.selectedUnavailability;
   const references = store.detail?.id === tool?.id ? (store.detail?.references ?? null) : null;
 
   return (
@@ -67,30 +66,6 @@ function ToolDetailRail({ store }: { readonly store: ToolStore }) {
             {tool.destructive ? <Chip>destructive</Chip> : null}
             {tool.enabled ? null : <Chip>выключен</Chip>}
           </div>
-
-          {problem === null ? null : (
-            <div
-              role="status"
-              className="flex gap-2 rounded-card bg-warn-soft px-3 py-2.5 text-[12px]"
-            >
-              <Icon path={mdiAlertCircleOutline} size={15} className="mt-px flex-none text-warn" />
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="font-medium text-main-100">{problem.title}</span>
-                {problem.detail === null ? null : (
-                  <span className="wrap-break-word text-main-400">{problem.detail}</span>
-                )}
-                {tool.source === "mcp" ? (
-                  <button
-                    type="button"
-                    className="mt-1 self-start text-[11.5px] font-medium text-accent-medium hover:underline"
-                    onClick={() => void navigate(ROUTES.connections)}
-                  >
-                    Открыть «Коннекторы»
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          )}
 
           <div>
             <span className="mb-1.5 block text-[11px] font-medium text-main-400">Разрешение</span>

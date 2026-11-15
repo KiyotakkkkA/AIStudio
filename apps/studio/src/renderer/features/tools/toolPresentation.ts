@@ -42,6 +42,7 @@ export function formatLastUsed(timestamp: number | null, now: number): string {
 }
 
 export interface Unavailability {
+  readonly tone: "warn" | "err";
   readonly title: string;
   readonly detail: string | null;
 }
@@ -50,6 +51,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
   if (tool.available) {
     if (tool.source === "mcp" && server !== null && server.status === "failed")
       return {
+        tone: "err",
         title: "Сервер-источник не подключён",
         detail: server.lastError,
       };
@@ -58,11 +60,13 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
   if (tool.source === "mcp") {
     if (server === null)
       return {
+        tone: "warn",
         title: "MCP-сервер удалён",
         detail: "Инструмент остался в реестре, но его вызов невозможен.",
       };
     const state = serverState(server, null);
     return {
+      tone: server.status === "failed" ? "err" : "warn",
       title: `Источник офлайн: ${server.name} — ${STATE_LABELS[state].toLowerCase()}`,
       detail:
         server.lastError ??
@@ -72,6 +76,7 @@ export function unavailability(tool: ToolDto, server: McpServerDto | null): Unav
     };
   }
   return {
+    tone: "warn",
     title: "Инструмент недоступен",
     detail: "Источник больше не предоставляет этот инструмент.",
   };

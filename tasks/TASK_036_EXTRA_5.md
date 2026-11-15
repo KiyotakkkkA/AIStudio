@@ -14,7 +14,7 @@ estimate: 8 h
 
 The cog in the nav rail opens the «Параметры» dialog (`features/preferences/PreferencesDialog.tsx`).
 Its nav has one group, «Приложение» (`PREFERENCES_GROUP`), with two sections: «Внешний вид» and
-«О системе» (`PreferenceSection` in `stores/UiStore.ts`, labels in
+«О приложении» (`PreferenceSection` in `stores/UiStore.ts`, labels in
 `preferencesPresentation.ts`).
 
 The app has no way to tell the user that something happened while they are looking elsewhere.
@@ -204,7 +204,7 @@ than a library swap.
   chat route with no selection. A `downloads` target navigates to «Загрузки». The
   preferences dialog closes if it is open.
 - `PreferenceSection` gains `general` and `notifications`. The nav order in the «Приложение»
-  group is «Общие», «Внешний вид», «Уведомления», «О системе». Icons: `mdiCogOutline`,
+  group is «Общие», «Внешний вид», «Уведомления», «О приложении». Icons: `mdiCogOutline`,
   `mdiBellOutline`.
 - `PreferencesStore` (or an extension of `UiStore`, whichever fits next to `ui.font.*`) loads the
   six keys, writes them through `settings.set` and rolls back the toggle when the call fails,
@@ -358,7 +358,7 @@ and check that the app starts in the tray. Turn autostart off in Task Manager, r
   `tauri`. While the tray is on, close hides the window. «Выход» closes the window, so its
   geometry is stored, and exits through the shutdown coordinator. A launch by autostart with
   the tray on stays hidden.
-- Renderer: the sections «Общие», «Внешний вид», «Уведомления», «О системе». `AppSettingsStore`
+- Renderer: the sections «Общие», «Внешний вид», «Уведомления», «О приложении». `AppSettingsStore`
   writes each toggle and rolls it back with an error under the row when the write fails. The
   notification kinds are shown only while the master toggle is on and keep their values.
   `AppFrame` handles the `navigation` step for `/chat` + `conversationId` and for
