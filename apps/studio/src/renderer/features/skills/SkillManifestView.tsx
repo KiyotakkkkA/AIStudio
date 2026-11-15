@@ -37,7 +37,7 @@ function SkillManifestView({
       {skill !== null && !skill.enabled ? (
         <div className="flex flex-none items-center gap-2.5 rounded-control bg-main-800 px-3 py-2.25 text-[12px] text-main-300">
           <Icon path={mdiPowerPlugOffOutline} size={16} />
-          Навык выключен: он не предлагается в чате и не запускается.
+          Навык отключён настройками приложения.
         </div>
       ) : null}
 
