@@ -6,6 +6,10 @@ use zvs_contract::{AppError, AppErrorCode, Json, SettingsSetOutput, Timestamp};
 use crate::data::schema::SettingRow;
 use crate::data::{Database, Repositories};
 use crate::platform::clock::SharedClock;
+use crate::platform::theme::{
+    FONT_SIZE_SETTING_KEY, PaletteMode, THEME_SETTING_KEY, ThemePort, apply_interface_zoom,
+    apply_palette, apply_theme_source,
+};
 
 pub type SettingDto = SettingsSetOutput;
 
@@ -33,6 +37,21 @@ impl SettingService {
             .into_iter()
             .map(to_dto)
             .collect()
+    }
+
+    pub fn apply_appearance(&self, port: &dyn ThemePort) -> Result<(), AppError> {
+        let theme = self.get(THEME_SETTING_KEY)?;
+        let font_size = self.get(FONT_SIZE_SETTING_KEY)?;
+        let palettes = PaletteMode::ALL
+            .into_iter()
+            .map(|mode| Ok((mode.setting_key(), self.get(mode.setting_key())?)))
+            .collect::<Result<Vec<_>, AppError>>()?;
+        apply_theme_source(theme.as_ref().map(|setting| &setting.value), port);
+        for (key, setting) in palettes {
+            apply_palette(key, setting.as_ref().map(|setting| &setting.value), port);
+        }
+        apply_interface_zoom(font_size.as_ref().map(|setting| &setting.value), port);
+        Ok(())
     }
 
     pub fn set(&self, key: &str, value: &Json) -> Result<SettingDto, AppError> {

@@ -15,6 +15,7 @@ pub mod chat;
 pub mod cli;
 pub mod compaction;
 pub mod computer;
+pub mod data_transfer;
 pub mod documents;
 pub mod downloads;
 pub mod enums;
@@ -369,3 +370,5 @@ pub use images::{
     CliImageImportInput, IMAGE_DATA_URL_MAX, IMAGES_MAX, ImageAttachmentDto, ImageDataDto,
     ImageReadInput,
 };
+
+pub use data_transfer::*;

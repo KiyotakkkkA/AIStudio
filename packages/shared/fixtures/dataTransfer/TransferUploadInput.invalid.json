@@ -1,0 +1,16 @@
+[
+  {
+    "name": "extension",
+    "value": {
+      "name": "data.zip",
+      "bytes": 1
+    }
+  },
+  {
+    "name": "too large",
+    "value": {
+      "name": "data.dbox",
+      "bytes": 8589934593
+    }
+  }
+]

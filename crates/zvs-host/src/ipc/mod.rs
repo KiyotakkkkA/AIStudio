@@ -9,6 +9,7 @@ mod caller;
 pub mod chat;
 pub mod cli;
 pub mod computer;
+pub mod data_transfer;
 pub mod documents;
 pub mod downloads;
 pub mod exec_policy;
@@ -80,6 +81,7 @@ pub fn register(server: &mut IpcServer) {
     browser_sites::register(server);
     computer::register(server);
     storage::register(server);
+    data_transfer::register(server);
     voice::register(server);
 }
 
@@ -224,6 +226,13 @@ mod tests {
                 "dashboards.refresh",
                 "dashboards.setInterval",
                 "dashboards.status",
+                "dataTransfer.appendImport",
+                "dataTransfer.beginImport",
+                "dataTransfer.disposeImport",
+                "dataTransfer.export",
+                "dataTransfer.import",
+                "dataTransfer.inspectImport",
+                "dataTransfer.inventory",
                 "documents.close",
                 "documents.list",
                 "documents.open",

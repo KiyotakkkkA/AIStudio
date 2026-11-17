@@ -93,6 +93,9 @@ impl PickerPort for DialogPicker {
     async fn save_as(&self, suggested_name: &str) -> Result<Option<String>, AppError> {
         let (sender, receiver) = oneshot::channel::<Option<FilePath>>();
         let mut dialog = self.0.dialog().file().set_file_name(suggested_name);
+        if suggested_name.ends_with(".dbox") {
+            dialog = dialog.add_filter("Архив данных ZVS AI Studio", &["dbox"]);
+        }
         if let Some(studio) = self.0.get_window(window::STUDIO) {
             dialog = dialog.set_parent(&studio);
         }

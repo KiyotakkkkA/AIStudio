@@ -32,6 +32,46 @@ use zvs_contract::{
 type Check = fn(Value) -> Result<Value, String>;
 
 const TABLE: &[(&str, Check)] = &[
+    (
+        "dataTransfer/TransferCategory",
+        round_trip::<zvs_contract::TransferCategory>,
+    ),
+    (
+        "dataTransfer/TransferSelection",
+        round_trip::<zvs_contract::TransferSelection>,
+    ),
+    (
+        "dataTransfer/TransferCategoryDto",
+        round_trip::<zvs_contract::TransferCategoryDto>,
+    ),
+    (
+        "dataTransfer/TransferPreviewDto",
+        round_trip::<zvs_contract::TransferPreviewDto>,
+    ),
+    (
+        "dataTransfer/TransferUploadInput",
+        round_trip::<zvs_contract::TransferUploadInput>,
+    ),
+    (
+        "dataTransfer/TransferRef",
+        round_trip::<zvs_contract::TransferRef>,
+    ),
+    (
+        "dataTransfer/TransferChunkInput",
+        round_trip::<zvs_contract::TransferChunkInput>,
+    ),
+    (
+        "dataTransfer/TransferImportInput",
+        round_trip::<zvs_contract::TransferImportInput>,
+    ),
+    (
+        "dataTransfer/TransferExportDto",
+        round_trip::<zvs_contract::TransferExportDto>,
+    ),
+    (
+        "dataTransfer/TransferImportDto",
+        round_trip::<zvs_contract::TransferImportDto>,
+    ),
     ("primitives/ProviderId", round_trip::<ProviderId>),
     (
         "providers/ProviderUsageDto",

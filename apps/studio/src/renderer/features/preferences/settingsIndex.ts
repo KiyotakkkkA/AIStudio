@@ -1,4 +1,10 @@
 import {
+  DATA_EXPORT_ID,
+  DATA_IMPORT_ID,
+  DATA_EXPORT_TITLE,
+  DATA_IMPORT_TITLE,
+} from "./dataTransferCopy";
+import {
   DEVICE_ENABLED_ID,
   DEVICE_ENABLED_LABEL,
   APP_PERMISSIONS_ID,
@@ -185,6 +191,8 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: ENABLED_ROW.key, section: "memory", label: ENABLED_ROW.label },
   { id: MEMORY_RECORDS_ROW.key, section: "memory", label: MEMORY_RECORDS_ROW.label },
   { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
+  { id: DATA_EXPORT_ID, section: "data", label: DATA_EXPORT_TITLE },
+  { id: DATA_IMPORT_ID, section: "data", label: DATA_IMPORT_TITLE },
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
   { id: STORAGE_RESET_ID, section: "data", label: STORAGE_RESET_LABEL },
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },

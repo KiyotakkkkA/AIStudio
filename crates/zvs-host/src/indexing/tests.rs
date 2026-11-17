@@ -664,6 +664,36 @@ fn sorted(mut values: Vec<String>) -> Vec<String> {
 }
 
 #[tokio::test]
+async fn imported_documents_are_indexed_without_an_existing_table_and_keep_their_ids() {
+    let host = Harness::new().await;
+    host.write("imported.txt", "alpha beta gamma delta");
+    host.add_folder(&[], &[]);
+    host.index(false).await;
+    let previous = host.documents()[0].id.clone();
+    host.core
+        .remove_index(&host.store_path())
+        .await
+        .expect("remove index");
+    host.patch_store(&VectorStorePatch {
+        table_created_at: Some(None),
+        last_indexed_at: Some(None),
+        status: Some(zvs_contract::VectorHealth::Pending),
+        documents: Some(0),
+        vectors: Some(0),
+        bytes: Some(0),
+        ..VectorStorePatch::default()
+    });
+    host.database.with_connection(|connection| {
+        connection.execute("UPDATE vector_document SET content_hash='dbox:pending',chunk_count=0,indexed_at=0 WHERE id=?1", [&previous])?;
+        Ok(())
+    }).expect("pending document");
+    let report = host.index(false).await;
+    assert_eq!(report.indexed, 1);
+    assert_eq!(host.documents()[0].id, previous);
+    assert!(!host.rows_for(&previous).is_empty());
+}
+
+#[tokio::test]
 async fn a_folder_is_walked_extracted_embedded_and_recorded_end_to_end() {
     let host = Harness::new().await;
     host.write("guide.md", "alpha beta gamma delta epsilon zeta eta theta");

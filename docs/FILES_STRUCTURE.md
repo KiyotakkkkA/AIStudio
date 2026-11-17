@@ -61,6 +61,8 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 │   │   ├── outputs/
 │   │   └── snapshots/<run-id>/
 │   ├── scenarios/
+│   ├── imports/<batch-id>/stores/<store-id>/
+│   ├── transfer-journals/<batch-id>.json
 │   ├── library/
 │   │   ├── skills/
 │   │   ├── dashboards/

@@ -1,3 +1,13 @@
+import {
+  TransferSelection,
+  TransferPreviewDto,
+  TransferUploadInput,
+  TransferRef,
+  TransferChunkInput,
+  TransferImportInput,
+  TransferExportDto,
+  TransferImportDto,
+} from "../dataTransfer.js";
 import { CLI_CONFIRM_SETTING_KEY } from "../cli.js";
 import { z } from "zod";
 import { CliImageImportInput, ImageAttachments, ImageDataDto, ImageReadInput } from "../images.js";
@@ -628,6 +638,13 @@ export const contract = defineContract({
     input: z.object({ refresh: z.boolean().default(false) }),
     output: DiskUsageDto,
   },
+  "dataTransfer.inventory": { input: z.void(), output: TransferPreviewDto },
+  "dataTransfer.export": { input: TransferSelection, output: TransferExportDto.nullable() },
+  "dataTransfer.beginImport": { input: TransferUploadInput, output: TransferRef },
+  "dataTransfer.appendImport": { input: TransferChunkInput, output: z.void() },
+  "dataTransfer.inspectImport": { input: TransferRef, output: TransferPreviewDto },
+  "dataTransfer.import": { input: TransferImportInput, output: TransferImportDto },
+  "dataTransfer.disposeImport": { input: TransferRef, output: z.void() },
   "storage.usage": { input: StorageUsageInput, output: StorageUsageDto },
   "storage.resetChallenge": { input: z.void(), output: StorageResetConfirmation },
   "storage.reset": { input: StorageResetConfirmation, output: z.void() },

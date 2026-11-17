@@ -70,8 +70,10 @@ for account mode became requests issued *inside* a hidden webview of the work pr
 cookies never leave it (§12). `webContents.debugger` became WebView2's DevTools Protocol API.
 `app.getGPUInfo` became DXGI adapter enumeration. `dialog` became `tauri-plugin-dialog`. Single
 instance became `tauri-plugin-single-instance`. `better-sqlite3` and Drizzle became `rusqlite`.
-The napi addon became direct linking to `zvs-core`. The Playwright-Electron e2e became
-Playwright over WebView2 CDP in an `e2e`-feature build. electron-builder became the Tauri
+The napi addon became direct linking to `zvs-core`. Playwright UI tests were removed as
+unnecessary by project decision on 2026-11-18; Vitest and Rust tests remain the automated
+test suites. The native WebView2 integration test retains the `e2e` cargo feature.
+electron-builder became the Tauri
 bundler (NSIS). Electron user data is **not** migrated: the Tauri build starts fresh.
 
 ---
@@ -82,7 +84,7 @@ bundler (NSIS). Electron user data is **not** migrated: the Tauri build starts f
 
 | Piece | Version | Note |
 | --- | --- | --- |
-| Node | 26.7.0 | dev toolchain only (renderer build, Vitest, Playwright); not shipped |
+| Node | 26.7.0 | dev toolchain only (renderer build, Vitest); not shipped |
 | pnpm | 12.3.4 | workspace manager |
 | Rust / cargo | 1.93.1 | stable channel, edition 2024; the host, the core and the sidecar |
 | `@kiyotakkkka/zvs-uikit-lib` | 8.3.0 | ESM-only; peers `react@^19`, `react-dom@^19`; subpaths `.`, `./chart`, `./code-view`, `./server`, `./styles.css`; brings `clsx`, `tailwind-merge`, `shiki`, `recharts`, `@tanstack/react-virtual` |
@@ -105,7 +107,7 @@ bootstrap and pin there.
 | AI | Hand-written adapter families in the Rust host over one shared `reqwest` client — no vendor SDK |
 | Vector | LanceDB (Rust crate) in `zvs-core`, linked in-process |
 | Native | tokio (async), `tokio-util` cancellation, a plain Rust binary for the sidecar, the `windows` crate for DPAPI/DXGI/WebView2 COM |
-| Test | Vitest (`packages`, renderer), `cargo test` (host, core, sidecar), Playwright over WebView2 CDP (e2e) |
+| Test | Vitest (`packages`, renderer), `cargo test` (host, core, sidecar); native WebView2 integration tests |
 | Viewer | `pdf.js` (renderer), sidecar conversion for DOCX/XLSX/PPTX |
 | Browser | Tauri child webviews in a dedicated WebView2 profile + WebView2's DevTools Protocol API (CDP) |
 | Package | Tauri bundler, NSIS, per-user install |
@@ -188,7 +190,6 @@ zvs-ai-studio/
 │  │     └─ platform/            # paths, logger, ids, clock, events, archive, metrics
 │  ├─ zvs-pipe/                  # the CLI pipe: per-user named pipe, owner checks
 │  └─ zvs-jobd/                  # sidecar binary, thin wrapper over zvs-core
-├─ e2e/                          # Playwright over WebView2 CDP
 ├─ design/                       # the maket (source of truth for UI)
 ├─ docs/                         # this file, ADRs
 ├─ Cargo.toml                    # cargo workspace
@@ -536,6 +537,13 @@ repositories.
   failure. A failed migration blocks boot and shows a recovery window. The app never runs on
   a half-migrated database.
 - Backup the DB file before each migration run; keep the last three.
+- Explicit data transfer uses the versioned `.dbox` format described in [DBOX.md](DBOX.md).
+  `dataTransfer.*` is studio-only; the renderer selects categories and uploads bounded
+  chunks, while the Rust host validates, exports and restores through a dedicated service
+  and repository. Secrets, account sessions, grants, model binaries and run history are
+  excluded. Import adds fresh entity IDs, starts executable configuration disabled and
+  journals filesystem publication alongside its SQLite transaction. Startup journal
+  recovery runs immediately after database preparation, before normal service construction.
 - `run_event` is the replay log, kept lean (TASK_045_EXTRA_5). Kernel step events are stored
   without `input` and `output`; `runs.events` puts them back from the `step` row (the output
   only when the event's status is the row's). Tokens reach the renderer one by one, but they

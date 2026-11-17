@@ -39,14 +39,6 @@ execFileSync(
     stdio: "inherit",
   },
 );
-if (features.includes("e2e")) {
-  execFileSync(
-    "cargo",
-    ["build", "--locked", "--package", "zvs-core", "--example", "seed_vectors", ...profile],
-    { cwd: root, stdio: "inherit" },
-  );
-}
-
 const bundling = release && !rest.includes("--no-bundle");
 const sidecar = join(
   root,

@@ -13,6 +13,7 @@ pub mod chat_prompt;
 pub mod chat_reply;
 pub mod chat_tools;
 pub mod crypto;
+pub mod data_transfer;
 pub mod graph;
 pub mod health_check;
 pub mod mcp;
@@ -92,6 +93,7 @@ use crate::workspace::{ExplorerService, FolderAccessService};
 pub struct Services {
     pub system: SystemService,
     pub storage: StorageService,
+    pub data_transfer: data_transfer::DataTransferService,
     pub accounts: AccountService,
     pub settings: SettingService,
     pub secrets: Arc<SecretService>,

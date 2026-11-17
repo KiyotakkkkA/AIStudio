@@ -1,0 +1,14 @@
+[
+  {
+    "name": "empty",
+    "value": {
+      "categories": []
+    }
+  },
+  {
+    "name": "duplicate",
+    "value": {
+      "categories": ["settings", "settings"]
+    }
+  }
+]

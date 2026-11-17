@@ -6,6 +6,7 @@ pub mod browser_download;
 pub mod browser_library;
 pub mod browser_site_rule;
 pub mod chat;
+pub mod data_transfer;
 pub mod document;
 pub mod download;
 pub mod folder_grant;

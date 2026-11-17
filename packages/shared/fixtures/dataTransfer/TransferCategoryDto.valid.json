@@ -1,0 +1,20 @@
+[
+  {
+    "name": "example",
+    "value": {
+      "category": "conversations",
+      "count": 2,
+      "bytes": 1024
+    }
+  },
+  {
+    "name": "names and dependencies",
+    "value": {
+      "category": "conversations",
+      "count": 2,
+      "bytes": 1024,
+      "names": ["Диалог"],
+      "requires": ["connections"]
+    }
+  }
+]

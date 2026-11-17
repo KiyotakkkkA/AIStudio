@@ -858,7 +858,15 @@ impl IndexingService {
 
     async fn upgrade(&self, store: VectorStoreRow, full: bool) -> Result<VectorStoreRow, AppError> {
         let path = self.stores().store_path(&store.id)?;
-        let stats = self.stores().core().stats(&path).await?;
+        let stats = match self.stores().core().stats(&path).await {
+            Err(error)
+                if error.code == AppErrorCode::NotFound && store.table_created_at.is_none() =>
+            {
+                self.stores().recreate_table(&store.id).await?;
+                return self.stores().require_store(&store.id);
+            }
+            result => result?,
+        };
         if u64::from(stats.schema_version) >= VECTOR_SCHEMA_VERSION {
             return Ok(store);
         }

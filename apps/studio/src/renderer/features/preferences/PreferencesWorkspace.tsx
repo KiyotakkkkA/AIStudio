@@ -1,3 +1,14 @@
+import {
+  DATA_EXPORT_ID,
+  DATA_IMPORT_ID,
+  DATA_EXPORT_TITLE,
+  DATA_IMPORT_TITLE,
+  DATA_EXPORT_HINT,
+  DATA_IMPORT_HINT,
+  DATA_EXPORT_ACTION,
+  DATA_SELECT_FILE,
+} from "./dataTransferCopy";
+import DataTransferSettings from "./DataTransferSettings";
 import { observer } from "mobx-react-lite";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
@@ -9,6 +20,8 @@ import {
   mdiCogOutline,
   mdiConsole,
   mdiDevices,
+  mdiFileExportOutline,
+  mdiFileImportOutline,
   mdiHarddisk,
   mdiInformationOutline,
   mdiMicrophoneOutline,
@@ -1104,10 +1117,19 @@ const VoiceSection = observer(function VoiceSection() {
 });
 
 const DataSection = observer(function DataSection() {
+  const [transfer, setTransfer] = useState<"export" | "import" | null>(null);
   const { storage } = useStore();
   useEffect(() => {
     void storage.load();
   }, [storage]);
+  if (transfer !== null)
+    return (
+      <DataTransferSettings
+        key={transfer}
+        importing={transfer === "import"}
+        onBack={() => setTransfer(null)}
+      />
+    );
   const usage = storage.usage;
   const total = usage?.totalBytes ?? 0;
   const parts = storage.categories.map((item) => ({
@@ -1221,6 +1243,18 @@ const DataSection = observer(function DataSection() {
         )}
       </section>
       <PreferenceContainer title="Управление данными">
+        <SettingRow id={DATA_EXPORT_ID} label={DATA_EXPORT_TITLE} hint={DATA_EXPORT_HINT}>
+          <Button tone="primary" size="sm" onClick={() => setTransfer("export")}>
+            <Icon path={mdiFileExportOutline} />
+            {DATA_EXPORT_ACTION}
+          </Button>
+        </SettingRow>
+        <SettingRow id={DATA_IMPORT_ID} label={DATA_IMPORT_TITLE} hint={DATA_IMPORT_HINT}>
+          <Button tone="primary" size="sm" onClick={() => setTransfer("import")}>
+            <Icon path={mdiFileImportOutline} />
+            {DATA_SELECT_FILE}
+          </Button>
+        </SettingRow>
         <SettingRow
           id={STORAGE_CLEAR_ID}
           label={STORAGE_CLEAR_CACHE}

@@ -99,6 +99,7 @@ pub fn create_studio<R: Runtime>(
     let shown = Arc::new(AtomicBool::new(hidden));
 
     let mut builder = WebviewWindowBuilder::from_config(app, &config)?
+        .disable_drag_drop_handler()
         .inner_size(state.bounds.width as f64, state.bounds.height as f64)
         .maximized(state.maximized);
     if let (Some(x), Some(y)) = (state.bounds.x, state.bounds.y) {

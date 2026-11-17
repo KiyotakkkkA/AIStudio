@@ -4,7 +4,6 @@
     ".": {
       "entry": [
         "scripts/*.mjs",
-        "e2e/**/*.ts",
         "test/helpers/fakeMcpServer.mjs",
         "test/helpers/fakeCodexServer.mjs",
         "test/helpers/fakeCopilot.mjs",

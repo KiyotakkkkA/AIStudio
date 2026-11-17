@@ -122,7 +122,7 @@ impl StorageRoots {
                 StorageRoot::new(StorageCategory::Skills, vec![paths.skills_dir.clone()]),
                 StorageRoot::new(
                     StorageCategory::Vectors,
-                    vec![paths.vector_stores_dir.clone()],
+                    vec![paths.vector_stores_dir.clone(), paths.imports_dir.clone()],
                 ),
                 StorageRoot::new(
                     StorageCategory::Downloads,

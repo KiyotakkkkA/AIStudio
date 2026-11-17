@@ -644,6 +644,11 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         );
     }
     let database = Arc::new(database);
+    let data_transfer = zvs_host::services::data_transfer::DataTransferService::new(
+        paths.clone(),
+        Arc::clone(&database),
+        Arc::clone(&clock),
+    )?;
 
     let theme: SharedThemePort = Arc::new(TauriTheme::new(app.clone()));
     let shell_state = ShellState::shared();
@@ -1466,6 +1471,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
     let services = Arc::new(Services {
         system,
         storage,
+        data_transfer,
         accounts,
         settings,
         secrets,

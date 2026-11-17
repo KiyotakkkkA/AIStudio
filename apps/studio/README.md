@@ -23,8 +23,8 @@ host behind it is `crates/zvs-host`. Architecture and the decisions behind it li
 
 `scripts/tauri.mjs` points `PROTOC` at `target/tools/protoc` when it exists, builds the
 `zvs-jobd` sidecar next to `zvs-studio.exe` (where `StudioPaths::sidecar_path` looks for it),
-and drops a literal `--`, so `pnpm build -- --features e2e` works. With the `e2e` feature it
-also sets `ZVS_E2E_BUILD` and builds `zvs-core`'s `seed_vectors` example for the e2e suite.
+and drops a literal `--` when passing build arguments. With the `e2e` feature it sets
+`ZVS_E2E_BUILD` for native WebView2 integration tests.
 
 ## The bridge
 
@@ -71,4 +71,4 @@ so a failing run can be reproduced in a fresh UI. In development the hook is on 
 ## Smoke channels
 
 `system.ping` is the request/response round trip. `system.demoStream` is the streaming one: it
-opens a stream, emits ten `progress` events and ends. `e2e/smoke.spec.ts` calls both.
+opens a stream, emits ten `progress` events and ends.

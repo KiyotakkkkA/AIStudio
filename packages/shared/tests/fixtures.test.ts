@@ -1,3 +1,4 @@
+import * as dataTransfer from "../src/dataTransfer.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -494,6 +495,16 @@ const schemas: Record<string, z.ZodType> = {
   "system/ResourceSampleDto": ResourceSampleDto,
   "system/SystemPingInput": contract["system.ping"].input,
   "storage/StorageResetConfirmation": contract["storage.reset"].input,
+  "dataTransfer/TransferCategory": dataTransfer.TransferCategory,
+  "dataTransfer/TransferSelection": dataTransfer.TransferSelection,
+  "dataTransfer/TransferCategoryDto": dataTransfer.TransferCategoryDto,
+  "dataTransfer/TransferPreviewDto": dataTransfer.TransferPreviewDto,
+  "dataTransfer/TransferUploadInput": dataTransfer.TransferUploadInput,
+  "dataTransfer/TransferRef": dataTransfer.TransferRef,
+  "dataTransfer/TransferChunkInput": dataTransfer.TransferChunkInput,
+  "dataTransfer/TransferImportInput": dataTransfer.TransferImportInput,
+  "dataTransfer/TransferExportDto": dataTransfer.TransferExportDto,
+  "dataTransfer/TransferImportDto": dataTransfer.TransferImportDto,
   "storage/StorageCategory": storage.StorageCategory,
   "storage/StoragePart": storage.StoragePart,
   "storage/StorageUsageDto": contract["storage.usage"].output,

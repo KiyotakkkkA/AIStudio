@@ -75,4 +75,4 @@ disposes the event bus. Closing the studio window disposes the account gateway.
 ## Tests
 
 `cargo test -p zvs-studio` (Windows). `tests/account_gateway.rs` needs `--features e2e` and a
-real WebView2. The Playwright suite in `e2e/` drives a build made with `--features e2e`.
+real WebView2. Playwright tests are not used.

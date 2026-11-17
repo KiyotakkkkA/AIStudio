@@ -49,7 +49,7 @@ The whole host is Rust (PASSPORT D10). The renderer only renders: it reaches the
 | [crates/zvs-copilot](crates/zvs-copilot/README.md)       | GitHub Copilot protocol                                                                                      |
 | `packages/shared`                                        | Zod DTOs, the IPC contract, error codes, events, golden fixtures                                             |
 | `packages/ipc`                                           | Typed renderer client over the bridge                                                                        |
-| `e2e/`, `test/helpers/`                                  | Playwright suite; shared fakes (`createFakeBridge`, `createFakeClock`, fake servers)                         |
+| `test/helpers/`                                          | Shared fakes (`createFakeBridge`, `createFakeClock`, fake servers)                                           |
 
 `tasks`, `design` and `references` are kept local (see `.gitignore`).
 
@@ -91,12 +91,11 @@ Markdown.
 
 ## Commands
 
-| Command         | What it does                                                                  |
-| --------------- | ----------------------------------------------------------------------------- |
-| `pnpm dev`      | Builds the workspace packages and the sidecar, then `tauri dev` with Vite HMR |
-| `pnpm build`    | Web build plus `tauri build --no-bundle`: `target/release/zvs-studio.exe`     |
-| `pnpm package`  | `tauri build` with the NSIS installer                                         |
-| `pnpm test:e2e` | Playwright against a build with the `e2e` cargo feature (WebView2 DevTools)   |
+| Command        | What it does                                                                  |
+| -------------- | ----------------------------------------------------------------------------- |
+| `pnpm dev`     | Builds the workspace packages and the sidecar, then `tauri dev` with Vite HMR |
+| `pnpm build`   | Web build plus `tauri build --no-bundle`: `target/release/zvs-studio.exe`     |
+| `pnpm package` | `tauri build` with the NSIS installer                                         |
 
 Gates (a change is not done until the ones it can affect pass):
 

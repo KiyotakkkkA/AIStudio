@@ -15,7 +15,7 @@ crates/zvs-host            services, execution kernel, repositories, drivers
 crates/zvs-core            vectors and indexing      crates/zvs-jobd  sidecar
 packages/shared            Zod schemas + fixtures     packages/ipc   typed client
 docs/PASSPORT.md           binding architecture reference
-e2e/, test/helpers/        Playwright suite and shared test fakes
+test/helpers/             Shared test fakes
 ```
 
 Read `docs/PASSPORT.md` before changing architecture, the IPC contract or the permission
@@ -37,7 +37,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-`pnpm build`, `pnpm test:e2e` and `zvs-studio` clippy need Windows and a built app; CI runs
+`pnpm build` and `zvs-studio` clippy need Windows; CI runs
 them. In a Linux container they fail on missing GTK (`gdk-3.0`) and WebView2 — verify the
 host crates and the renderer instead, and say in the PR what you could not run rather than
 reporting a full pass.
@@ -77,8 +77,9 @@ test that greps for `"active turn"` breaks the moment the message is translated.
 - Stores take clock and bridge dependencies so they can be tested — use `createFakeBridge()`
   and `createFakeClock()` from `test/helpers/`, not real time or a real Tauri runtime.
 - Tests are mandatory for services, the kernel, repositories, the permission model and the
-  contract; presentational markup is covered once by the e2e smoke test. Test the logic a
-  surface carries, not its markup.
+  contract. Test the logic a surface carries, not its markup.
+- Playwright was removed as unnecessary by project decision on 2026-11-18. Do not add or
+  run Playwright tests or require them as a gate.
 - Do not widen scope. Note what you find and leave it; `mcp__ccd_session__spawn_task` or a
   line in the PR is the right place for it.
 - Never invent a version — resolve the latest stable and pin it exactly. Never commit

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "negative bytes",
+    "value": {
+      "category": "settings",
+      "count": 1,
+      "bytes": -1
+    }
+  },
+  {
+    "name": "long name",
+    "value": {
+      "category": "settings",
+      "count": 1,
+      "bytes": 1,
+      "names": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    }
+  }
+]
