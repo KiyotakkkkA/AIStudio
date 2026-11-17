@@ -4,6 +4,7 @@ import { AppErrorCode, contract, type Contract, type StorageUsageDto } from "@zv
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import StorageStore from "../../src/renderer/features/preferences/StorageStore.ts";
 import {
+  STORAGE_RESET_FAILED,
   STORAGE_CACHE_BUSY,
   STORAGE_UNAVAILABLE,
   clearedCopy,
@@ -108,4 +109,59 @@ test("sizes use Russian units and the ru-RU decimal separator", () => {
   expect(storageSize(2_621_440)).toBe(`${(2.5).toLocaleString("ru-RU")} МБ`);
   expect(storageSize(317 * 1024 ** 2)).toBe("317 МБ");
   expect(clearedCopy(0)).not.toBe(clearedCopy(1));
+});
+
+test("reset requires the exact current challenge and cannot be submitted twice", async () => {
+  const bridge = createFakeBridge<Contract>()
+    .handle("storage.resetChallenge", () => ({ challenge: "a1b2c3" }))
+    .handle("storage.reset", () => undefined);
+  const store = new StorageStore(createIpcClient(contract, bridge));
+  await store.reset();
+  expect(bridge.calls).toHaveLength(0);
+  await store.openReset();
+  for (const input of ["", "A1B2C3", " a1b2c3", "wrong"]) {
+    store.setResetInput(input);
+    expect(store.canReset).toBe(false);
+    await store.reset();
+  }
+  expect(bridge.calls).toHaveLength(1);
+  store.setResetInput("a1b2c3");
+  expect(store.canReset).toBe(true);
+  await store.reset();
+  await store.reset();
+  expect(bridge.calls.at(-1)).toEqual({
+    channel: "storage.reset",
+    payload: { challenge: "a1b2c3" },
+  });
+  expect(bridge.calls).toHaveLength(2);
+  expect(store.canReset).toBe(false);
+});
+
+test("cancelling resets the input; reopening fetches a fresh challenge", async () => {
+  let challenge = "a1b2c3";
+  const bridge = createFakeBridge<Contract>().handle("storage.resetChallenge", () => ({
+    challenge,
+  }));
+  const store = new StorageStore(createIpcClient(contract, bridge));
+  await store.openReset();
+  store.setResetInput(challenge);
+  store.closeReset();
+  expect(store.canReset).toBe(false);
+  challenge = "123456";
+  await store.openReset();
+  expect(store.resetInput).toBe("");
+  expect(store.resetChallenge).toBe(challenge);
+});
+
+test("reset errors leave data untouched and allow retry", async () => {
+  const bridge = createFakeBridge<Contract>()
+    .handle("storage.resetChallenge", () => ({ challenge: "123456" }))
+    .fail("storage.reset", AppErrorCode.NATIVE_ERROR, "io");
+  const store = new StorageStore(createIpcClient(contract, bridge));
+  await store.openReset();
+  store.setResetInput("123456");
+  await store.reset();
+  expect(store.resetError).toBe(STORAGE_RESET_FAILED);
+  expect(store.resetting).toBe(false);
+  expect(store.canReset).toBe(true);
 });

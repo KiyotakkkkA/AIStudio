@@ -148,6 +148,7 @@ struct Browser {
 }
 
 struct Lifecycle {
+    restart: std::sync::atomic::AtomicBool,
     shutdown: Arc<ShutdownCoordinator>,
     logger: SharedLogger,
     events: EventBus,
@@ -235,6 +236,23 @@ fn boot_failure(
 
 fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let (paths, legacy) = resolve_paths(app)?;
+    if paths
+        .root
+        .join(zvs_host::services::storage::RESET_MARKER)
+        .try_exists()?
+        && e2e::data_dir().is_none()
+    {
+        use tauri_plugin_autostart::ManagerExt;
+        app.autolaunch().disable()?;
+    }
+    // WebView2 can briefly retain profile files after the previous process exits.
+    for attempt in 0..=20 {
+        match zvs_host::services::storage::apply_pending_reset(&paths.root) {
+            Ok(_) => break,
+            Err(error) if attempt == 20 => return Err(error.into()),
+            Err(_) => std::thread::sleep(std::time::Duration::from_millis(250)),
+        }
+    }
     match DevApp::current() {
         DevApp::Boot => {
             window::set_shell_profile(paths.boot_profile_dir.clone());
@@ -562,11 +580,16 @@ fn on_run_event(app: &AppHandle, event: RunEvent) {
         RunEvent::ExitRequested { api, .. } => match lifecycle.shutdown.request_exit() {
             ExitDecision::Begin => {
                 api.prevent_exit();
+                let restart = lifecycle.restart.load(std::sync::atomic::Ordering::SeqCst);
                 let shutdown = Arc::clone(&lifecycle.shutdown);
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {
                     shutdown.run().await;
-                    app.exit(0);
+                    if restart {
+                        app.request_restart();
+                    } else {
+                        app.exit(0);
+                    }
                 });
             }
             ExitDecision::Wait => api.prevent_exit(),
@@ -1558,6 +1581,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         shell: shell_state,
         logger: logger.clone(),
         lifecycle: Lifecycle {
+            restart: std::sync::atomic::AtomicBool::new(false),
             shutdown,
             logger,
             events,

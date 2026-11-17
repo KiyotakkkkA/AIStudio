@@ -364,6 +364,8 @@ pub const POLICY: &[ChannelPolicy] = &[
     studio("skills.updateAllBundled", Effect::Act),
     studio("skills.updateBundled", Effect::Act),
     studio("storage.clearCache", Effect::Act),
+    studio("storage.reset", Effect::Act),
+    studio("storage.resetChallenge", Effect::Act),
     studio("storage.usage", Effect::Read),
     studio("subagents.get", Effect::Read),
     studio("subagents.set", Effect::Act),

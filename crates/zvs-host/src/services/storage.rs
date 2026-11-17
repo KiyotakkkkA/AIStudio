@@ -11,6 +11,44 @@ use crate::downloads::disk::directory_size;
 use crate::platform::clock::SharedClock;
 use crate::platform::paths::{DownloadKind, StudioPaths};
 
+pub const RESET_MARKER: &str = ".reset-requested";
+
+/// Runs before opening SQLite, log files or any WebView2 profile. Keep the marker
+/// until every deletion succeeds so an interrupted reset is retried at next boot.
+pub fn apply_pending_reset(root: &Path) -> std::io::Result<bool> {
+    if !root.join(RESET_MARKER).try_exists()? {
+        return Ok(false);
+    }
+    let metadata = std::fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() || root.parent().is_none() || root.file_name().is_none() {
+        return Err(std::io::Error::other("Invalid application state root"));
+    }
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        if entry.file_name() == RESET_MARKER {
+            continue;
+        }
+        let kind = entry.file_type()?;
+        if kind.is_symlink() {
+            if entry.path().is_dir() {
+                std::fs::remove_dir(entry.path())?;
+            } else {
+                std::fs::remove_file(entry.path())?;
+            }
+        } else if kind.is_dir() {
+            std::fs::remove_dir_all(entry.path())?;
+        } else {
+            std::fs::remove_file(entry.path())?;
+        }
+    }
+    // Prevent legacy data from being imported back after a deliberate reset.
+    zvs_contract::layout::StateFile::current()
+        .write(root)
+        .map_err(std::io::Error::other)?;
+    std::fs::remove_file(root.join(RESET_MARKER))?;
+    Ok(true)
+}
+
 pub const CACHE_BUSY: &str = "Кэш нельзя очистить, пока выполняются задачи";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +75,7 @@ impl StorageRoot {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageRoots {
+    pub reset_root: PathBuf,
     pub categories: Vec<StorageRoot>,
     pub disposable: Vec<PathBuf>,
 }
@@ -70,6 +109,7 @@ impl StorageRoots {
         let database = paths.db_path.to_string_lossy().into_owned();
         let toolchain = paths.toolchain_dir.clone();
         Self {
+            reset_root: paths.root.clone(),
             categories: vec![
                 StorageRoot::new(
                     StorageCategory::Conversations,
@@ -220,6 +260,7 @@ struct Inner {
     database: Arc<Database>,
     clock: SharedClock,
     cached: Mutex<Option<StorageUsageDto>>,
+    reset_challenge: Mutex<Option<String>>,
 }
 
 #[derive(Clone)]
@@ -235,6 +276,7 @@ impl StorageService {
                 database,
                 clock,
                 cached: Mutex::new(None),
+                reset_challenge: Mutex::new(None),
             }),
         }
     }
@@ -256,6 +298,35 @@ impl StorageService {
             .map_err(native)?;
         *self.cached() = Some(usage.clone());
         Ok(usage)
+    }
+
+    pub fn reset_challenge(&self) -> zvs_contract::StorageResetConfirmation {
+        let challenge = uuid::Uuid::new_v4().simple().to_string()[..6].to_owned();
+        *self
+            .inner
+            .reset_challenge
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(challenge.clone());
+        zvs_contract::StorageResetConfirmation { challenge }
+    }
+
+    pub fn reset(&self, input: zvs_contract::StorageResetConfirmation) -> Result<(), AppError> {
+        let mut challenge = self
+            .inner
+            .reset_challenge
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if challenge.as_deref() != Some(input.challenge.as_str()) {
+            return Err(AppError::new(
+                AppErrorCode::ValidationFailed,
+                "Invalid reset confirmation",
+            ));
+        }
+        let marker = self.inner.roots.reset_root.join(RESET_MARKER);
+        let file = std::fs::File::create(marker).map_err(native)?;
+        file.sync_all().map_err(native)?;
+        *challenge = None;
+        Ok(())
     }
 
     pub async fn clear_cache(&self) -> Result<StorageClearCacheOutput, AppError> {
@@ -335,6 +406,54 @@ mod tests {
             .iter()
             .find(|item| item.category == category)
             .map_or(0, |item| item.bytes)
+    }
+
+    #[test]
+    fn reset_requires_the_current_confirmation_and_is_consumed_once() {
+        let test = fixture();
+        fs::create_dir_all(&test.paths.root).expect("creates root");
+        let old = test.service.reset_challenge();
+        let current = test.service.reset_challenge();
+        assert_ne!(old, current);
+        assert!(test.service.reset(old).is_err());
+        assert!(!test.paths.root.join(RESET_MARKER).exists());
+        test.service
+            .reset(current.clone())
+            .expect("schedules reset");
+        assert!(test.paths.root.join(RESET_MARKER).is_file());
+        assert!(test.service.reset(current).is_err());
+    }
+
+    #[test]
+    fn pending_reset_removes_all_state_and_prevents_legacy_reimport() {
+        let test = fixture();
+        write(&test.paths.db_path, 8);
+        write(&test.paths.shell_profile_dir.join("Cookies"), 8);
+        write(&test.paths.browser_profile_dir.join("Cookies"), 8);
+        write(&test.paths.assets_dir.join("models/model"), 8);
+        write(&test.paths.backups_dir.join("backup"), 8);
+        write(&test.paths.root.join("unknown-future-data"), 8);
+        let outside = test.paths.resources_dir.join("keep");
+        write(&outside, 8);
+        assert!(!apply_pending_reset(&test.paths.root).expect("no reset"));
+        assert!(test.paths.db_path.is_file());
+        test.service
+            .reset(test.service.reset_challenge())
+            .expect("schedules");
+        assert!(apply_pending_reset(&test.paths.root).expect("resets"));
+        assert!(!test.paths.db_path.exists());
+        assert!(!test.paths.profiles_dir.exists());
+        assert!(!test.paths.assets_dir.exists());
+        assert!(!test.paths.backups_dir.exists());
+        assert!(!test.paths.root.join("unknown-future-data").exists());
+        assert!(outside.is_file());
+        assert!(
+            zvs_contract::layout::StateFile::read(&test.paths.root)
+                .expect("reads")
+                .expect("state")
+                .matches_build()
+        );
+        assert!(!apply_pending_reset(&test.paths.root).expect("already reset"));
     }
 
     #[tokio::test]

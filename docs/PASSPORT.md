@@ -556,6 +556,13 @@ repositories.
   removes a pruned run's snapshots and manifest entries, but not the files they point to.
   `storage.usage` reports bytes per category, cached until `refresh`. `storage.clearCache`
   empties `cache/` and is refused while a run is unfinished.
+  `storage.resetChallenge` issues a short random confirmation string; `storage.reset`
+  accepts only the current string once. Both channels are studio-only. A successful reset
+  writes a durable marker in the state root and asks the shell to restart through normal
+  shutdown. Before opening any database, logger or webview on the next launch, the host
+  removes all state-root contents, recreates the current layout stamp (to prevent legacy
+  reimport), then removes the marker. Failed or interrupted deletion retains the marker
+  for retry; files outside the state root are untouched.
 
 Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 `vector_document`, `conversation`, `message`, `scenario`, `scenario_version`, `run`, `step`,

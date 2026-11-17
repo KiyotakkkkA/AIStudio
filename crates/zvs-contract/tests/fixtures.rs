@@ -660,6 +660,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::StorageClearCacheOutput>,
     ),
     (
+        "storage/StorageResetConfirmation",
+        round_trip::<zvs_contract::StorageResetConfirmation>,
+    ),
+    (
         "runtimes/ModelFormat",
         round_trip::<zvs_contract::ModelFormat>,
     ),

@@ -64,6 +64,9 @@ export const StorageUsageDto = z
   );
 export type StorageUsageDto = z.infer<typeof StorageUsageDto>;
 
+export const StorageResetConfirmation = z.object({ challenge: z.string().regex(/^[0-9a-f]{6}$/) });
+export type StorageResetConfirmation = z.infer<typeof StorageResetConfirmation>;
+
 export const StorageUsageInput = z.object({ refresh: z.boolean().default(false) });
 export type StorageUsageInput = z.infer<typeof StorageUsageInput>;
 

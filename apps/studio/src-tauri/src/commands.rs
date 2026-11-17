@@ -160,10 +160,21 @@ pub async fn ipc_call<R: Runtime>(
     if let Some(result) = window_channel(&webview, &channel) {
         return result;
     }
-    Ok(host
+    let output = host
         .server
         .dispatch(Caller::Studio, &channel, payload)
-        .await)
+        .await;
+    if channel == "storage.reset" && output["ok"] == json!(true) {
+        // A Tauri restart cannot be prevented by ExitRequested. Request a normal
+        // exit first so the coordinator finishes before asking Tauri to restart.
+        webview
+            .app_handle()
+            .state::<crate::Lifecycle>()
+            .restart
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        webview.app_handle().exit(0);
+    }
+    Ok(output)
 }
 
 #[tauri::command]

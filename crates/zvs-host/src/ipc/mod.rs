@@ -360,6 +360,8 @@ mod tests {
                 "skills.updateAllBundled",
                 "skills.updateBundled",
                 "storage.clearCache",
+                "storage.reset",
+                "storage.resetChallenge",
                 "storage.usage",
                 "subagents.get",
                 "subagents.set",

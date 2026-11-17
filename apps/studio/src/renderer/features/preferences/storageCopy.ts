@@ -12,6 +12,15 @@ export const STORAGE_CLEAR_CACHE_HINT =
 export const STORAGE_CLEAR_CONFIRM = "Очистить кэш?";
 export const STORAGE_CLEAR_CONSEQUENCE = "Временные файлы будут удалены.";
 export const STORAGE_CLEAR = "Очистить";
+export const STORAGE_RESET_LABEL = "Очистить данные приложения";
+export const STORAGE_RESET_HINT =
+  "Удаление всех данных приложения и возврат к исходному состоянию.";
+export const STORAGE_RESET_TITLE = "Очистить все данные приложения?";
+export const STORAGE_RESET_CONSEQUENCE =
+  "Все данные приложения, включая диалоги, настройки, секреты, загрузки и данные браузера, будут удалены. Действие нельзя отменить. Приложение будет перезапущено.";
+export const STORAGE_RESET_INPUT = "Строка подтверждения";
+export const STORAGE_RESET_FAILED = "Не удалось очистить данные приложения.";
+export const STORAGE_RESET_ID = "storage.reset";
 export const STORAGE_CLEAR_ID = "storage.clearCache";
 const STORAGE_CLEAR_FAILED = "Не удалось очистить кэш.";
 export const STORAGE_CACHE_BUSY = "Кэш нельзя очистить, пока выполняются задачи.";

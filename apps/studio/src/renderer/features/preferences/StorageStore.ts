@@ -1,7 +1,12 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import type { IpcClient } from "@zvs/ipc";
 import type { Contract, StorageCategory, StorageUsageDto } from "@zvs/shared";
-import { STORAGE_UNAVAILABLE, clearErrorCopy, clearedCopy } from "./storageCopy";
+import {
+  STORAGE_RESET_FAILED,
+  STORAGE_UNAVAILABLE,
+  clearErrorCopy,
+  clearedCopy,
+} from "./storageCopy";
 
 export default class StorageStore {
   usage: StorageUsageDto | null = null;
@@ -9,6 +14,11 @@ export default class StorageStore {
   clearing = false;
   error: string | null = null;
   notice: string | null = null;
+  resetChallenge: string | null = null;
+  resetInput = "";
+  resetting = false;
+  resetLoading = false;
+  resetError: string | null = null;
   expanded = new Set<StorageCategory>();
 
   constructor(private readonly ipc: IpcClient<Contract>) {
@@ -49,6 +59,58 @@ export default class StorageStore {
     } finally {
       runInAction(() => {
         this.loading = false;
+      });
+    }
+  }
+
+  get canReset() {
+    return (
+      this.resetChallenge !== null && this.resetInput === this.resetChallenge && !this.resetting
+    );
+  }
+
+  setResetInput(value: string) {
+    this.resetInput = value;
+  }
+
+  closeReset() {
+    if (this.resetting) return;
+    this.resetChallenge = null;
+    this.resetInput = "";
+  }
+
+  async openReset() {
+    if (this.resetLoading || this.resetting) return;
+    this.resetLoading = true;
+    this.resetError = null;
+    this.resetChallenge = null;
+    this.resetInput = "";
+    try {
+      const { challenge } = await this.ipc.call("storage.resetChallenge", undefined);
+      runInAction(() => {
+        this.resetChallenge = challenge;
+      });
+    } catch {
+      runInAction(() => {
+        this.resetError = STORAGE_RESET_FAILED;
+      });
+    } finally {
+      runInAction(() => {
+        this.resetLoading = false;
+      });
+    }
+  }
+
+  async reset() {
+    if (!this.canReset) return;
+    this.resetting = true;
+    this.resetError = null;
+    try {
+      await this.ipc.call("storage.reset", { challenge: this.resetInput });
+    } catch {
+      runInAction(() => {
+        this.resetting = false;
+        this.resetError = STORAGE_RESET_FAILED;
       });
     }
   }

@@ -109,6 +109,7 @@ import {
 } from "./preferencesPresentation";
 import PreferencesSearch from "./PreferencesSearch";
 import SettingRow from "./SettingRow";
+import StorageResetRow from "./StorageResetRow";
 import SettingsSubPage from "./SettingsSubPage";
 import DevicePreferences from "../device/DevicePreferences";
 import BrowserPreferences from "../browser/BrowserPreferences";
@@ -1219,7 +1220,7 @@ const DataSection = observer(function DataSection() {
           </div>
         )}
       </section>
-      <PreferenceContainer title="Очистка данных">
+      <PreferenceContainer title="Управление данными">
         <SettingRow
           id={STORAGE_CLEAR_ID}
           label={STORAGE_CLEAR_CACHE}
@@ -1227,8 +1228,8 @@ const DataSection = observer(function DataSection() {
           error={storage.error ?? undefined}
         >
           <Button
-            tone="ghost"
-            disabled={storage.clearing}
+            tone="danger-soft"
+            disabled={storage.clearing || storage.resetting}
             needConfirm
             modalSetup={{
               title: STORAGE_CLEAR_CONFIRM,
@@ -1240,6 +1241,7 @@ const DataSection = observer(function DataSection() {
             {STORAGE_CLEAR}
           </Button>
         </SettingRow>
+        <StorageResetRow storage={storage} />
         {storage.notice === null ? null : (
           <p role="status" className="m-0 pt-1 text-[12px] text-main-500">
             {storage.notice}

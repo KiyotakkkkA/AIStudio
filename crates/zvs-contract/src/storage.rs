@@ -126,6 +126,27 @@ impl Validate for StorageClearCacheOutput {
     }
 }
 
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageResetConfirmation {
+    pub challenge: String,
+}
+
+impl Validate for StorageResetConfirmation {
+    fn validate(&self) -> Result<(), AppError> {
+        if self.challenge.len() != 6
+            || !self
+                .challenge
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            return Err(invalid("challenge", "format"));
+        }
+        Ok(())
+    }
+}
+
 no_refinements!(StorageUsageInput);
 
 #[cfg(test)]

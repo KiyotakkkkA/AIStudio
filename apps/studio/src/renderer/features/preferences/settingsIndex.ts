@@ -29,7 +29,12 @@ import {
   CLI_THEME_SETTING_ID,
   CLI_TITLE,
 } from "./cliCopy";
-import { STORAGE_CLEAR_CACHE, STORAGE_CLEAR_ID } from "./storageCopy";
+import {
+  STORAGE_RESET_LABEL,
+  STORAGE_RESET_ID,
+  STORAGE_CLEAR_CACHE,
+  STORAGE_CLEAR_ID,
+} from "./storageCopy";
 import { VOICE_DEVICE_ROW, VOICE_MODEL_ROW } from "../voice/voiceCopy";
 import {
   BROWSER_ENABLED_ID,
@@ -181,6 +186,7 @@ export const SETTING_ENTRIES: readonly SettingEntry[] = [
   { id: MEMORY_RECORDS_ROW.key, section: "memory", label: MEMORY_RECORDS_ROW.label },
   { id: MODEL_ROW.key, section: "memory", label: MODEL_ROW.label, fallback: ENABLED_ROW.key },
   { id: STORAGE_CLEAR_ID, section: "data", label: STORAGE_CLEAR_CACHE },
+  { id: STORAGE_RESET_ID, section: "data", label: STORAGE_RESET_LABEL },
   { id: SETTING_IDS.components, section: "components", label: SECTION_LABELS.components },
   { id: CLI_SETTING_ID, section: "cli", label: CLI_TITLE },
   { id: CLI_THEME_SETTING_ID, section: "cli", label: CLI_THEME_LABEL },

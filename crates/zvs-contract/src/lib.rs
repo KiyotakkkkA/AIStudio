@@ -316,7 +316,7 @@ pub use skills::{
 };
 pub use storage::{
     StorageCategory, StorageCategoryUsage, StorageClearCacheOutput, StoragePart, StoragePartUsage,
-    StorageUsageDto, StorageUsageInput,
+    StorageResetConfirmation, StorageUsageDto, StorageUsageInput,
 };
 pub use subagents::{
     CliSubagentCancelInput, SUBAGENT_CONCURRENCY_DEFAULT, SUBAGENT_CONCURRENCY_MAX,
