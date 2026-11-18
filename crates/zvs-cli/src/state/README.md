@@ -24,7 +24,7 @@ Msg ──► App::update(&mut self, msg) ──► Vec<Request>
 `Phase::Connecting(status)` until the link is up, then `Phase::Access` when the working folder
 is not granted yet (the user grants it for this conversation, always, or exits), then
 `Phase::Chat`. `App::exit` set to `Exit::Quiet` or `Exit::Message` ends the session; the
-runtime prints the message and the `--resume` hint after leaving the alternate screen.
+runtime restores the terminal and prints the message and the `--resume` hint after the inline session.
 
 ## Files
 
@@ -87,7 +87,7 @@ the rest wait for the details toggle (Ctrl+O). A left click without a drag asks
 runtime opens with the system handler (`launch::open_url`, `http`/`https` only), and a note row
 (`zvs-note:<id>`) yields `Request::ReadNote`.
 
-**Notes.** `/notes` (Alt+N) needs an open dialog and asks `notes.list`; each row is a note
+**Notes.** `/notes` (F7 by default) needs an open dialog and asks `notes.list`; each row is a note
 (title, update date) or an invalid file (`ошибка` and the host's reason). Enter reads the note
 (`notes.read`) into `Panel::Note`, which lists its fields and body as lines; ← returns to the
 list. Delete arms a confirmation and a second Delete sends `notes.remove`, after which the list

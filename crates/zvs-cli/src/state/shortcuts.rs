@@ -344,31 +344,46 @@ impl Shortcut {
             Self::NewChat => Chord::ctrl('n'),
             Self::ClearScreen => Chord::ctrl('l'),
             Self::Models => Chord::ctrl('p'),
-            Self::Effort => Chord::alt('e'),
+            Self::Effort => Chord::function(2),
             Self::Resume => Chord::ctrl('r'),
             Self::Context => Chord::ctrl('k'),
-            Self::Goal => Chord::alt('g'),
-            Self::Skills => Chord::alt('s'),
-            Self::Mcp => Chord::alt('m'),
-            Self::Processes => Chord::alt('b'),
-            Self::Notes => Chord::alt('n'),
-            Self::Permissions => Chord::alt('p'),
-            Self::Connect => Chord::alt('c'),
-            Self::Desktop => Chord {
-                shift: true,
-                ..Chord::alt('d')
+            Self::Goal => Chord::function(3),
+            Self::Skills => Chord::function(4),
+            Self::Mcp => Chord::function(5),
+            Self::Processes => Chord::function(6),
+            Self::Notes => Chord::function(7),
+            Self::Permissions => Chord::function(8),
+            Self::Connect => Chord::ctrl('b'),
+            Self::Desktop => Chord::function(9),
+            Self::Theme => Chord::function(10),
+            Self::Compact => Chord::ctrl('g'),
+            Self::Config => Chord::function(12),
+            Self::StopSubagent => Chord::ctrl('x'),
+            Self::QueuePrevious => Chord {
+                ctrl: true,
+                alt: false,
+                ..Chord::alt_key(ChordKey::Up)
             },
-            Self::Theme => Chord::alt('t'),
-            Self::Compact => Chord::alt('z'),
-            Self::Config => Chord::alt('o'),
-            Self::StopSubagent => Chord::alt('x'),
-            Self::QueuePrevious => Chord::alt_key(ChordKey::Up),
-            Self::QueueNext => Chord::alt_key(ChordKey::Down),
-            Self::QueueEdit => Chord::alt('i'),
-            Self::QueueRemove => Chord::alt('r'),
-            Self::QueueSend => Chord::alt_key(ChordKey::Enter),
+            Self::QueueNext => Chord {
+                ctrl: true,
+                alt: false,
+                ..Chord::alt_key(ChordKey::Down)
+            },
+            Self::QueueEdit => Chord {
+                shift: true,
+                ..Chord::ctrl('e')
+            },
+            Self::QueueRemove => Chord {
+                shift: true,
+                ..Chord::ctrl('r')
+            },
+            Self::QueueSend => Chord {
+                ctrl: true,
+                alt: false,
+                ..Chord::alt_key(ChordKey::Enter)
+            },
             Self::Help => Chord::function(1),
-            Self::Shortcuts => Chord::alt('k'),
+            Self::Shortcuts => Chord::ctrl('y'),
         })
     }
 

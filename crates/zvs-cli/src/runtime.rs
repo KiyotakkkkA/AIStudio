@@ -1,11 +1,15 @@
 use std::io::{self, IsTerminal};
 use std::time::Duration;
 
+use ratatui::crossterm::cursor::MoveTo;
 use ratatui::crossterm::event::{
     self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
 };
 use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{Clear, ClearType};
+use ratatui::widgets::{Paragraph, Widget};
+use ratatui::{TerminalOptions, Viewport};
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use zvs_contract::{
@@ -34,6 +38,7 @@ const WHEEL_STEP: isize = 3;
 
 enum Signal {
     App(Box<Msg>),
+    Meter(u64, Option<u64>),
     Linked(Connection),
 }
 
@@ -78,14 +83,14 @@ pub fn key(event: KeyEvent, pasting: bool) -> Option<Key> {
             Key::Chord(Chord::character(value, false, true, shift)?)
         }
         KeyCode::F(number) => Key::Chord(Chord::function_key(number, control, alt, shift)?),
-        KeyCode::Up if alt && !control => {
-            Key::Chord(Chord::named(ChordKey::Up, false, true, shift)?)
+        KeyCode::Up if control != alt => {
+            Key::Chord(Chord::named(ChordKey::Up, control, alt, shift)?)
         }
-        KeyCode::Down if alt && !control => {
-            Key::Chord(Chord::named(ChordKey::Down, false, true, shift)?)
+        KeyCode::Down if control != alt => {
+            Key::Chord(Chord::named(ChordKey::Down, control, alt, shift)?)
         }
-        KeyCode::Enter | KeyCode::Char('\r' | '\n') if alt && !shift && !control && !pasting => {
-            Key::Chord(Chord::named(ChordKey::Enter, false, true, false)?)
+        KeyCode::Enter | KeyCode::Char('\r' | '\n') if control != alt && !shift && !pasting => {
+            Key::Chord(Chord::named(ChordKey::Enter, control, alt, false)?)
         }
         KeyCode::Enter | KeyCode::Char('\r' | '\n') if shifted || pasting => Key::Newline,
         KeyCode::Enter | KeyCode::Char('\r' | '\n') => Key::Enter,
@@ -121,8 +126,8 @@ pub fn translate(batch: &[Event]) -> Vec<Msg> {
             Event::Mouse(mouse) => {
                 let at = (mouse.column, mouse.row);
                 match mouse.kind {
-                    MouseEventKind::ScrollUp => Some(Msg::Scroll(WHEEL_STEP)),
-                    MouseEventKind::ScrollDown => Some(Msg::Scroll(-WHEEL_STEP)),
+                    MouseEventKind::ScrollUp => Some(Msg::Scroll(WHEEL_STEP, at.0, at.1)),
+                    MouseEventKind::ScrollDown => Some(Msg::Scroll(-WHEEL_STEP, at.0, at.1)),
                     MouseEventKind::Down(MouseButton::Left) => {
                         Some(Msg::Pointer(Pointer::Press(at.0, at.1)))
                     }
@@ -438,6 +443,14 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             Msg::Context(link.call("chat.context", &input).await)
         }
         Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
+        Request::GetSkill(id) => Msg::SkillDetail(
+            id,
+            link.call("skills.get", &zvs_contract::SkillRef { id })
+                .await,
+        ),
+        Request::GetServer(id) => {
+            Msg::ServerDetail(id, link.call("mcp.get", &json!({ "id": id })).await)
+        }
         Request::Notes(id) => Msg::Notes(link.call("notes.list", &json!({ "id": id })).await),
         Request::ReadNote {
             conversation,
@@ -777,8 +790,53 @@ async fn session(
     app.resume = resume;
     let mut link: Option<Link> = None;
     let shell = ShellControl::default();
+    let mut last_measure = None;
+    let mut meter_generation = 0_u64;
     loop {
+        if let (Some(link), Some(model)) = (&link, &app.model)
+            && !app.busy()
+            && app.phase == crate::state::Phase::Chat
+        {
+            let conversation = app.conversation.as_ref().map(|known| known.id);
+            let key = (
+                conversation,
+                model.provider,
+                model.model.clone(),
+                app.transcript.entries.len(),
+            );
+            if last_measure.as_ref() != Some(&key) {
+                if last_measure
+                    .as_ref()
+                    .is_some_and(|(id, provider, model, _)| {
+                        (*id, *provider, model) != (key.0, key.1, &key.2)
+                    })
+                {
+                    app.context_percent = None;
+                }
+                last_measure = Some(key);
+                meter_generation = meter_generation.wrapping_add(1);
+                let generation = meter_generation;
+                let request = Request::Context {
+                    conversation,
+                    provider: model.provider,
+                    model: model.model.clone(),
+                };
+                let (link, folder, signals) = (link.clone(), app.folder.clone(), signals.clone());
+                tokio::spawn(async move {
+                    let percent = match execute(link, request, folder).await {
+                        Msg::Context(Ok(context)) => context
+                            .total
+                            .saturating_mul(100)
+                            .checked_div(context.context_window),
+                        _ => None,
+                    };
+                    let _ = signals.send(Signal::Meter(generation, percent));
+                });
+            }
+        }
         let drawn = terminal.draw(|frame| ui::draw(frame, &app))?;
+        let viewport = drawn.area;
+        app.viewport = (viewport.width, viewport.height);
         let screen = screen_rows(drawn.buffer);
         let Some(first) = received.recv().await else {
             break;
@@ -794,7 +852,22 @@ async fn session(
                     link = Some(connected);
                     app.update(Msg::Connected)
                 }
-                Signal::App(message) => app.update(*message),
+                Signal::App(message) => match *message {
+                    Msg::Scroll(delta, x, y) => {
+                        if viewport.contains(ratatui::layout::Position::new(x, y)) {
+                            app.update(Msg::Scroll(delta, x - viewport.x, y - viewport.y))
+                        } else {
+                            Vec::new()
+                        }
+                    }
+                    message => app.update(message),
+                },
+                Signal::Meter(generation, percent) => {
+                    if generation == meter_generation {
+                        app.context_percent = percent;
+                    }
+                    Vec::new()
+                }
             };
             dispatch(
                 link.as_ref(),
@@ -805,12 +878,32 @@ async fn session(
                 &signals,
             );
             if app.exit.is_some() {
+                write_history(terminal, &app)?;
                 let conversation = app.conversation.as_ref().map(|known| known.id);
                 return Ok((app.exit.take(), conversation));
             }
         }
     }
     Ok((None, app.conversation.as_ref().map(|known| known.id)))
+}
+
+fn write_history<B: ratatui::backend::Backend>(
+    terminal: &mut ratatui::Terminal<B>,
+    app: &App,
+) -> Result<(), B::Error> {
+    ui::theme::activate(app.active_theme());
+    let width = usize::from(terminal.size()?.width);
+    let mut lines = ui::transcript::history(app, width);
+    if lines.first().is_some_and(|line| line.width() == 0) {
+        lines.remove(0);
+    }
+    for batch in lines.chunks(usize::from(u16::MAX)) {
+        let height = u16::try_from(batch.len()).unwrap_or(u16::MAX);
+        terminal.insert_before(height, |buffer| {
+            Paragraph::new(batch.to_vec()).render(buffer.area, buffer);
+        })?;
+    }
+    Ok(())
 }
 
 async fn add_server(input: CreateMcpServerInput) -> i32 {
@@ -905,15 +998,38 @@ pub async fn run() -> i32 {
     let folder = std::env::current_dir()
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let mut terminal = ratatui::init();
-    let _ = execute!(std::io::stdout(), EnableMouseCapture, EnableBracketedPaste);
+    let height = ratatui::crossterm::terminal::size()
+        .map_or(20, |(_, height)| height.saturating_sub(2).max(1));
+    if let Err(error) = execute!(
+        io::stdout(),
+        Clear(ClearType::All),
+        Clear(ClearType::Purge),
+        MoveTo(0, 0)
+    ) {
+        eprintln!("{error}");
+        return 1;
+    }
+    let mut terminal = match ratatui::try_init_with_options(TerminalOptions {
+        viewport: Viewport::Inline(height),
+    }) {
+        Ok(terminal) => terminal,
+        Err(error) => {
+            let _ = ratatui::crossterm::terminal::disable_raw_mode();
+            eprintln!("{error}");
+            return 1;
+        }
+    };
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        let _ = execute!(io::stdout(), DisableMouseCapture, DisableBracketedPaste);
+        previous_hook(panic);
+    }));
+    let _ = execute!(io::stdout(), EnableBracketedPaste, EnableMouseCapture);
     let outcome = session(&mut terminal, folder, resume).await;
-    let _ = execute!(
-        std::io::stdout(),
-        DisableMouseCapture,
-        DisableBracketedPaste
-    );
-    ratatui::restore();
+    let _ = terminal.clear();
+    let _ = terminal.show_cursor();
+    let _ = execute!(io::stdout(), DisableMouseCapture, DisableBracketedPaste);
+    let _ = ratatui::crossterm::terminal::disable_raw_mode();
     let (exit, conversation) = match outcome {
         Ok(parts) => parts,
         Err(error) => {
@@ -990,6 +1106,41 @@ async fn send_attachments(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exiting_an_inline_session_writes_contiguous_history() {
+        let mut terminal = ratatui::Terminal::with_options(
+            ratatui::backend::TestBackend::new(48, 18),
+            TerminalOptions {
+                viewport: Viewport::Inline(14),
+            },
+        )
+        .unwrap();
+        let mut app = App::new("D:/test");
+        app.transcript.push_user("first prompt");
+        app.transcript
+            .entries
+            .push(crate::state::transcript::Entry::Assistant {
+                text: "first answer".to_owned(),
+                reasoning: String::new(),
+            });
+        app.transcript.push_user("second prompt");
+        write_history(&mut terminal, &app).unwrap();
+        let backend = terminal.backend();
+        let rows: Vec<String> = backend
+            .scrollback()
+            .content()
+            .chunks(48)
+            .chain(backend.buffer().content().chunks(48))
+            .map(|row| row.iter().map(ratatui::buffer::Cell::symbol).collect())
+            .collect();
+        let answer = rows
+            .iter()
+            .position(|row| row.contains("first answer"))
+            .unwrap();
+        assert!(rows[answer + 1].trim().is_empty());
+        assert!(rows[answer + 2].contains("second prompt"));
+    }
 
     #[test]
     fn control_backspace_is_layout_independent_and_control_delete_is_ignored() {

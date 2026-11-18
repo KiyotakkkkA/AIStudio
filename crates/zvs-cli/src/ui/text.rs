@@ -38,6 +38,9 @@ pub fn wrap(text: &str, width: usize) -> Vec<String> {
 }
 
 pub fn truncate(text: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
     if text.width() <= width {
         return text.to_owned();
     }
@@ -101,10 +104,7 @@ pub fn markdown(text: &str, width: usize, indent: &'static str) -> Vec<Line<'sta
             if fenced && !language.is_empty() {
                 lines.push(Line::from(vec![
                     Span::raw(indent),
-                    Span::styled(
-                        format!(" {language} "),
-                        theme::eyebrow().bg(theme::colors().code_bg),
-                    ),
+                    Span::styled(format!("┌ {language}"), theme::eyebrow()),
                 ]));
             }
             continue;
@@ -192,7 +192,7 @@ mod tests {
         let text: Vec<String> = lines.iter().map(plain).collect();
         assert_eq!(
             text,
-            ["  Итог", "  • пункт", "   rust ", "   fn main() {} "]
+            ["  Итог", "  • пункт", "  ┌ rust", "   fn main() {} "]
         );
     }
 }

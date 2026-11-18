@@ -33,7 +33,7 @@ use zvs_contract::{
 use self::attachments::Attachment;
 use self::input::Input;
 use self::modal::{Content, Modal};
-use self::overlay::{Action, Overlay, Panel, ProcessOutput, View};
+use self::overlay::{Action, Detail, Overlay, Panel, ProcessOutput, View};
 use self::palette::{Arg, Command, Item, Palette, Pick, Sources, Sub, arg_slot, is_command_text};
 use self::prompt::{Choice, Prompt, PromptKind};
 use self::shortcuts::{Chord, ChordKey, Keymap, SHORTCUTS, Shortcut};
@@ -245,6 +245,8 @@ pub enum Request {
         model: String,
     },
     Skills,
+    GetSkill(SkillId),
+    GetServer(McpServerId),
     Servers,
     Usage(ProviderId),
     SetSkill {
@@ -297,7 +299,7 @@ pub enum Msg {
     Key(Key),
     Paste(String),
     AttachmentOptions(Result<Vec<Attachment>, AppError>),
-    Scroll(isize),
+    Scroll(isize, u16, u16),
     Resize(u16, u16),
     Tick,
     Connecting(&'static str),
@@ -326,6 +328,8 @@ pub enum Msg {
     Context(Result<ChatContextDto, AppError>),
     Usage(Result<Option<ProviderUsageDto>, AppError>),
     Skills(Result<Vec<SkillDto>, AppError>),
+    SkillDetail(SkillId, Result<zvs_contract::SkillDetailDto, AppError>),
+    ServerDetail(McpServerId, Result<McpServerDetailDto, AppError>),
     Servers(Result<Vec<McpServerDto>, AppError>),
     SkillChanged(Result<SkillDto, AppError>),
     ServerChanged(Result<McpServerDto, AppError>),
@@ -381,6 +385,7 @@ pub struct App {
     pub input: Input,
     pub palette: Palette,
     pub prompts: VecDeque<Prompt>,
+    pub prompt_scroll: usize,
     pub run: Option<RunHandleDto>,
     pub awaiting: bool,
     pub held: Vec<HostEvent>,
@@ -396,14 +401,12 @@ pub struct App {
     pub expanded: bool,
     pub scroll: usize,
     pub escape_armed: bool,
-    pub help: bool,
     pub modal: Option<Modal>,
     pub goal_plan: Vec<zvs_contract::AgenticPlanStepDto>,
     pub attachment_options: Vec<Attachment>,
     pub attachment_lookup: Option<bool>,
     pub attachment_selected: usize,
     pub outgoing_attachments: Vec<Attachment>,
-    pub keys: bool,
     pub keymap: Keymap,
     pub theme: CliTheme,
     pub compacting: bool,
@@ -412,6 +415,7 @@ pub struct App {
     pub assistant: Option<AssistantPreferencesDto>,
     pub auto_copy: bool,
     pub status: Option<(Tone, String)>,
+    pub context_percent: Option<u64>,
     pub processes: Vec<BackgroundShellDto>,
     pub subagents: Vec<zvs_contract::ChatToolCallDto>,
     pub viewport: (u16, u16),
@@ -468,6 +472,7 @@ impl App {
             input: Input::default(),
             palette: Palette::default(),
             prompts: VecDeque::new(),
+            prompt_scroll: 0,
             run: None,
             awaiting: false,
             held: Vec::new(),
@@ -483,14 +488,12 @@ impl App {
             expanded: false,
             scroll: 0,
             escape_armed: false,
-            help: false,
             modal: None,
             goal_plan: Vec::new(),
             attachment_options: Vec::new(),
             attachment_lookup: None,
             attachment_selected: 0,
             outgoing_attachments: Vec::new(),
-            keys: false,
             keymap: Keymap::default(),
             theme: CliTheme::default(),
             compacting: false,
@@ -499,6 +502,7 @@ impl App {
             assistant: None,
             auto_copy: true,
             status: None,
+            context_percent: None,
             processes: Vec::new(),
             subagents: Vec::new(),
             viewport: (80, 24),
@@ -524,71 +528,8 @@ impl App {
             .unwrap_or(self.theme)
     }
 
-    pub fn keys_open(&self) -> bool {
-        self.keys
-            && self.prompts.is_empty()
-            && self.overlay.is_none()
-            && self.modal.is_none()
-            && !self.help
-    }
-
-    pub fn key_columns(&self) -> Vec<(&'static str, Vec<(String, &'static str)>)> {
-        let bound = |shortcut: Shortcut| self.keymap.label(shortcut);
-        let fixed = |keys: &str| keys.to_owned();
-        vec![
-            (
-                copy::KEYS_COMPOSE,
-                vec![
-                    (fixed("/"), copy::KEY_COMMANDS),
-                    (fixed("@"), copy::KEY_ATTACH),
-                    (fixed("?"), copy::KEY_HELP),
-                    (fixed("!"), copy::KEY_SHELL),
-                    (fixed("Ctrl+A"), copy::KEY_SELECT_ALL),
-                    (fixed("Ctrl+← / Ctrl+→"), copy::KEY_WORD_MOVE),
-                    (fixed("Ctrl+Backspace"), copy::KEY_DELETE_WORD),
-                    (fixed("Shift+Enter"), copy::KEY_NEWLINE),
-                    (fixed("↑ / ↓"), copy::KEY_HISTORY),
-                    (fixed("Tab"), copy::KEY_COMPLETE),
-                    (bound(Shortcut::ClearInput), copy::KEY_CLEAR_INPUT),
-                    (
-                        format!(
-                            "{} / {}",
-                            bound(Shortcut::QueuePrevious),
-                            bound(Shortcut::QueueNext)
-                        ),
-                        copy::KEY_QUEUE,
-                    ),
-                    (bound(Shortcut::QueueSend), copy::KEY_QUEUE_SEND),
-                ],
-            ),
-            (
-                copy::KEYS_SESSION,
-                vec![
-                    (fixed("Enter"), copy::KEY_SEND),
-                    (fixed("Esc"), copy::KEY_STOP),
-                    (bound(Shortcut::NewChat), copy::KEY_NEW_CHAT),
-                    (bound(Shortcut::Models), copy::KEY_MODELS),
-                    (bound(Shortcut::Effort), copy::KEY_EFFORT),
-                    (bound(Shortcut::Resume), copy::KEY_RESUME),
-                    (bound(Shortcut::Permissions), copy::KEY_PERMISSIONS),
-                    (fixed("Esc Esc / Ctrl+C"), copy::KEY_QUIT),
-                ],
-            ),
-            (
-                copy::KEYS_TRANSCRIPT,
-                vec![
-                    (bound(Shortcut::Details), copy::KEY_DETAILS),
-                    (fixed("PgUp / PgDn"), copy::KEY_SCROLL),
-                    (bound(Shortcut::ClearScreen), copy::KEY_CLEAR_SCREEN),
-                    (bound(Shortcut::Context), copy::KEY_CONTEXT),
-                    (fixed(copy::KEY_MOUSE), copy::KEY_COPY),
-                ],
-            ),
-        ]
-    }
-
     fn palette_allowed(&self) -> bool {
-        self.prompts.is_empty() && !self.help && self.modal.is_none() && self.overlay.is_none()
+        self.prompts.is_empty() && self.modal.is_none() && self.overlay.is_none()
     }
 
     pub fn sources(&self) -> Sources<'_> {
@@ -815,10 +756,7 @@ impl App {
             Msg::Paste(text) => {
                 if let Some(other) = self.question_input() {
                     other.insert(&text);
-                } else if self.prompts.is_empty()
-                    && self.modal.is_none()
-                    && !self.help
-                    && self.overlay.is_none()
+                } else if self.prompts.is_empty() && self.modal.is_none() && self.overlay.is_none()
                 {
                     if self.supports_images()
                         && let Some(image) = attachments::image_path(&text)
@@ -845,18 +783,8 @@ impl App {
                 self.viewport = (width, height);
                 Vec::new()
             }
-            Msg::Scroll(delta) => {
-                if self.help && self.modal.is_none() {
-                    self.modal = Some(Modal::new(Content::Help));
-                }
-                if self.modal.is_some() {
-                    self.clamp_modal();
-                }
-                if let Some(modal) = &mut self.modal {
-                    modal.offset = modal.offset.saturating_add_signed(-delta);
-                } else {
-                    self.scroll = self.scroll.saturating_add_signed(delta);
-                }
+            Msg::Scroll(delta, x, y) => {
+                self.scroll = crate::ui::scroll_transcript(self, delta, Some((x, y)));
                 Vec::new()
             }
             Msg::Tick => {
@@ -1132,6 +1060,10 @@ impl App {
             Msg::Context(result) => {
                 match result {
                     Ok(context) => {
+                        self.context_percent = context
+                            .total
+                            .saturating_mul(100)
+                            .checked_div(context.context_window);
                         if let Some(overlay) = self.overlay_for(Panel::Context) {
                             overlay.context = Some(context);
                             overlay.loading = false;
@@ -1156,6 +1088,24 @@ impl App {
                         }
                     }
                     Err(error) => self.panel_failed(&error),
+                }
+                Vec::new()
+            }
+            Msg::SkillDetail(id, result) => {
+                if let Some(overlay) = self.overlay_for(Panel::SkillDetail)
+                    && let Some(Detail::Skill(target, content)) = &mut overlay.detail
+                    && *target == id
+                {
+                    *content = Some(result.map(Box::new).map_err(|error| error.message));
+                }
+                Vec::new()
+            }
+            Msg::ServerDetail(id, result) => {
+                if let Some(overlay) = self.overlay_for(Panel::McpDetail)
+                    && let Some(Detail::Server(target, content)) = &mut overlay.detail
+                    && *target == id
+                {
+                    *content = Some(result.map(Box::new).map_err(|error| error.message));
                 }
                 Vec::new()
             }
@@ -2199,7 +2149,7 @@ impl App {
     fn command(&mut self, command: Command) -> Vec<Request> {
         self.palette.reset();
         match command {
-            Command::Help => self.help = true,
+            Command::Help => return self.open_panel(Panel::Shortcuts),
             Command::Exit => self.quit(None),
             Command::Clear => {
                 self.transcript.clear();
@@ -2244,7 +2194,7 @@ impl App {
             Command::Processes => return self.open_panel(Panel::Processes),
             Command::Notes => return self.open_panel(Panel::Notes),
             Command::Permissions => return self.open_panel(Panel::Permissions),
-            Command::Shortcuts => return self.open_panel(Panel::Shortcuts),
+            Command::Shortcuts => return self.open_reference_keys(false),
             Command::Theme => return self.open_panel(Panel::Theme),
             Command::Config => return self.open_panel(Panel::Config),
             Command::Compact => return self.compact_command(""),
@@ -2431,6 +2381,15 @@ impl App {
         self.run = Some(live.run);
     }
 
+    fn open_reference_keys(&mut self, floating: bool) -> Vec<Request> {
+        let requests = self.open_panel(Panel::Shortcuts);
+        if let Some(overlay) = self.overlay.as_mut() {
+            overlay.tab = 1;
+            overlay.floating_reference = floating;
+        }
+        requests
+    }
+
     fn open_panel(&mut self, panel: Panel) -> Vec<Request> {
         if panel == Panel::Resume && self.busy() {
             self.status = Some((Tone::Info, copy::BUSY.to_owned()));
@@ -2443,6 +2402,8 @@ impl App {
             | Panel::Shortcuts
             | Panel::Theme
             | Panel::ProcessOutput
+            | Panel::McpDetail
+            | Panel::SkillDetail
             | Panel::Note
             | Panel::Subagents
             | Panel::StopSubagents => Vec::new(),
@@ -2571,6 +2532,12 @@ impl App {
                 vec![Request::SetPolicy(PolicyChange::Mode(mode))]
             }
             Action::SetJudge(judge) => vec![Request::SetPolicy(PolicyChange::Judge(judge))],
+            Action::ComposeCommand(command) => {
+                self.overlay = None;
+                self.input.set(&command);
+                self.palette.reset();
+                Vec::new()
+            }
             Action::Rebind(shortcut) => {
                 if let Some(overlay) = self.overlay.as_mut() {
                     overlay.capturing = Some(shortcut);
@@ -2797,9 +2764,7 @@ impl App {
                 let Some(command) = other.command() else {
                     return Vec::new();
                 };
-                self.help = false;
                 self.modal = None;
-                self.keys = false;
                 self.overlay = None;
                 return self.command(command);
             }
@@ -2814,6 +2779,34 @@ impl App {
         let Some(overlay) = self.overlay.as_ref() else {
             return Vec::new();
         };
+        if matches!(overlay.panel, Panel::McpDetail | Panel::SkillDetail) {
+            let (limit, page) = match key {
+                Key::Up | Key::Down | Key::PageUp | Key::PageDown => {
+                    crate::ui::detail_scroll_bounds(self, overlay)
+                }
+                _ => (0, 0),
+            };
+            if let Some(overlay) = self.overlay.as_mut() {
+                let scroll = overlay.detail_scroll.min(limit);
+                match key {
+                    Key::Esc => {
+                        overlay.panel = if overlay.panel == Panel::McpDetail {
+                            Panel::Mcp
+                        } else {
+                            Panel::Skills
+                        };
+                        overlay.detail = None;
+                        overlay.detail_scroll = 0;
+                    }
+                    Key::Up => overlay.detail_scroll = scroll.saturating_sub(1),
+                    Key::Down => overlay.detail_scroll = (scroll + 1).min(limit),
+                    Key::PageUp => overlay.detail_scroll = scroll.saturating_sub(page),
+                    Key::PageDown => overlay.detail_scroll = (scroll + page).min(limit),
+                    _ => {}
+                }
+            }
+            return Vec::new();
+        }
         let view = self.view();
         let rows = overlay.rows(&view);
         let tabs = overlay.tabs(&view).len();
@@ -2928,11 +2921,37 @@ impl App {
             }
             Key::Up => overlay.up(rows.len()),
             Key::Down => overlay.down(rows.len()),
+            Key::PageUp => overlay.selected = overlay.selected.saturating_sub(SCROLL_STEP),
+            Key::PageDown => {
+                overlay.selected =
+                    (overlay.selected + SCROLL_STEP).min(rows.len().saturating_sub(1));
+            }
+            Key::Home => overlay.selected = 0,
+            Key::End => overlay.selected = rows.len().saturating_sub(1),
+            Key::Char('?') if overlay.panel == Panel::Shortcuts && overlay.filter.is_empty() => {
+                self.overlay = None;
+            }
             Key::Tab | Key::Right => overlay.next_tab(tabs, true),
             Key::Left => overlay.next_tab(tabs, false),
+            Key::Char(' ') if overlay.panel == Panel::Shortcuts => {
+                overlay.filter.insert(" ");
+                overlay.selected = 0;
+            }
             Key::Char(' ') => {
                 if let Some(row) = rows.get(overlay.selected) {
-                    overlay.toggle(&row.key);
+                    match &row.action {
+                        Some(Action::ToggleServer { id, .. } | Action::SignIn(id)) => {
+                            overlay.panel = Panel::McpDetail;
+                            overlay.detail = Some(Detail::Server(*id, None));
+                            return vec![Request::GetServer(*id)];
+                        }
+                        Some(Action::ToggleSkill { id, .. }) => {
+                            overlay.panel = Panel::SkillDetail;
+                            overlay.detail = Some(Detail::Skill(*id, None));
+                            return vec![Request::GetSkill(*id)];
+                        }
+                        _ => overlay.toggle(&row.key),
+                    }
                 }
             }
             Key::Char(value) => {
@@ -3104,14 +3123,26 @@ impl App {
         {
             return Vec::new();
         }
-        if (self.modal.is_some() || self.help) && key != Key::Interrupt {
+        if self.modal.is_some() && self.prompts.is_empty() && key != Key::Interrupt {
             self.clamp_modal();
-            let modal = self.modal.get_or_insert_with(|| Modal::new(Content::Help));
-            if modal.key(key) {
+            if self.modal.as_mut().is_some_and(|modal| modal.key(key)) {
                 self.modal = None;
-                self.help = false;
             }
             return Vec::new();
+        }
+        if !self.prompts.is_empty() {
+            match key {
+                Key::PageUp => {
+                    self.prompt_scroll = (self.prompt_scroll + SCROLL_STEP)
+                        .min(crate::ui::prompt_scroll_limit(self));
+                    return Vec::new();
+                }
+                Key::PageDown => {
+                    self.prompt_scroll = self.prompt_scroll.saturating_sub(SCROLL_STEP);
+                    return Vec::new();
+                }
+                _ => self.prompt_scroll = 0,
+            }
         }
         if self.overlay.is_some() && matches!(key, Key::PageUp | Key::PageDown) {
             return self.overlay_key(key);
@@ -3171,11 +3202,11 @@ impl App {
                 return Vec::new();
             }
             Key::PageUp => {
-                self.scroll = self.scroll.saturating_add(SCROLL_STEP);
+                self.scroll = crate::ui::scroll_transcript(self, SCROLL_STEP.cast_signed(), None);
                 return Vec::new();
             }
             Key::PageDown => {
-                self.scroll = self.scroll.saturating_sub(SCROLL_STEP);
+                self.scroll = crate::ui::scroll_transcript(self, -SCROLL_STEP.cast_signed(), None);
                 return Vec::new();
             }
             _ => {}
@@ -3191,18 +3222,6 @@ impl App {
         }
         if self.overlay.is_some() {
             return self.overlay_key(key);
-        }
-        if self.help {
-            if matches!(key, Key::Esc | Key::Enter) {
-                self.help = false;
-            }
-            return Vec::new();
-        }
-        if self.keys {
-            self.keys = false;
-            if matches!(key, Key::Esc | Key::Char('?')) {
-                return Vec::new();
-            }
         }
         if key == Key::Esc && self.input.selected_all() {
             self.input.deselect();
@@ -3286,7 +3305,7 @@ impl App {
             }
             Key::Esc => return self.escape(),
             Key::Newline => self.input.newline(),
-            Key::Char('?') if self.input.is_empty() => self.keys = true,
+            Key::Char('?') if self.input.is_empty() => return self.open_reference_keys(true),
             Key::Char(value) => {
                 self.input.insert(&value.to_string());
                 self.palette.reset();

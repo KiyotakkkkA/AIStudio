@@ -20,7 +20,9 @@ pub enum Panel {
     Resume,
     Context,
     Skills,
+    SkillDetail,
     Mcp,
+    McpDetail,
     Processes,
     ProcessOutput,
     Notes,
@@ -55,6 +57,7 @@ pub enum Action {
     SetMode(ExecMode),
     SetJudge(Option<ExecJudgeDto>),
     Rebind(Shortcut),
+    ComposeCommand(String),
     ResetShortcuts,
     SetTheme(CliTheme),
     ShowOutput(BackgroundShellId),
@@ -73,6 +76,7 @@ pub struct Row {
     pub tone: Tone,
     pub title: String,
     pub meta: String,
+    pub columns: Option<[String; 4]>,
     pub detail: Vec<String>,
     pub gauge: Option<f64>,
     pub current: bool,
@@ -87,6 +91,7 @@ impl Row {
             tone: Tone::Plain,
             title: title.into(),
             meta: String::new(),
+            columns: None,
             detail: Vec::new(),
             gauge: None,
             current: false,
@@ -129,12 +134,29 @@ impl Row {
         query.is_empty()
             || self.title.to_lowercase().contains(query)
             || self.meta.to_lowercase().contains(query)
+            || self
+                .columns
+                .as_ref()
+                .is_some_and(|columns| columns.join(" · ").to_lowercase().contains(query))
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Detail {
+    Server(
+        McpServerId,
+        Option<Result<Box<zvs_contract::McpServerDetailDto>, String>>,
+    ),
+    Skill(
+        SkillId,
+        Option<Result<Box<zvs_contract::SkillDetailDto>, String>>,
+    ),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Overlay {
     pub panel: Panel,
+    pub floating_reference: bool,
     pub filter: Input,
     pub tab: usize,
     pub selected: usize,
@@ -147,6 +169,8 @@ pub struct Overlay {
     pub usage: Option<ProviderUsageDto>,
     pub skills: Vec<SkillDto>,
     pub servers: Vec<McpServerDto>,
+    pub detail: Option<Detail>,
+    pub detail_scroll: usize,
     pub processes: Vec<BackgroundShellDto>,
     pub output: Option<ProcessOutput>,
     pub subagents: Vec<zvs_contract::ChatToolCallDto>,
@@ -715,13 +739,14 @@ fn skill_rows(overlay: &Overlay) -> Vec<Row> {
             } else {
                 (copy::SKILL_OFF, Tone::Faint)
             };
-            Row::new(skill.id.to_string(), "✦", skill.name.clone())
-                .meta(format!(
-                    "{state} · {} · {}",
-                    source_label(skill.source),
-                    format::files(skill.file_count)
-                ))
-                .tone(tone)
+            let mut row = Row::new(skill.id.to_string(), " ", skill.name.clone());
+            row.columns = Some([
+                state.to_owned(),
+                source_label(skill.source).to_owned(),
+                format::files(skill.file_count),
+                skill.description.clone(),
+            ]);
+            row.tone(tone)
                 .current(skill.enabled)
                 .detail([
                     skill.description.clone(),
@@ -782,13 +807,14 @@ fn server_rows(overlay: &Overlay) -> Vec<Row> {
                         .map(|command| format!("{command} {}", server.args.join(" ")))
                 })
                 .unwrap_or_default();
-            Row::new(server.id.to_string(), "⧉", server.name.clone())
-                .meta(format!(
-                    "{state} · {} · {}",
-                    server.transport.as_str(),
-                    format::tools(server.tool_count)
-                ))
-                .tone(tone)
+            let mut row = Row::new(server.id.to_string(), "⧉", server.name.clone());
+            row.columns = Some([
+                state.to_owned(),
+                server.transport.as_str().to_owned(),
+                format::tools(server.tool_count),
+                server.namespace.clone(),
+            ]);
+            row.tone(tone)
                 .current(running)
                 .detail([
                     target.trim().to_owned(),
@@ -958,12 +984,23 @@ fn config_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
 }
 
 fn shortcut_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
+    if overlay.tab == 0 {
+        return super::palette::every_item()
+            .into_iter()
+            .map(|item| {
+                let command = item.shown();
+                Row::new(command.clone(), " ", item.description())
+                    .meta(command.clone())
+                    .action(Action::ComposeCommand(command))
+            })
+            .collect();
+    }
     SHORTCUTS
         .iter()
         .map(|shortcut| {
             let capturing = overlay.capturing == Some(*shortcut);
             let bound = view.keymap.chord(*shortcut).is_some();
-            Row::new(shortcut.id(), "⌨", shortcut.description())
+            Row::new(shortcut.id(), " ", shortcut.description())
                 .meta(if capturing {
                     copy::SHORTCUT_PRESS.to_owned()
                 } else {
@@ -979,6 +1016,25 @@ fn shortcut_rows(overlay: &Overlay, view: &View<'_>) -> Vec<Row> {
                 .current(capturing)
                 .action(Action::Rebind(*shortcut))
         })
+        .chain(
+            [
+                ("/", copy::KEY_COMMANDS),
+                ("@", copy::KEY_ATTACH),
+                ("?", copy::KEY_HELP),
+                ("!", copy::KEY_SHELL),
+                ("Enter", copy::KEY_SEND),
+                ("Shift+Enter", copy::KEY_NEWLINE),
+                ("Ctrl+A", copy::KEY_SELECT_ALL),
+                ("Ctrl+← / Ctrl+→", copy::KEY_WORD_MOVE),
+                ("Ctrl+Backspace", copy::KEY_DELETE_WORD),
+                ("↑ / ↓", copy::KEY_HISTORY),
+                ("Tab", copy::KEY_COMPLETE),
+                ("Esc", copy::KEY_STOP),
+                ("PgUp / PgDn", copy::KEY_SCROLL),
+                ("Ctrl+C", copy::KEY_QUIT),
+            ]
+            .map(|(keys, label)| Row::new(keys, " ", label).meta(keys)),
+        )
         .chain(std::iter::once(
             Row::new("reset", "↺", copy::SHORTCUTS_RESET)
                 .tone(Tone::Accent)
@@ -991,6 +1047,7 @@ impl Overlay {
     pub fn new(panel: Panel) -> Self {
         Self {
             panel,
+            floating_reference: false,
             filter: Input::default(),
             tab: 0,
             selected: 0,
@@ -1013,6 +1070,8 @@ impl Overlay {
             usage: None,
             skills: Vec::new(),
             servers: Vec::new(),
+            detail: None,
+            detail_scroll: 0,
             processes: Vec::new(),
             output: None,
             subagents: Vec::new(),
@@ -1028,15 +1087,15 @@ impl Overlay {
             Panel::Effort => copy::EFFORT_TITLE,
             Panel::Resume => copy::RESUME_TITLE,
             Panel::Context => copy::CONTEXT_TITLE,
-            Panel::Skills => copy::SKILLS_TITLE,
-            Panel::Mcp => copy::MCP_TITLE,
+            Panel::Skills | Panel::SkillDetail => copy::SKILLS_TITLE,
+            Panel::Mcp | Panel::McpDetail => copy::MCP_TITLE,
             Panel::Processes => copy::PROCESSES_TITLE,
             Panel::ProcessOutput => copy::PROCESS_OUTPUT_TITLE,
             Panel::Notes => copy::NOTES_TITLE,
             Panel::Note => copy::NOTE_TITLE,
             Panel::Subagents | Panel::StopSubagents => copy::SUBAGENTS_TITLE,
             Panel::Permissions => copy::PERMISSIONS_TITLE,
-            Panel::Shortcuts => copy::SHORTCUTS_TITLE,
+            Panel::Shortcuts => copy::HELP_TITLE,
             Panel::Theme => copy::THEME_TITLE,
             Panel::Config => copy::CONFIG_TITLE,
         }
@@ -1049,8 +1108,8 @@ impl Overlay {
             Panel::Effort => "◐",
             Panel::Resume => "↺",
             Panel::Context => "▤",
-            Panel::Skills => "✦",
-            Panel::Mcp => "⧉",
+            Panel::Skills | Panel::SkillDetail => "✦",
+            Panel::Mcp | Panel::McpDetail => "⧉",
             Panel::Notes | Panel::Note => "✎",
             Panel::Processes | Panel::ProcessOutput | Panel::Subagents | Panel::StopSubagents => {
                 "⚙"
@@ -1075,13 +1134,15 @@ impl Overlay {
             Panel::Resume => fixed(&[copy::TAB_RECENT, copy::TAB_PINNED]),
             Panel::Context => fixed(&[copy::TAB_SUMMARY, copy::TAB_TOOLS]),
             Panel::Skills => fixed(&[copy::TAB_ALL, copy::TAB_ENABLED, copy::TAB_DISABLED]),
+            Panel::SkillDetail => Vec::new(),
             Panel::Mcp => fixed(&[copy::TAB_ALL, copy::TAB_CONNECTED, copy::TAB_STOPPED]),
+            Panel::McpDetail => Vec::new(),
             Panel::Processes => fixed(&[copy::TAB_RUNNING, copy::TAB_ALL]),
             Panel::Permissions => fixed(&[copy::TAB_MODE, copy::TAB_JUDGE]),
             Panel::Config => fixed(&[copy::TAB_CONVERSATIONS, copy::TAB_GENERAL]),
+            Panel::Shortcuts => fixed(&[copy::COMMANDS_TITLE, copy::KEYS_TITLE]),
             Panel::Connect
             | Panel::Effort
-            | Panel::Shortcuts
             | Panel::Theme
             | Panel::ProcessOutput
             | Panel::Notes
@@ -1100,6 +1161,7 @@ impl Overlay {
             Panel::Context => context_rows(self),
             Panel::Skills => skill_rows(self),
             Panel::Mcp => server_rows(self),
+            Panel::McpDetail | Panel::SkillDetail => Vec::new(),
             Panel::Processes => process_rows(self),
             Panel::ProcessOutput => output_rows(self),
             Panel::Notes => note_rows(self),

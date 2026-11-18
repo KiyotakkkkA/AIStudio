@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::sync::OnceLock;
 
 use ratatui::style::{Color, Modifier, Style};
 use zvs_contract::CliTheme;
@@ -6,7 +7,6 @@ use zvs_contract::CliTheme;
 pub struct Colors {
     pub gradient: [(u8, u8, u8); 6],
     pub accent: Color,
-    pub accent_soft: Color,
     pub accent_light: Color,
     pub ink: Color,
     pub muted: Color,
@@ -15,12 +15,6 @@ pub struct Colors {
     pub ok: Color,
     pub warn: Color,
     pub err: Color,
-    pub on_warn: Color,
-    pub user_bg: Color,
-    pub tool_bg: Color,
-    pub panel_bg: Color,
-    pub prompt_bg: Color,
-    pub shell_bg: Color,
     pub selection_bg: Color,
     pub code_bg: Color,
 }
@@ -43,7 +37,6 @@ const EMBER: Colors = Colors {
         stop(0x9a4214),
     ],
     accent: rgb(0xf2914d),
-    accent_soft: rgb(0x3a2416),
     accent_light: rgb(0xf0c9ad),
     ink: rgb(0xece3d9),
     muted: rgb(0x9c8e80),
@@ -52,12 +45,6 @@ const EMBER: Colors = Colors {
     ok: rgb(0x9cc06b),
     warn: rgb(0xe8b84a),
     err: rgb(0xe86a58),
-    on_warn: rgb(0x1a1408),
-    user_bg: rgb(0x2b221c),
-    tool_bg: rgb(0x302720),
-    panel_bg: rgb(0x221c17),
-    prompt_bg: rgb(0x2e2414),
-    shell_bg: rgb(0x2a2412),
     selection_bg: rgb(0x5a3a22),
     code_bg: rgb(0x1c1814),
 };
@@ -72,7 +59,6 @@ const GRAPHITE: Colors = Colors {
         stop(0x3457a3),
     ],
     accent: rgb(0x7fa8f5),
-    accent_soft: rgb(0x1e2a3e),
     accent_light: rgb(0xc3d5f5),
     ink: rgb(0xe2e5ea),
     muted: rgb(0x8e95a0),
@@ -81,12 +67,6 @@ const GRAPHITE: Colors = Colors {
     ok: rgb(0x8fc47a),
     warn: rgb(0xe5c06a),
     err: rgb(0xe86f6f),
-    on_warn: rgb(0x17140a),
-    user_bg: rgb(0x22252b),
-    tool_bg: rgb(0x272a31),
-    panel_bg: rgb(0x1c1f24),
-    prompt_bg: rgb(0x292618),
-    shell_bg: rgb(0x282514),
     selection_bg: rgb(0x2f456b),
     code_bg: rgb(0x181a1e),
 };
@@ -101,7 +81,6 @@ const MOSS: Colors = Colors {
         stop(0x47722f),
     ],
     accent: rgb(0x9cc86a),
-    accent_soft: rgb(0x222e18),
     accent_light: rgb(0xcfe3b3),
     ink: rgb(0xe3e8da),
     muted: rgb(0x939c86),
@@ -110,12 +89,6 @@ const MOSS: Colors = Colors {
     ok: rgb(0x7cc9a5),
     warn: rgb(0xe6bd58),
     err: rgb(0xe56f5c),
-    on_warn: rgb(0x181408),
-    user_bg: rgb(0x22271d),
-    tool_bg: rgb(0x282d22),
-    panel_bg: rgb(0x1c2018),
-    prompt_bg: rgb(0x2b2814),
-    shell_bg: rgb(0x2a2612),
     selection_bg: rgb(0x3a4c26),
     code_bg: rgb(0x181b15),
 };
@@ -130,7 +103,6 @@ const DUSK: Colors = Colors {
         stop(0x6642a6),
     ],
     accent: rgb(0xb892f5),
-    accent_soft: rgb(0x2c223e),
     accent_light: rgb(0xdcc8f8),
     ink: rgb(0xe8e2f0),
     muted: rgb(0x9a90a8),
@@ -139,12 +111,6 @@ const DUSK: Colors = Colors {
     ok: rgb(0x8fc88a),
     warn: rgb(0xe8be62),
     err: rgb(0xec7286),
-    on_warn: rgb(0x1a140a),
-    user_bg: rgb(0x272130),
-    tool_bg: rgb(0x2c2636),
-    panel_bg: rgb(0x201b28),
-    prompt_bg: rgb(0x2d261a),
-    shell_bg: rgb(0x2c2515),
     selection_bg: rgb(0x46346a),
     code_bg: rgb(0x1b1721),
 };
@@ -159,7 +125,6 @@ const FROST: Colors = Colors {
         stop(0x287688),
     ],
     accent: rgb(0x6ecfde),
-    accent_soft: rgb(0x172e34),
     accent_light: rgb(0xb9e6ed),
     ink: rgb(0xdeeaec),
     muted: rgb(0x889a9e),
@@ -168,12 +133,6 @@ const FROST: Colors = Colors {
     ok: rgb(0x95cc7c),
     warn: rgb(0xe8c068),
     err: rgb(0xec746c),
-    on_warn: rgb(0x161309),
-    user_bg: rgb(0x1b2629),
-    tool_bg: rgb(0x202b2e),
-    panel_bg: rgb(0x161f22),
-    prompt_bg: rgb(0x292616),
-    shell_bg: rgb(0x282513),
     selection_bg: rgb(0x224a54),
     code_bg: rgb(0x141a1c),
 };
@@ -182,14 +141,116 @@ thread_local! {
     static ACTIVE: Cell<CliTheme> = const { Cell::new(CliTheme::Ember) };
 }
 
-pub const fn colors_of(theme: CliTheme) -> &'static Colors {
-    match theme {
-        CliTheme::Ember => &EMBER,
-        CliTheme::Graphite => &GRAPHITE,
-        CliTheme::Moss => &MOSS,
-        CliTheme::Dusk => &DUSK,
-        CliTheme::Frost => &FROST,
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ColorDepth {
+    None,
+    Indexed,
+    Rgb,
+}
+
+struct Appearance {
+    light: bool,
+    depth: ColorDepth,
+}
+
+fn appearance() -> &'static Appearance {
+    static DETECTED: OnceLock<Appearance> = OnceLock::new();
+    DETECTED.get_or_init(|| {
+        let terminal = std::env::var("TERM").unwrap_or_default();
+        let true_color = std::env::var("COLORTERM")
+            .is_ok_and(|value| matches!(value.as_str(), "truecolor" | "24bit"))
+            || std::env::var_os("WT_SESSION").is_some();
+        let depth = if std::env::var_os("NO_COLOR").is_some() || terminal == "dumb" {
+            ColorDepth::None
+        } else if !true_color && terminal.contains("256color") {
+            ColorDepth::Indexed
+        } else {
+            ColorDepth::Rgb
+        };
+        let light = match std::env::var("ZVS_CLI_BACKGROUND").as_deref() {
+            Ok("light") => true,
+            Ok("dark") => false,
+            _ => std::env::var("COLORFGBG")
+                .ok()
+                .and_then(|value| value.rsplit(';').next()?.parse::<u8>().ok())
+                .is_some_and(|background| background == 7 || background == 15),
+        };
+        Appearance { light, depth }
+    })
+}
+
+fn adapt(color: Color, depth: ColorDepth) -> Color {
+    match (depth, color) {
+        (ColorDepth::None, _) => Color::Reset,
+        (ColorDepth::Indexed, Color::Rgb(r, g, b)) => {
+            let cube = |value: u8| u8::try_from((u16::from(value) * 5 + 127) / 255).unwrap_or(5);
+            Color::Indexed(16 + 36 * cube(r) + 6 * cube(g) + cube(b))
+        }
+        _ => color,
     }
+}
+
+fn terminal_palette(mut colors: Colors, appearance: &Appearance) -> Colors {
+    let foreground = |color| {
+        let color = if appearance.light {
+            dim(color, 0.53)
+        } else {
+            color
+        };
+        adapt(color, appearance.depth)
+    };
+    colors.accent = foreground(colors.accent);
+    colors.accent_light = foreground(colors.accent_light);
+    colors.ink = Color::Reset;
+    colors.muted = foreground(if appearance.light {
+        rgb(0xbbbbbb)
+    } else {
+        colors.muted
+    });
+    colors.faint = foreground(if appearance.light {
+        rgb(0xd1d1d1)
+    } else {
+        colors.faint
+    });
+    colors.line = foreground(if appearance.light {
+        rgb(0xcccccc)
+    } else {
+        colors.line
+    });
+    colors.ok = foreground(colors.ok);
+    colors.warn = foreground(colors.warn);
+    colors.err = foreground(colors.err);
+    colors.selection_bg = adapt(
+        if appearance.light {
+            rgb(0xd8e2f0)
+        } else {
+            colors.selection_bg
+        },
+        appearance.depth,
+    );
+    colors.code_bg = adapt(
+        if appearance.light {
+            rgb(0xf0f0f0)
+        } else {
+            colors.code_bg
+        },
+        appearance.depth,
+    );
+    colors
+}
+
+pub fn colors_of(theme: CliTheme) -> &'static Colors {
+    static PALETTES: OnceLock<[Colors; 5]> = OnceLock::new();
+    let palettes = PALETTES.get_or_init(|| {
+        [EMBER, GRAPHITE, MOSS, DUSK, FROST].map(|colors| terminal_palette(colors, appearance()))
+    });
+    &palettes[match theme {
+        CliTheme::Ember => 0,
+        CliTheme::Graphite => 1,
+        CliTheme::Moss => 2,
+        CliTheme::Dusk => 3,
+        CliTheme::Frost => 4,
+    }]
 }
 
 pub fn activate(theme: CliTheme) {
@@ -212,7 +273,15 @@ pub fn ember(position: f64) -> Color {
     let (from, to) = (stops[index], stops[index + 1]);
     let mix =
         |a: u8, b: u8| (f64::from(a) + (f64::from(b) - f64::from(a)) * fraction).round() as u8;
-    Color::Rgb(mix(from.0, to.0), mix(from.1, to.1), mix(from.2, to.2))
+    let color = Color::Rgb(mix(from.0, to.0), mix(from.1, to.1), mix(from.2, to.2));
+    adapt(
+        if appearance().light {
+            dim(color, 0.53)
+        } else {
+            color
+        },
+        appearance().depth,
+    )
 }
 
 pub fn dim(color: Color, factor: f64) -> Color {
@@ -250,11 +319,7 @@ pub fn eyebrow() -> Style {
 }
 
 pub fn selected() -> Style {
-    let colors = colors();
-    Style::new()
-        .fg(colors.accent)
-        .bg(colors.accent_soft)
-        .add_modifier(Modifier::BOLD)
+    accent()
 }
 
 #[cfg(test)]
@@ -263,17 +328,47 @@ mod tests {
 
     #[test]
     fn every_theme_has_its_own_accent_and_the_active_one_drives_the_styles() {
-        let accents: Vec<Color> = CliTheme::ALL
+        let accents: Vec<Color> = [EMBER, GRAPHITE, MOSS, DUSK, FROST]
             .iter()
-            .map(|theme| colors_of(*theme).accent)
+            .map(|colors| colors.accent)
             .collect();
         for (index, accent) in accents.iter().enumerate() {
             assert!(!accents[index + 1..].contains(accent));
         }
         activate(CliTheme::Frost);
         assert_eq!(accent().fg, Some(colors_of(CliTheme::Frost).accent));
-        assert_eq!(ember(0.0), rgb(0xc8f2f6));
         activate(CliTheme::Ember);
-        assert_eq!(accent().fg, Some(rgb(0xf2914d)));
+        assert_eq!(accent().fg, Some(colors_of(CliTheme::Ember).accent));
+    }
+
+    #[test]
+    fn terminal_appearance_preserves_the_background_and_limits_colors() {
+        let light = terminal_palette(
+            EMBER,
+            &Appearance {
+                light: true,
+                depth: ColorDepth::Rgb,
+            },
+        );
+        assert_eq!(light.ink, Color::Reset);
+        assert_ne!(light.accent, EMBER.accent);
+        assert_eq!(light.code_bg, rgb(0xf0f0f0));
+        let indexed = terminal_palette(
+            FROST,
+            &Appearance {
+                light: false,
+                depth: ColorDepth::Indexed,
+            },
+        );
+        assert!(matches!(indexed.accent, Color::Indexed(_)));
+        let plain = terminal_palette(
+            MOSS,
+            &Appearance {
+                light: false,
+                depth: ColorDepth::None,
+            },
+        );
+        assert_eq!(plain.accent, Color::Reset);
+        assert_eq!(plain.code_bg, Color::Reset);
     }
 }

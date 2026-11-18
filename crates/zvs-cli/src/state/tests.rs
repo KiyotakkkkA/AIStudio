@@ -383,8 +383,12 @@ fn queue_step(seq: u64, messages: &[ChatQueuedMessageDto], urgent: bool) -> Msg 
     )
 }
 
-fn alt(key: ChordKey) -> Msg {
-    Msg::Key(Key::Chord(Chord::alt_key(key)))
+fn queue_key(key: ChordKey) -> Msg {
+    Msg::Key(Key::Chord(Chord {
+        ctrl: true,
+        alt: false,
+        ..Chord::alt_key(key)
+    }))
 }
 
 #[test]
@@ -399,23 +403,27 @@ fn the_queue_follows_host_steps_and_its_shortcuts_select_edit_remove_and_send() 
     assert_eq!(app.queue.len(), 2);
     assert_eq!(app.queue_selected, None);
 
-    app.update(alt(ChordKey::Up));
+    app.update(queue_key(ChordKey::Up));
     assert_eq!(app.queue_selected, Some(1));
-    app.update(alt(ChordKey::Up));
-    app.update(alt(ChordKey::Up));
+    app.update(queue_key(ChordKey::Up));
+    app.update(queue_key(ChordKey::Up));
     assert_eq!(app.queue_selected, Some(0));
-    app.update(alt(ChordKey::Down));
+    app.update(queue_key(ChordKey::Down));
     assert_eq!(app.queue_selected, Some(1));
 
     typed(&mut app, "черновик");
-    app.update(Msg::Key(Key::Chord(Chord::alt('i'))));
+    app.update(Msg::Key(Key::Chord(
+        Shortcut::QueueEdit.default_chord().unwrap(),
+    )));
     assert_eq!(app.input.text(), "Второе");
     assert_eq!(app.status.as_ref().unwrap().1, copy::QUEUE_EDITING);
     app.update(Msg::Key(Key::Esc));
     assert_eq!(app.input.text(), "черновик");
     assert!(app.queue_editing.is_none());
 
-    app.update(Msg::Key(Key::Chord(Chord::alt('i'))));
+    app.update(Msg::Key(Key::Chord(
+        Shortcut::QueueEdit.default_chord().unwrap(),
+    )));
     app.input.set("Изменённое");
     assert_eq!(
         app.update(Msg::Key(Key::Enter)),
@@ -428,13 +436,18 @@ fn the_queue_follows_host_steps_and_its_shortcuts_select_edit_remove_and_send() 
     assert_eq!(app.input.text(), "черновик");
 
     assert_eq!(
-        app.update(Msg::Key(Key::Chord(Chord::alt('r')))),
+        app.update(Msg::Key(Key::Chord(
+            Shortcut::QueueRemove.default_chord().unwrap()
+        ))),
         [Request::QueueRemove {
             id,
             message: "q2".to_owned()
         }]
     );
-    assert_eq!(app.update(alt(ChordKey::Enter)), [Request::QueueSend(id)]);
+    assert_eq!(
+        app.update(queue_key(ChordKey::Enter)),
+        [Request::QueueSend(id)]
+    );
 
     app.update(Msg::Queue(Ok(ChatQueueDto {
         conversation_id: id,
@@ -477,13 +490,18 @@ fn an_emptied_queue_shows_the_sent_messages_and_attaches_once_idle() {
 #[test]
 fn an_empty_queue_explains_itself_and_an_unbound_alt_enter_types_a_newline() {
     let mut app = running();
-    assert!(app.update(alt(ChordKey::Enter)).is_empty());
+    assert!(app.update(queue_key(ChordKey::Enter)).is_empty());
     assert_eq!(app.status.as_ref().unwrap().1, copy::QUEUE_EMPTY);
-    assert!(app.update(Msg::Key(Key::Chord(Chord::alt('r')))).is_empty());
+    assert!(
+        app.update(Msg::Key(Key::Chord(
+            Shortcut::QueueRemove.default_chord().unwrap()
+        )))
+        .is_empty()
+    );
 
     app.keymap.unbind(Shortcut::QueueSend);
     typed(&mut app, "a");
-    app.update(alt(ChordKey::Enter));
+    app.update(Msg::Key(Key::Chord(Chord::alt_key(ChordKey::Enter))));
     typed(&mut app, "b");
     assert_eq!(app.input.text(), "a\nb");
 }
@@ -720,7 +738,10 @@ fn a_server_waiting_for_sign_in_offers_it_in_the_panel() {
     let id = server.id;
     app.update(Msg::Servers(Ok(vec![server])));
     let rows = app.overlay.as_ref().expect("panel").rows(&app.view());
-    assert!(rows[0].meta.starts_with(copy::MCP_SIGN_IN_REQUIRED));
+    assert_eq!(
+        rows[0].columns.as_ref().map(|values| values[0].as_str()),
+        Some(copy::MCP_SIGN_IN_REQUIRED)
+    );
     assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::SignIn(id)]);
     assert!(app.overlay.is_none());
 }
@@ -816,51 +837,24 @@ fn chord(app: &mut App, chord: shortcuts::Chord) -> Vec<Request> {
 }
 
 #[test]
-fn a_question_mark_in_an_empty_line_toggles_the_shortcut_panel() {
+fn the_reference_opens_from_question_mark_and_filters_keys() {
     let mut app = ready();
     typed(&mut app, "?");
-    assert!(app.keys_open());
+    let panel = app.overlay.as_ref().expect("reference");
+    assert_eq!(panel.panel, Panel::Shortcuts);
+    assert_eq!(panel.tab, 1);
     assert!(app.input.is_empty());
-    let columns = app.key_columns();
-    assert_eq!(
-        columns.iter().map(|(title, _)| *title).collect::<Vec<_>>(),
-        [
-            copy::KEYS_COMPOSE,
-            copy::KEYS_SESSION,
-            copy::KEYS_TRANSCRIPT
-        ]
-    );
+    typed(&mut app, "Ctrl");
+    let panel = app.overlay.as_ref().expect("reference");
     assert!(
-        columns[2]
-            .1
-            .contains(&("Ctrl+O".to_owned(), copy::KEY_DETAILS))
-    );
-    typed(&mut app, "?");
-    assert!(!app.keys_open());
-    assert!(app.input.is_empty());
-
-    typed(&mut app, "?");
-    app.update(Msg::Key(Key::Esc));
-    assert!(!app.keys_open());
-    assert!(app.input.is_empty());
-    assert!(!app.escape_armed);
-}
-
-#[test]
-fn typing_closes_the_shortcut_panel_and_keeps_the_text() {
-    let mut app = ready();
-    typed(&mut app, "?");
-    typed(&mut app, "why?");
-    assert!(!app.keys_open());
-    assert_eq!(app.input.text(), "why?");
-    app.update(Msg::Key(Key::Enter));
-    assert!(matches!(app.transcript.entries.last(), Some(Entry::User(text)) if text == "why?"));
-    assert!(
-        app.transcript
-            .entries
+        panel
+            .rows(&app.view())
             .iter()
-            .all(|entry| matches!(entry, Entry::User(_)))
+            .all(|row| row.meta.contains("Ctrl"))
     );
+    app.update(Msg::Key(Key::Esc));
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.overlay.is_none());
 }
 
 #[test]
@@ -911,7 +905,7 @@ fn chords_run_their_commands_and_unbound_ones_do_nothing() {
         Some(Panel::Models)
     );
     assert_eq!(
-        chord(&mut app, shortcuts::Chord::alt('s')),
+        chord(&mut app, shortcuts::Chord::function(4)),
         [Request::Skills]
     );
     assert_eq!(
@@ -919,8 +913,11 @@ fn chords_run_their_commands_and_unbound_ones_do_nothing() {
         Some(Panel::Skills)
     );
     chord(&mut app, shortcuts::Chord::function(1));
-    assert!(app.help && app.overlay.is_none());
-    assert!(chord(&mut app, shortcuts::Chord::ctrl('x')).is_empty());
+    assert_eq!(
+        app.overlay.as_ref().map(|overlay| overlay.panel),
+        Some(Panel::Shortcuts)
+    );
+    assert!(chord(&mut app, shortcuts::Chord::ctrl('z')).is_empty());
 
     app.update(Msg::Key(Key::Esc));
     chord(&mut app, shortcuts::Chord::ctrl('o'));
@@ -1110,7 +1107,7 @@ fn the_chosen_effort_is_sent_with_the_message() {
 #[test]
 fn the_effort_shortcut_opens_the_panel() {
     let mut app = reasoning_app();
-    assert!(chord(&mut app, shortcuts::Chord::alt('e')).is_empty());
+    assert!(chord(&mut app, shortcuts::Chord::function(2)).is_empty());
     assert_eq!(
         app.overlay.as_ref().map(|overlay| overlay.panel),
         Some(Panel::Effort)
@@ -1166,6 +1163,41 @@ fn mcp_inspect_asks_for_the_named_server_and_posts_its_card() {
         app.transcript.entries.last(),
         Some(Entry::Server(detail)) if detail.server.name == "qdrant"
     ));
+}
+
+#[test]
+fn mcp_panel_keeps_selection_and_accepts_only_its_own_detail_result() {
+    let mut app = ready();
+    let detail: McpServerDetailDto = first(include_str!(
+        "../../../../packages/shared/fixtures/mcp/McpServerDetailDto.valid.json"
+    ));
+    let id = detail.server.id;
+    command(&mut app, "/mcp");
+    app.update(Msg::Servers(Ok(vec![detail.server.clone()])));
+    typed(&mut app, "qdr");
+    assert_eq!(
+        app.update(Msg::Key(Key::Char(' '))),
+        [Request::GetServer(id)]
+    );
+
+    app.update(Msg::Inspected(Ok(detail.clone())));
+    assert!(matches!(
+        app.overlay.as_ref().and_then(|overlay| overlay.detail.as_ref()),
+        Some(Detail::Server(target, None)) if *target == id
+    ));
+    app.update(Msg::ServerDetail(id, Ok(detail)));
+    assert!(matches!(
+        app.overlay
+            .as_ref()
+            .and_then(|overlay| overlay.detail.as_ref()),
+        Some(Detail::Server(_, Some(Ok(_))))
+    ));
+    app.update(Msg::Key(Key::Esc));
+    let overlay = app.overlay.as_ref().expect("server list");
+    assert_eq!(overlay.panel, Panel::Mcp);
+    assert_eq!(overlay.filter.text(), "qdr");
+    assert_eq!(overlay.selected, 0);
+    assert!(overlay.detail.is_none());
 }
 
 #[test]
@@ -1775,22 +1807,19 @@ const CHILD: &str = "0199aa11-8888-7111-8111-111111111111";
 const LATER_CHILD: &str = "0199aa11-8888-7111-8111-222222222222";
 
 #[test]
-fn modal_navigation_scrolls_help_without_moving_the_transcript() {
+fn reference_navigation_does_not_scroll_the_transcript() {
     let mut app = ready();
     command(&mut app, "/help");
     app.update(Msg::Resize(70, 20));
     app.update(Msg::Key(Key::PageDown));
-    assert!(app.modal.as_ref().unwrap().offset > 0);
+    assert!(app.overlay.as_ref().unwrap().selected > 0);
     assert_eq!(app.scroll, 0);
     app.update(Msg::Key(Key::End));
-    app.clamp_modal();
-    let end = app.modal.as_ref().unwrap().offset;
+    let end = app.overlay.as_ref().unwrap().selected;
     app.update(Msg::Key(Key::Up));
-    assert_eq!(app.modal.as_ref().unwrap().offset, end - 1);
-    app.update(Msg::Scroll(3));
-    assert_eq!(app.modal.as_ref().unwrap().offset, end - 4);
+    assert_eq!(app.overlay.as_ref().unwrap().selected, end - 1);
     app.update(Msg::Key(Key::Esc));
-    assert!(!app.help && app.modal.is_none());
+    assert!(app.overlay.is_none());
 }
 
 #[test]

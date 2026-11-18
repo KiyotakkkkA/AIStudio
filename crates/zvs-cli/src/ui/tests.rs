@@ -68,7 +68,7 @@ fn the_welcome_screen_shows_the_art_folder_model_and_version() {
     println!("{screen}");
     assert!(screen.contains("█████"));
     assert!(screen.contains(r"D:\work\project"));
-    assert!(screen.contains("OpenRouter / GPT-4o mini"));
+    assert!(screen.contains("GPT-4o mini"));
     assert!(screen.contains(copy::MODE_ALWAYS_ASK));
     assert!(screen.contains(&crate::version::label()));
 }
@@ -86,8 +86,8 @@ fn the_access_prompt_lists_its_three_answers() {
 fn a_conversation_renders_user_tool_and_answer_blocks() {
     let screen = render(&conversation_app(), 90, 24);
     println!("{screen}");
-    assert!(screen.contains("  Прочитай README"));
-    assert!(screen.contains(" ✓ read_file "));
+    assert!(screen.contains("› Прочитай README"));
+    assert!(screen.contains(&format!("✓ {} README.md", copy::TOOL_READ_ACTION)));
     assert!(screen.contains("• Запуск через pnpm dev"));
 }
 
@@ -99,12 +99,106 @@ fn the_palette_opens_above_the_input() {
     println!("{screen}");
     assert!(screen.contains(copy::COMMANDS_TITLE));
     assert!(screen.contains("/clear"));
+    assert!(!screen.contains(copy::INPUT_PLACEHOLDER));
+    assert!(screen.contains("OpenRouter"));
+    assert!(screen.contains(r"D:\work\project"));
+    assert!(screen.lines().any(|line| line.starts_with("│› /")));
+    let area = Rect::new(0, 0, 90, 24);
+    let sheet = super::active_sheet(&app, area).expect("command palette");
+    let [_, _, _, panel, composer, _] = super::chat_areas(&app, area, sheet.height, sheet.floating);
+    assert!(panel.height < 18);
+    assert_eq!(panel.bottom(), composer.y);
+}
+
+#[test]
+fn wheel_scrolls_tool_history_without_moving_the_composer_or_footer() {
+    let mut app = conversation_app();
+    app.viewport = (100, 20);
+    app.transcript
+        .entries
+        .push(crate::state::transcript::Entry::Assistant {
+            text: "A line of the completed answer.\n".repeat(30),
+            reasoning: String::new(),
+        });
+    let tail = render(&app, 100, 20);
+    app.update(Msg::Scroll(100, 5, 3));
+    let start = render(&app, 100, 20);
+    assert!(start.contains(copy::TOOL_READ_ACTION), "{start}");
+    assert_eq!(
+        start.lines().skip(16).collect::<Vec<_>>(),
+        tail.lines().skip(16).collect::<Vec<_>>()
+    );
+    let position = app.scroll;
+    app.update(Msg::Scroll(-3, 5, 18));
+    assert_eq!(app.scroll, position);
+}
+
+#[test]
+fn the_sheet_uses_at_least_three_quarters_and_hides_the_composer_and_status() {
+    let mut app = conversation_app();
+    app.overlay = Some(crate::state::overlay::Overlay::new(Panel::Theme));
+    let area = Rect::new(10, 20, 100, 50);
+    let sheet = super::active_sheet(&app, area).expect("theme panel");
+    let [history, _, _, panel, composer, status] =
+        super::chat_areas(&app, area, sheet.height, sheet.floating);
+    assert_eq!(panel.height, 38);
+    assert!(history.bottom() <= panel.y);
+    assert_eq!(panel.bottom(), area.bottom());
+    assert_eq!(composer.height, 0);
+    assert_eq!(status.height, 0);
+}
+
+#[test]
+fn an_approval_prompt_is_visible_when_an_overlay_is_open() {
+    let mut app = conversation_app();
+    app.overlay = Some(crate::state::overlay::Overlay::new(Panel::Theme));
+    let request = json!({
+        "id": "0199aa11-7777-7111-8111-111111111111",
+        "runId": "0199aa11-8888-7111-8111-111111111111",
+        "subject": "demo.tool",
+    });
+    let prompt = crate::state::prompt::from_request(
+        request.as_object().expect("request"),
+        zvs_contract::ExecMode::AlwaysAsk,
+    )
+    .expect("approval");
+    app.prompts.push_back(prompt);
+    let screen = render(&app, 80, 24);
+    assert!(screen.contains(copy::APPROVAL_TITLE), "{screen}");
+    assert!(screen.contains(copy::HINT_PROMPT), "{screen}");
+}
+
+#[test]
+fn panel_search_uses_a_full_width_field_above_its_results() {
+    let mut app = conversation_app();
+    let mut overlay = crate::state::overlay::Overlay::new(Panel::Shortcuts);
+    overlay.tab = 1;
+    app.overlay = Some(overlay);
+    for width in [70_u16, 110] {
+        let screen = render(&app, width, 28);
+        let lines: Vec<_> = screen.lines().collect();
+        let search = lines
+            .iter()
+            .position(|line| line.contains(copy::SEARCH_PLACEHOLDER))
+            .expect("search field");
+        let top = lines[search - 1].trim_start();
+        assert!(top.starts_with('╭') && top.ends_with('╮'), "{screen}");
+        assert_eq!(top.chars().count(), usize::from(width - 4));
+        assert!(lines[search + 1].trim_start().starts_with('╰'));
+        assert!(lines[search + 2].contains(copy::SHORTCUT_COLUMN_KEYS));
+    }
+    for value in "Ctrl+O".chars() {
+        app.update(Msg::Key(Key::Char(value)));
+    }
+    let filtered = render(&app, 110, 28);
+    assert!(filtered.lines().any(|line| line.contains("⌕ Ctrl+O")));
+    assert!(filtered.contains(shortcuts::SHORTCUTS[0].description()));
 }
 
 #[test]
 fn help_and_tiny_terminals_do_not_panic() {
     let mut app = conversation_app();
-    app.help = true;
+    app.update(Msg::Key(Key::Char('?')));
     for (width, height) in [(90, 30), (20, 6), (1, 1), (200, 60)] {
         render(&app, width, height);
     }
@@ -125,40 +219,74 @@ fn column_of(screen: &str, text: &str) -> usize {
 }
 
 #[test]
-fn the_shortcut_list_and_the_rebinding_panel_render() {
+fn skill_columns_share_origins_and_expand_with_the_terminal() {
+    let mut app = conversation_app();
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../../packages/shared/fixtures/skills/SkillDto.valid.json"
+    ))
+    .expect("skill fixtures");
+    let mut overlay = crate::state::overlay::Overlay::new(Panel::Skills);
+    overlay.loading = false;
+    overlay.skills = cases
+        .iter()
+        .map(|case| serde_json::from_value(case["value"].clone()).expect("skill"))
+        .collect();
+    overlay.skills[1].name = "XML".to_owned();
+    overlay.skills[1].file_count = 22;
+    app.overlay = Some(overlay);
+
+    for width in [110, 200] {
+        let screen = render(&app, width, 35);
+        let status = column_of(&screen, copy::LIST_STATUS);
+        assert_eq!(column_of(&screen, copy::SKILL_ON), status);
+        assert_eq!(column_of(&screen, copy::SKILL_INVALID), status);
+        let files = column_of(&screen, copy::LIST_FILES);
+        assert_eq!(column_of(&screen, &crate::format::files(1)), files);
+        assert_eq!(column_of(&screen, &crate::format::files(22)), files);
+        assert!(screen.contains(copy::LIST_DESCRIPTION), "{screen}");
+    }
+    let wide = render(&app, 200, 35);
+    let description = app.overlay.as_ref().expect("skills").skills[0]
+        .description
+        .as_str();
+    assert_eq!(
+        column_of(&wide, description),
+        column_of(&wide, copy::LIST_DESCRIPTION)
+    );
+    let narrow = render(&app, 40, 25);
+    assert_eq!(
+        column_of(&narrow, copy::SKILL_ON),
+        column_of(&narrow, copy::LIST_STATUS)
+    );
+}
+
+#[test]
+fn one_reference_renders_both_tabs_and_rebinding() {
     let mut app = ready(WorkingFolderAccess::Granted);
     app.update(Msg::Key(Key::Char('?')));
+    let sheet = super::active_sheet(&app, Rect::new(0, 0, 120, 40)).expect("reference");
+    assert_eq!(sheet.height, super::rows(super::REFERENCE_ROWS + 4));
     let screen = render(&app, 120, 40);
-    assert!(screen.contains(copy::SHORTCUTS_TITLE), "{screen}");
-    for title in [
-        copy::KEYS_COMPOSE,
-        copy::KEYS_SESSION,
-        copy::KEYS_TRANSCRIPT,
-    ] {
-        assert!(screen.contains(title), "{screen}");
-    }
-    assert!(screen.contains("Ctrl+O"), "{screen}");
-    assert!(screen.contains(copy::KEY_DETAILS), "{screen}");
-    assert!(screen.contains(copy::HINT_KEYS), "{screen}");
-    let narrow = render(&app, 50, 40);
-    assert!(narrow.contains(copy::KEYS_TRANSCRIPT), "{narrow}");
-
-    for value in "/shortcuts".chars() {
-        app.update(Msg::Key(Key::Char(value)));
-    }
-    app.update(Msg::Key(Key::Enter));
-    let screen = render(&app, 100, 40);
+    assert!(screen.contains(copy::HELP_TITLE), "{screen}");
     assert!(screen.contains(copy::SHORTCUT_COLUMN_KEYS), "{screen}");
+    assert!(screen.contains("Ctrl+O"), "{screen}");
+    assert!(screen.contains(copy::HINT_REFERENCE_KEYS), "{screen}");
+    assert!(!screen.contains(copy::INPUT_PLACEHOLDER), "{screen}");
+    assert!(screen.contains(copy::SEARCH_PLACEHOLDER), "{screen}");
+
+    app.update(Msg::Key(Key::Tab));
+    let commands = render(&app, 100, 40);
+    assert!(commands.contains("/clear"), "{commands}");
+    assert!(commands.contains(copy::HINT_REFERENCE_COMMANDS));
+
+    app.update(Msg::Key(Key::Tab));
+    let screen = render(&app, 100, 40);
     let starts: Vec<usize> = shortcuts::SHORTCUTS
         .iter()
+        .take(4)
         .map(|shortcut| column_of(&screen, shortcut.description()))
         .collect();
-    assert!(
-        starts.windows(2).all(|pair| pair[0] == pair[1]),
-        "{starts:?}
-{screen}"
-    );
-
+    assert!(starts.windows(2).all(|pair| pair[0] == pair[1]), "{screen}");
     app.update(Msg::Key(Key::Enter));
     let capturing = render(&app, 100, 40);
     assert!(capturing.contains(copy::SHORTCUT_PRESS), "{capturing}");
@@ -167,7 +295,8 @@ fn the_shortcut_list_and_the_rebinding_panel_render() {
         column_of(&capturing, shortcuts::SHORTCUTS[0].description()),
         starts[0]
     );
-    let _ = render(&app, 20, 6);
+    let narrow = render(&app, 20, 6);
+    assert!(narrow.contains("?") || narrow.lines().count() == 6);
 }
 
 #[test]
@@ -395,7 +524,7 @@ fn delegate(status: &str, report: &str) -> zvs_contract::ChatToolCallDto {
 fn child(index: usize) -> zvs_contract::ChatToolCallDto {
     serde_json::from_value(json!({
         "id": format!("c{index}"), "key": "fs.read", "name": format!("read_{index}"),
-        "round": 0, "arguments": {}, "status": "succeeded"
+        "round": 0, "arguments": {"path": format!("file_{index}.rs")}, "status": "succeeded"
     }))
     .expect("a child call")
 }
@@ -416,9 +545,9 @@ fn a_running_subagent_block_shows_the_header_and_the_last_five_child_calls() {
     assert!(text[1].contains(copy::SUBAGENT_RUNNING));
     assert!(text[1].contains(&crate::format::tools(7)));
     assert_eq!(text.len(), 2 + transcript::SUBAGENT_STEPS_SHOWN);
-    assert!(text[2].contains("read_2"));
-    assert!(text.last().expect("a line").contains("read_6"));
-    assert!(text[2].starts_with("      "));
+    assert!(text[2].contains("file_2.rs"));
+    assert!(text.last().expect("a line").contains("file_6.rs"));
+    assert!(text[2].starts_with("    ✓ "));
 }
 
 #[test]
@@ -504,9 +633,9 @@ fn the_queue_is_a_muted_section_above_the_input_with_its_shortcuts() {
     assert!(screen.contains(copy::QUEUE_SENDING), "{screen}");
     assert!(screen.contains(" › Добавь тесты"), "{screen}");
     assert!(screen.contains("   И проверь clippy"), "{screen}");
-    assert!(screen.contains("Alt+↑/Alt+↓"), "{screen}");
+    assert!(screen.contains("Ctrl+↑/Ctrl+↓"), "{screen}");
     assert!(
-        screen.contains(&format!("Alt+Enter {}", copy::QUEUE_SEND)),
+        screen.contains(&format!("Ctrl+Enter {}", copy::QUEUE_SEND)),
         "{screen}"
     );
     let queue_row = screen

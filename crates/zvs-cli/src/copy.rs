@@ -321,10 +321,26 @@ pub const RECOMMENDED: &str = "рекомендуется";
 pub const QUESTION_PROGRESS: &str = "из";
 
 pub const SEARCH_PLACEHOLDER: &str = "Поиск…";
+pub const LIST_NAME: &str = "Название";
+pub const LIST_STATUS: &str = "Статус";
+pub const LIST_SOURCE: &str = "Источник";
+pub const LIST_FILES: &str = "Файлы";
+pub const LIST_TRANSPORT: &str = "Транспорт";
+pub const LIST_DESCRIPTION: &str = "Описание";
+pub const TOOL_READ_ACTION: &str = "Чтение";
+pub const TOOL_LIST_ACTION: &str = "Список файлов";
+pub const TOOL_EDIT_ACTION: &str = "Изменение файлов";
 pub const LOADING: &str = "Загрузка…";
 pub const NOTHING_FOUND: &str = "Ничего не найдено";
 pub const HINT_PANEL: &str =
-    "↑/↓ — выбор · ←/→, Tab — вкладки · Пробел — подробности · Enter — выбрать · Esc — закрыть";
+    "↑/↓ выбор · Enter действие · Пробел подробности · Tab вкладки · Esc назад";
+pub const HINT_DETAIL: &str = "Esc назад · ↑/↓ прокрутка · PgUp/PgDn страница";
+pub const HINT_REFERENCE_COMMANDS: &str = "↑/↓ выбор · Enter вставить · Tab клавиши · Esc закрыть";
+pub const HINT_REFERENCE_KEYS: &str = "↑/↓ выбор · Enter переназначить · Tab команды · Esc закрыть";
+pub const HINT_ATTACHMENTS: &str = "↑/↓ выбор · Enter добавить · Esc закрыть";
+pub const SKILL_AUTHOR: &str = "Автор";
+pub const SKILL_VERSION: &str = "Версия";
+pub const SKILL_INSTRUCTIONS: &str = "Инструкции";
 pub const TAB_ALL: &str = "Все";
 
 pub const MODELS_TITLE: &str = "Модели";

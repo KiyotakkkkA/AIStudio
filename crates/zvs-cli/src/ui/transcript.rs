@@ -19,7 +19,6 @@ use crate::state::transcript::{AGENT_DELEGATE, Entry, Segment, ShellEnd, ShellRu
 pub const SPINNER: [&str; 8] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"];
 pub const TICKS_PER_SECOND: u64 = 10;
 const RESULT_LINES: usize = 12;
-const COLLAPSED_ARGUMENT: usize = 80;
 const SOURCES_SHOWN: usize = 5;
 
 pub fn spinner(frame: u64) -> &'static str {
@@ -148,46 +147,73 @@ fn goal_block(call: &ChatToolCallDto, expanded: bool, width: usize) -> Vec<Line<
     lines
 }
 
-fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec<Line<'static>> {
+fn tool(
+    call: &ChatToolCallDto,
+    expanded: bool,
+    frame: u64,
+    width: usize,
+    details_key: Option<&str>,
+) -> Vec<Line<'static>> {
     if call.key == GOAL_TOOL && call.status == ChatToolCallStatus::Succeeded {
         return goal_block(call, expanded, width);
     }
     let (icon, color, label) = status_look(call.status, frame);
-    let mut lines = Vec::new();
-    let chip = Style::new().bg(theme::colors().tool_bg);
-    let mut header = vec![
-        Span::raw("  "),
-        Span::styled(
-            format!(" {icon} "),
-            chip.fg(color).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            format!("{} ", call.name),
-            chip.fg(theme::colors().ink).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(format!("  {label}"), Style::new().fg(color)),
-    ];
+    let pairs = arguments(&call.arguments);
+    let action = match call.key.as_str() {
+        "files.read" | "fs.read" => copy::TOOL_READ_ACTION,
+        "files.list" | "fs.list" => copy::TOOL_LIST_ACTION,
+        "files.apply" | "fs.apply" => copy::TOOL_EDIT_ACTION,
+        "shell.run" | "shell.exec" | "process.run" => copy::COMMAND,
+        _ => call.name.as_str(),
+    };
+    let details = if expanded {
+        ""
+    } else {
+        let mut values = pairs
+            .iter()
+            .filter(|(_, value)| !value.is_empty() && value != "null");
+        values
+            .clone()
+            .find(|(key, _)| matches!(key.as_str(), "path" | "paths" | "argv" | "command"))
+            .or_else(|| values.next())
+            .map_or("", |(_, value)| value.as_str())
+    };
+    let mut suffix = String::new();
+    if call.status != ChatToolCallStatus::Succeeded {
+        suffix.push_str(&format!(" · {label}"));
+    }
+    if call.duration_ms > 0 {
+        suffix.push_str(&format!(" · {}", duration(call.duration_ms)));
+    }
     if let Some(shell) = call
         .meta
         .as_ref()
         .and_then(|meta| meta.get("shellId"))
-        .and_then(|value| value.as_str())
+        .and_then(Value::as_str)
     {
-        header.push(Span::styled(
-            format!(" · {} {}", copy::PROCESS_IN_BACKGROUND, short_id(shell)),
+        suffix.push_str(&format!(
+            " · {} {}",
+            copy::PROCESS_IN_BACKGROUND,
+            short_id(shell)
+        ));
+    }
+    let room = width.saturating_sub(2 + suffix.width());
+    let action = truncate(action, room);
+    let detail_room = room.saturating_sub(action.width() + 1);
+    let mut lines = vec![Line::from(vec![
+        Span::styled(format!("{icon} "), Style::new().fg(color)),
+        Span::styled(action, theme::strong()),
+        Span::styled(
+            if detail_room == 0 || details.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", truncate(details, detail_room))
+            },
             theme::accent(),
-        ));
-    }
-    if call.duration_ms > 0 {
-        header.push(Span::styled(
-            format!(" · {}", duration(call.duration_ms)),
-            theme::faint(),
-        ));
-    }
-    lines.push(Line::from(header));
-
-    let room = width.saturating_sub(8).max(10);
-    let pairs = arguments(&call.arguments);
+        ),
+        Span::styled(suffix, theme::muted()),
+    ])];
+    let room = width.saturating_sub(4).max(1);
     if expanded {
         if !pairs.is_empty() {
             lines.push(Line::from(vec![
@@ -208,40 +234,32 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
                 ]));
             }
         }
-    } else if !pairs.is_empty() {
-        let summary = pairs
-            .iter()
-            .map(|(key, value)| {
-                if key.is_empty() {
-                    value.clone()
-                } else {
-                    format!("{key}: {value}")
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("  ");
-        lines.push(Line::from(vec![
-            indent(),
-            Span::styled(
-                truncate(&summary, room.min(COLLAPSED_ARGUMENT)),
-                theme::muted(),
-            ),
-        ]));
     }
 
     let output = call.error.as_ref().or(call.result.as_ref());
     if let Some(output) = output.filter(|text| !text.trim().is_empty()) {
         let style = if call.error.is_some() {
             Style::new().fg(theme::colors().err)
-        } else {
+        } else if expanded {
             theme::text()
+        } else {
+            theme::muted()
         };
         let wrapped: Vec<String> = output
             .trim_end()
             .split('\n')
-            .flat_map(|line| wrap(line, room))
+            .flat_map(|line| {
+                wrap(
+                    line,
+                    if expanded {
+                        room
+                    } else {
+                        room.saturating_sub(2)
+                    },
+                )
+            })
             .collect();
-        let shown = if expanded { RESULT_LINES } else { 1 };
+        let shown = if expanded { RESULT_LINES } else { 3 };
         if expanded {
             lines.push(Line::from(vec![
                 indent(),
@@ -249,7 +267,13 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
             ]));
         }
         for (index, piece) in wrapped.iter().take(shown).enumerate() {
-            let lead = if index == 0 && !expanded { "⎿ " } else { "" };
+            let lead = if expanded {
+                ""
+            } else if index == 0 {
+                "⎿ "
+            } else {
+                "  "
+            };
             lines.push(Line::from(vec![
                 indent(),
                 Span::styled(lead, theme::faint()),
@@ -258,9 +282,19 @@ fn tool(call: &ChatToolCallDto, expanded: bool, frame: u64, width: usize) -> Vec
         }
         let hidden = wrapped.len().saturating_sub(shown);
         if hidden > 0 {
+            let shortcut = details_key
+                .filter(|_| !expanded)
+                .map_or_else(String::new, |key| format!(" · {key}"));
             lines.push(Line::from(vec![
                 indent(),
-                Span::styled(format!("… {} {hidden}", copy::MORE_LINES), theme::faint()),
+                Span::styled(
+                    format!(
+                        "… {} {}{shortcut}",
+                        copy::MORE_LINES,
+                        format::number(hidden as u64)
+                    ),
+                    theme::faint(),
+                ),
             ]));
         }
         if call.truncated && expanded {
@@ -328,7 +362,7 @@ pub fn subagent_block(
         "failed" => ("✗", theme::colors().err, copy::SUBAGENT_FAILED),
         _ => ("✓", theme::colors().ok, copy::SUBAGENT_DONE),
     };
-    let chip = Style::new().bg(theme::colors().tool_bg);
+    let chip = Style::new();
     let mut lines = vec![Line::from(vec![
         Span::raw("  "),
         Span::styled(
@@ -357,7 +391,7 @@ pub fn subagent_block(
         ]));
         let hidden = children.len().saturating_sub(SUBAGENT_STEPS_SHOWN);
         for child in children.iter().skip(hidden) {
-            if let Some(mut first) = tool(child, false, frame, width.saturating_sub(4))
+            if let Some(mut first) = tool(child, false, frame, width.saturating_sub(4), None)
                 .into_iter()
                 .next()
             {
@@ -458,7 +492,7 @@ fn shell_block(run: &ShellRun, expanded: bool, frame: u64, width: usize) -> Vec<
             copy::SHELL_FAILED.to_owned(),
         ),
     };
-    let chip = Style::new().bg(theme::colors().shell_bg);
+    let chip = Style::new();
     let room = width.saturating_sub(8).max(10);
     let mut lines = vec![Line::from(vec![
         Span::raw("  "),
@@ -495,34 +529,16 @@ fn shell_block(run: &ShellRun, expanded: bool, frame: u64, width: usize) -> Vec<
 }
 
 fn user(text: &str, width: usize) -> Vec<Line<'static>> {
-    let room = width.saturating_sub(6).max(8);
-    let style = Style::new()
-        .fg(theme::colors().ink)
-        .bg(theme::colors().user_bg);
-    let edge = Span::styled("  ", style);
-    let mut lines = vec![Line::from(vec![
-        edge.clone(),
-        Span::styled(
-            copy::YOU,
-            Style::new()
-                .fg(theme::colors().accent)
-                .bg(theme::colors().user_bg)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            " ".repeat(room.saturating_sub(copy::YOU.width()) + 2),
-            style,
-        ),
-    ])];
-    for piece in wrap(text, room) {
-        let pad = room.saturating_sub(piece.width()) + 2;
-        lines.push(Line::from(vec![
-            edge.clone(),
-            Span::styled(piece, style),
-            Span::styled(" ".repeat(pad), style),
-        ]));
-    }
-    lines
+    wrap(text, width.saturating_sub(2))
+        .into_iter()
+        .enumerate()
+        .map(|(index, part)| {
+            Line::from(vec![
+                Span::styled(if index == 0 { "› " } else { "  " }, theme::accent()),
+                Span::styled(part, theme::text()),
+            ])
+        })
+        .collect()
 }
 
 fn reasoning(text: &str, expanded: bool, width: usize) -> Vec<Line<'static>> {
@@ -603,7 +619,7 @@ fn capability_block(
     title: &str,
     items: &[&McpCapabilityDto],
     expanded: bool,
-    toggle: &str,
+    toggle: Option<&str>,
     room: usize,
 ) -> Vec<Line<'static>> {
     if items.is_empty() {
@@ -622,7 +638,9 @@ fn capability_block(
                 format!("{title} · {}", format::number(items.len() as u64)),
                 theme::strong(),
             ),
-            Span::styled(format!("   {toggle} — {action}"), theme::faint()),
+            toggle.map_or_else(Span::default, |key| {
+                Span::styled(format!("   {key} — {action}"), theme::faint())
+            }),
         ]),
     ];
     if !expanded {
@@ -675,10 +693,10 @@ fn capability_block(
     lines
 }
 
-fn server_card(
+pub(super) fn server_card(
     detail: &McpServerDetailDto,
     expanded: bool,
-    toggle: &str,
+    toggle: Option<&str>,
     width: usize,
 ) -> Vec<Line<'static>> {
     let server = &detail.server;
@@ -797,11 +815,18 @@ fn assistant(text: &str, thought: &str, expanded: bool, width: usize) -> Vec<Lin
     if !thought.trim().is_empty() {
         lines.extend(reasoning(thought, expanded, width));
     }
-    let mut body = markdown(text.trim_end(), width, "    ");
-    if let Some(first) = body.first_mut()
-        && let Some(lead) = first.spans.first_mut()
-    {
-        *lead = Span::styled("  ● ", theme::accent());
+    let text = text.trim();
+    if text.is_empty() {
+        return lines;
+    }
+    if !lines.is_empty() {
+        lines.push(Line::default());
+    }
+    let mut body = markdown(text, width, "  ");
+    if text.starts_with('#') || text.starts_with("```") {
+        lines.push(Line::from(Span::styled("●", theme::accent())));
+    } else if let Some(lead) = body.first_mut().and_then(|line| line.spans.first_mut()) {
+        *lead = Span::styled("● ", theme::accent());
     }
     lines.extend(body);
     lines
@@ -927,10 +952,23 @@ pub fn lines(app: &App, width: usize) -> Vec<Line<'static>> {
 }
 
 pub fn layout(app: &App, width: usize) -> (Vec<Line<'static>>, Vec<(usize, String)>) {
+    layout_lines(app, width, true)
+}
+
+pub fn history(app: &App, width: usize) -> Vec<Line<'static>> {
+    layout_lines(app, width, false).0
+}
+
+fn layout_lines(
+    app: &App,
+    width: usize,
+    include_live: bool,
+) -> (Vec<Line<'static>>, Vec<(usize, String)>) {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut links: Vec<(usize, String)> = Vec::new();
     let expanded = app.expanded;
     let toggle = app.keymap.label(Shortcut::Details);
+    let tool_shortcut = app.keymap.chord(Shortcut::Details).map(|_| toggle.as_str());
     for entry in &app.transcript.entries {
         if !matches!(entry, Entry::Attachments(_)) {
             lines.push(Line::default());
@@ -1000,14 +1038,17 @@ pub fn layout(app: &App, width: usize) -> (Vec<Line<'static>>, Vec<(usize, Strin
             Entry::Tool(call) if call.key == AGENT_DELEGATE && call.meta.is_some() => {
                 subagent_block(call, &[], expanded, app.frame, width)
             }
-            Entry::Tool(call) => tool(call, expanded, app.frame, width),
+            Entry::Tool(call) => tool(call, expanded, app.frame, width, tool_shortcut),
             Entry::Notice { tone, text } => notice(*tone, text, width),
             Entry::Recap(text) => recap(text, width),
             Entry::Compaction(text) => compaction_mark(text, width),
             Entry::Shell(run) => shell_block(run, expanded, app.frame, width),
-            Entry::Server(detail) => server_card(detail, expanded, &toggle, width),
+            Entry::Server(detail) => server_card(detail, expanded, Some(&toggle), width),
             Entry::Sources(_) => Vec::new(),
         });
+    }
+    if !include_live {
+        return (lines, links);
     }
     if let Some(run) = &app.shell {
         lines.push(Line::default());
@@ -1027,7 +1068,9 @@ pub fn layout(app: &App, width: usize) -> (Vec<Line<'static>>, Vec<(usize, Strin
                         width,
                     ));
                 }
-                Segment::Tool(call) => lines.extend(tool(call, expanded, app.frame, width)),
+                Segment::Tool(call) => {
+                    lines.extend(tool(call, expanded, app.frame, width, tool_shortcut));
+                }
                 Segment::Text { text, reasoning } => {
                     let thinking = index == last && text.is_empty();
                     lines.extend(assistant(text, reasoning, expanded || thinking, width));
@@ -1093,20 +1136,27 @@ mod tests {
     }
 
     #[test]
-    fn a_collapsed_tool_block_shows_one_line_of_arguments_and_result() {
-        let text = plain(&tool(&call("one\ntwo\nthree"), false, 0, 80));
+    fn a_collapsed_tool_shows_a_short_preview_and_the_expansion_key() {
+        let text = plain(&tool(
+            &call("one\ntwo\nthree\nfour"),
+            false,
+            0,
+            80,
+            Some("Ctrl+O"),
+        ));
         assert_eq!(
             text[0],
-            format!("   ✓ read_file   {} · 1,2 с", copy::TOOL_SUCCEEDED)
+            format!("✓ {} src/main.rs · 1,2 с", copy::TOOL_READ_ACTION)
         );
-        assert_eq!(text[1], "    path: src/main.rs  lines: 40");
-        assert_eq!(text[2], "    ⎿ one");
-        assert_eq!(text[3], format!("    … {} 2", copy::MORE_LINES));
+        assert_eq!(text[1], "    ⎿ one");
+        assert_eq!(text[2], "      two");
+        assert_eq!(text[3], "      three");
+        assert_eq!(text[4], format!("    … {} 1 · Ctrl+O", copy::MORE_LINES));
     }
 
     #[test]
     fn an_expanded_tool_block_lists_every_argument_and_result_line() {
-        let text = plain(&tool(&call("one\ntwo"), true, 0, 80));
+        let text = plain(&tool(&call("one\ntwo"), true, 0, 80, Some("Ctrl+O")));
         assert!(text.contains(&format!("    {}", copy::ARGUMENTS)));
         assert!(text.contains(&"    lines: 40".to_owned()));
         assert!(text.contains(&"    two".to_owned()));

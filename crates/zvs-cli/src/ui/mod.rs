@@ -2,6 +2,7 @@ pub mod banner;
 pub mod modal;
 pub mod overlay;
 pub mod prompt;
+mod scrollbar;
 pub mod text;
 pub mod theme;
 pub mod transcript;
@@ -10,37 +11,22 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Padding, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, Padding, Paragraph};
 use unicode_width::UnicodeWidthStr;
-use zvs_contract::ExecMode;
 
 use crate::copy;
 use crate::state::overlay::Panel;
-use crate::state::palette::{Command, every_item, loading, matches};
+use crate::state::palette::{loading, matches};
 use crate::state::shortcuts::Shortcut;
 use crate::state::transcript::Tone;
 use crate::state::{App, Phase};
 
 const INPUT_MAX_LINES: usize = 8;
 const PALETTE_ROWS: usize = 8;
-const KEYS_GAP: usize = 4;
+const REFERENCE_ROWS: usize = 18;
 const QUEUE_ROWS: usize = 5;
 
 pub use crate::state::overlay::mode_label;
-
-fn panel(
-    title: &str,
-    color: ratatui::style::Color,
-    background: ratatui::style::Color,
-) -> Block<'static> {
-    Block::new()
-        .style(Style::new().bg(background))
-        .padding(Padding::new(1, 1, 0, 1))
-        .title(Line::from(Span::styled(
-            format!(" {title}"),
-            Style::new().fg(color).add_modifier(Modifier::BOLD),
-        )))
-}
 
 fn rows(count: usize) -> u16 {
     u16::try_from(count).unwrap_or(u16::MAX)
@@ -66,7 +52,11 @@ fn model_line(app: &App) -> String {
 
 fn welcome(frame: &mut Frame<'_>, area: Rect) {
     let width = usize::from(area.width);
-    let mut lines = banner::lines(width.saturating_sub(4));
+    let mut lines = banner::lines(if area.height >= 8 {
+        width.saturating_sub(4)
+    } else {
+        0
+    });
     lines.push(Line::default());
     lines.push(Line::from(vec![
         Span::styled(copy::TITLE, theme::strong()),
@@ -93,15 +83,43 @@ fn transcript_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
         welcome(frame, area);
         return;
     }
-    let lines = transcript::lines(app, usize::from(area.width));
+    let text = transcript_text_area(area);
+    let lines = transcript::lines(app, usize::from(text.width));
     let height = usize::from(area.height);
     let bottom = lines.len().saturating_sub(height);
     let offset = bottom.saturating_sub(app.scroll.min(bottom));
-    frame.render_widget(Paragraph::new(lines).scroll((rows(offset), 0)), area);
+    let target = transcript_area(text, lines.len());
+    scrollbar::draw(frame, area, lines.len(), offset, true);
+    let visible: Vec<_> = lines.into_iter().skip(offset).take(height).collect();
+    frame.render_widget(Paragraph::new(visible), target);
+}
+
+fn transcript_text_area(area: Rect) -> Rect {
+    Rect {
+        width: area.width - u16::from(area.width > 1),
+        ..area
+    }
+}
+
+fn transcript_area(area: Rect, line_count: usize) -> Rect {
+    let height = area.height.min(rows(line_count));
+    Rect {
+        y: area.y + area.height - height,
+        height,
+        ..area
+    }
+}
+
+fn reference_filter(app: &App) -> Option<&crate::state::input::Input> {
+    app.overlay
+        .as_ref()
+        .filter(|overlay| overlay.floating_reference)
+        .map(|overlay| &overlay.filter)
 }
 
 fn input_layout(app: &App, width: u16) -> (Vec<std::ops::Range<usize>>, (usize, usize)) {
-    app.input
+    reference_filter(app)
+        .unwrap_or(&app.input)
         .visual_layout(usize::from(width.saturating_sub(4)), app.shell_mode())
 }
 
@@ -191,33 +209,41 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
     };
     let block = if shell {
         Block::new()
-            .style(Style::new().bg(theme::colors().shell_bg))
             .padding(Padding::new(1, 1, 0, 1))
             .title(Line::from(vec![
                 Span::styled(
                     format!(" {} ", copy::SHELL_MODE),
                     Style::new()
-                        .fg(theme::colors().on_warn)
-                        .bg(theme::colors().warn)
+                        .fg(theme::colors().warn)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(format!("  {}", app.folder), theme::faint()),
             ]))
     } else {
         Block::new()
-            .style(Style::new().bg(theme::colors().panel_bg))
-            .padding(Padding::new(1, 1, 1, 1))
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(theme::faint())
     };
     let inner = block.inner(area);
     frame.render_widget(block, area);
-    let text = app.input.text();
+    let filter = reference_filter(app);
+    let input = filter.unwrap_or(&app.input);
+    let text = input.text();
     let (wrapped, (row, column)) = input_layout(app, area.width);
     let visible = usize::from(inner.height.max(1));
     let first = row.saturating_sub(visible - 1);
     let lines: Vec<Line<'static>> = if text.is_empty() {
         vec![Line::from(vec![
             Span::styled("› ", lead),
-            Span::styled(copy::INPUT_PLACEHOLDER, theme::faint()),
+            Span::styled(
+                if filter.is_some() {
+                    copy::SEARCH_PLACEHOLDER
+                } else {
+                    copy::INPUT_PLACEHOLDER
+                },
+                theme::faint(),
+            ),
         ])]
     } else {
         wrapped
@@ -235,7 +261,7 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
                     spans.push(Span::styled(text[range].to_owned(), theme::text()));
                 } else {
                     let mut offset = 0;
-                    spans.extend(app.input.pieces(0, text.len()).into_iter().filter_map(
+                    spans.extend(input.pieces(0, text.len()).into_iter().filter_map(
                         |(piece, attachment)| {
                             let start = range.start.max(offset);
                             let end = range.end.min(offset + piece.len());
@@ -249,17 +275,14 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
                                         } else {
                                             theme::colors().accent
                                         };
-                                        Style::new()
-                                            .fg(color)
-                                            .bg(theme::colors().accent_soft)
-                                            .add_modifier(Modifier::BOLD)
+                                        Style::new().fg(color).add_modifier(Modifier::BOLD)
                                     }),
                                 )
                             })
                         },
                     ));
                 }
-                if app.input.selected_all() {
+                if input.selected_all() {
                     for span in spans.iter_mut().skip(1) {
                         span.style = span.style.bg(theme::colors().selection_bg);
                     }
@@ -269,373 +292,345 @@ fn input_view(frame: &mut Frame<'_>, area: Rect, app: &App) {
             .collect()
     };
     frame.render_widget(Paragraph::new(lines), inner);
-    if app.prompts.is_empty() && !app.help && app.modal.is_none() && app.overlay.is_none() {
+    if !inner.is_empty()
+        && app.prompts.is_empty()
+        && app.modal.is_none()
+        && (app.overlay.is_none() || filter.is_some() && !app.capturing())
+    {
         let x = inner.x + rows(column + 2).min(inner.width.saturating_sub(1));
-        let y = inner.y + rows(row - first);
+        let y = inner.y + rows(row - first).min(inner.height.saturating_sub(1));
         frame.set_cursor_position((x, y));
     }
 }
 
-fn palette_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
+fn picker_lines(app: &App, width: usize, limit: usize, attachments: bool) -> Vec<Line<'static>> {
+    let row = |index, selected, label: String| {
+        let marker = if index == selected { " › " } else { "   " };
+        let style = if index == selected {
+            theme::accent()
+        } else {
+            theme::text()
+        };
+        Line::from(Span::styled(
+            format!(
+                "{marker}{}",
+                text::truncate(&label, width.saturating_sub(3))
+            ),
+            style,
+        ))
+    };
+    if attachments {
+        let choices = app.attachment_choices();
+        let start = app
+            .attachment_selected
+            .saturating_add(1)
+            .saturating_sub(limit);
+        return choices
+            .iter()
+            .enumerate()
+            .skip(start)
+            .take(limit)
+            .map(|(index, choice)| {
+                let kind = if choice.image() {
+                    copy::IMAGE_KIND
+                } else {
+                    copy::STORE_KIND
+                };
+                row(
+                    index,
+                    app.attachment_selected,
+                    format!("{} · {kind}", choice.name()),
+                )
+            })
+            .collect();
+    }
     let sources = app.sources();
     let found = matches(app.input.text(), &sources);
-    if found.is_empty() {
-        if loading(app.input.text(), &sources) {
-            let area = Rect {
-                x: above.x + 1,
-                y: above.y + above.height.saturating_sub(3),
-                width: above.width.saturating_sub(2),
-                height: 3.min(above.height),
-            };
-            frame.render_widget(Clear, area);
-            frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled(
-                        format!(" {} ", transcript::spinner(app.frame)),
-                        theme::accent(),
-                    ),
-                    Span::styled(copy::LOADING, theme::muted()),
-                ]))
-                .block(panel(
-                    copy::COMMANDS_TITLE,
-                    theme::colors().muted,
-                    theme::colors().panel_bg,
-                )),
-                area,
-            );
-        }
-        return;
+    if found.is_empty() && loading(app.input.text(), &sources) {
+        return vec![Line::from(vec![
+            Span::styled(
+                format!(" {} ", transcript::spinner(app.frame)),
+                theme::accent(),
+            ),
+            Span::styled(copy::LOADING, theme::muted()),
+        ])];
     }
-    let selected = app.palette.selected().min(found.len() - 1);
-    let start = selected.saturating_sub(PALETTE_ROWS - 1);
-    let width = above.width.saturating_sub(2);
-    let height = rows(found.len().min(PALETTE_ROWS) + 2);
-    let area = Rect {
-        x: above.x + 1,
-        y: above.y + above.height.saturating_sub(height),
-        width,
-        height: height.min(above.height),
-    };
-    let name_width = found
-        .iter()
-        .map(|item| item.shown().width())
-        .chain(every_item().iter().map(|item| item.shown().width()))
-        .max()
-        .unwrap_or(0)
-        + 2;
-    let lines: Vec<Line<'static>> = found
+    let selected = app.palette.selected().min(found.len().saturating_sub(1));
+    let start = selected.saturating_add(1).saturating_sub(limit);
+    found
         .iter()
         .enumerate()
         .skip(start)
-        .take(PALETTE_ROWS)
+        .take(limit)
         .map(|(index, item)| {
-            let shown = item.shown();
-            let pad = " ".repeat(name_width.saturating_sub(shown.width()));
-            let name = format!("{shown}{pad}");
-            if index == selected {
-                Line::from(vec![
-                    Span::styled(format!(" {name}"), theme::selected()),
-                    Span::styled(format!("{} ", item.description()), theme::selected()),
-                ])
-            } else {
-                Line::from(vec![
-                    Span::styled(format!(" {name}"), theme::accent()),
-                    Span::styled(item.description(), theme::muted()),
-                ])
-            }
-        })
-        .collect();
-    frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(lines).block(panel(
-            copy::COMMANDS_TITLE,
-            theme::colors().muted,
-            theme::colors().panel_bg,
-        )),
-        area,
-    );
-}
-
-fn help_column(title: &str, entries: &[(String, String)], width: usize) -> Vec<Line<'static>> {
-    let width = width.max(1);
-    let key_width = entries
-        .iter()
-        .map(|(key, _)| key.width())
-        .max()
-        .unwrap_or(0)
-        .min(width / 2)
-        .max(1);
-    let meaning_width = width.saturating_sub(key_width + 2).max(1);
-    let mut lines = vec![
-        Line::from(Span::styled(title.to_owned(), theme::strong())),
-        Line::default(),
-    ];
-    for (key, meaning) in entries {
-        let keys = text::wrap(key, key_width);
-        let meanings = text::wrap(meaning, meaning_width);
-        for row in 0..keys.len().max(meanings.len()) {
-            let key = keys.get(row).cloned().unwrap_or_default();
-            let padding = key_width.saturating_sub(key.width()) + 2;
-            lines.push(Line::from(vec![
-                Span::styled(key, theme::accent()),
-                Span::raw(" ".repeat(padding)),
-                Span::styled(
-                    meanings.get(row).cloned().unwrap_or_default(),
-                    theme::text(),
-                ),
-            ]));
-        }
-    }
-    lines
-}
-
-pub fn help_lines(app: &App, width: usize) -> Vec<Line<'static>> {
-    let commands = every_item()
-        .into_iter()
-        .map(|item| (format!("/{}", item.label()), item.description()))
-        .collect();
-    let mut sections = vec![(copy::COMMANDS_TITLE, commands)];
-    sections.extend(app.key_sections());
-    if width >= 90 {
-        let usable = width.saturating_sub(KEYS_GAP * 2);
-        let column = usable / 3;
-        let band: Vec<_> = sections
-            .iter()
-            .enumerate()
-            .map(|(index, (title, entries))| {
-                let column = if index == 2 {
-                    usable - column * 2
-                } else {
-                    column
-                };
-                (column, help_column(title, entries, column))
-            })
-            .collect();
-        side_by_side(&band)
-    } else {
-        let mut lines = Vec::new();
-        for (title, entries) in sections {
-            lines.extend(help_column(title, &entries, width));
-            lines.push(Line::default());
-        }
-        lines
-    }
-}
-
-fn key_column(title: &str, rows: &[(String, &str)]) -> (usize, Vec<Line<'static>>) {
-    let keys = rows.iter().map(|(keys, _)| keys.width()).max().unwrap_or(0) + 2;
-    let width = rows
-        .iter()
-        .map(|(_, meaning)| keys + meaning.width())
-        .chain([title.width()])
-        .max()
-        .unwrap_or(0);
-    let mut lines = vec![Line::from(Span::styled(title.to_owned(), theme::strong()))];
-    for (combo, meaning) in rows {
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{combo}{}", " ".repeat(keys.saturating_sub(combo.width()))),
-                theme::accent(),
-            ),
-            Span::styled((*meaning).to_owned(), theme::text()),
-        ]));
-    }
-    (width, lines)
-}
-
-fn side_by_side(band: &[(usize, Vec<Line<'static>>)]) -> Vec<Line<'static>> {
-    let height = band.iter().map(|(_, lines)| lines.len()).max().unwrap_or(0);
-    (0..height)
-        .map(|row| {
-            let mut spans = Vec::new();
-            for (index, (width, lines)) in band.iter().enumerate() {
-                let line = lines.get(row).cloned().unwrap_or_default();
-                let used = line.width();
-                spans.extend(line.spans);
-                if index + 1 < band.len() {
-                    spans.push(Span::raw(" ".repeat(width.saturating_sub(used) + KEYS_GAP)));
-                }
-            }
-            Line::from(spans)
+            row(
+                index,
+                selected,
+                format!("{}  ·  {}", item.shown(), item.description()),
+            )
         })
         .collect()
 }
 
-pub fn key_panel_lines(app: &App, width: usize) -> Vec<Line<'static>> {
-    let mut lines = vec![
-        Line::from(Span::styled(copy::SHORTCUTS_TITLE, theme::strong())),
-        Line::default(),
-    ];
-    let mut band: Vec<(usize, Vec<Line<'static>>)> = Vec::new();
-    let mut used = 0;
-    for (title, rows) in app.key_columns() {
-        let column = key_column(title, &rows);
-        let needed = if band.is_empty() {
-            column.0
-        } else {
-            column.0 + KEYS_GAP
-        };
-        if !band.is_empty() && used + needed > width {
-            lines.extend(side_by_side(&band));
-            lines.push(Line::default());
-            band.clear();
-            used = 0;
+fn hint_line(hint: &str, width: usize) -> Line<'static> {
+    let mut shown = String::new();
+    for segment in hint.split(" · ") {
+        let gap = if shown.is_empty() { " " } else { " · " };
+        if shown.width() + gap.width() + segment.width() <= width {
+            shown.push_str(gap);
+            shown.push_str(segment);
         }
-        used += if band.is_empty() { column.0 } else { needed };
-        band.push(column);
     }
-    lines.extend(side_by_side(&band));
-    lines.push(Line::default());
-    lines.push(Line::from(vec![
-        Span::styled(format!("/{}", Command::Shortcuts.name()), theme::accent()),
-        Span::styled(format!(" {}", copy::KEYS_CUSTOMIZE), theme::faint()),
-        Span::raw("   "),
-        Span::styled(format!("/{}", Command::Theme.name()), theme::accent()),
-        Span::styled(format!(" {}", copy::KEYS_THEME), theme::faint()),
-    ]));
-    lines
+    Line::from(Span::styled(shown, theme::muted()))
 }
 
-fn keys_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
-    let lines = key_panel_lines(app, usize::from(above.width.saturating_sub(4)));
-    let height = rows(lines.len() + 1).min(above.height);
-    let area = Rect {
-        y: above.y + above.height.saturating_sub(height),
-        height,
-        ..above
+fn sheet_rule(title: &str, count: Option<usize>, width: usize) -> Line<'static> {
+    let count = count.map_or_else(String::new, |count| {
+        format!(" {} ", crate::format::number(count as u64))
+    });
+    let title = text::truncate(title, width.saturating_sub(count.width() + 5));
+    let fill = width.saturating_sub(title.width() + count.width() + 4);
+    Line::from(vec![
+        Span::styled("─ ", theme::faint()),
+        Span::styled(title, theme::strong()),
+        Span::styled(format!(" {}{count}─", "─".repeat(fill)), theme::muted()),
+    ])
+}
+
+enum SheetBody<'a> {
+    Overlay(&'a crate::state::overlay::Overlay),
+    Lines(Vec<Line<'static>>, usize, Option<(u16, u16)>),
+}
+
+struct Sheet<'a> {
+    title: std::borrow::Cow<'a, str>,
+    body: SheetBody<'a>,
+    count: Option<usize>,
+    hint: &'static str,
+    height: u16,
+    floating: bool,
+}
+
+fn sheet_min_height(area: Rect) -> u16 {
+    area.height - area.height / 4
+}
+
+fn sheet_limit(area: Rect) -> u16 {
+    area.height.saturating_sub(1).max(sheet_min_height(area))
+}
+
+fn sheet_height(area: Rect, body_lines: usize) -> u16 {
+    rows(body_lines + 2).clamp(sheet_min_height(area), sheet_limit(area))
+}
+
+fn floating_sheet_limit(app: &App, area: Rect, max_height: u16) -> u16 {
+    let [history, ..] = chat_areas(app, area, 0, true);
+    let available = history.height.saturating_sub(u16::from(history.height > 3));
+    available.min(max_height)
+}
+
+fn active_sheet(app: &App, area: Rect) -> Option<Sheet<'_>> {
+    let cap = sheet_limit(area);
+    let width = usize::from(area.width);
+    let room = usize::from(cap.saturating_sub(2));
+    let lines_sheet = |title, lines: Vec<Line<'static>>, offset, cursor, hint| {
+        let height = sheet_height(area, lines.len());
+        Sheet {
+            title,
+            body: SheetBody::Lines(lines, offset, cursor),
+            count: None,
+            hint,
+            height,
+            floating: false,
+        }
     };
-    frame.render_widget(Clear, area);
+    if let Some(current) = app.prompts.front() {
+        let panel = prompt::panel(current, width);
+        let offset = panel
+            .cursor
+            .map_or_else(
+                || panel.lines.len().saturating_sub(room),
+                |(_, row)| usize::from(row).saturating_add(1).saturating_sub(room),
+            )
+            .saturating_sub(app.prompt_scroll);
+        return Some(lines_sheet(
+            panel.title.into(),
+            panel.lines,
+            offset,
+            panel.cursor,
+            copy::HINT_PROMPT,
+        ));
+    }
+    if let Some(modal) = &app.modal {
+        let (title, lines) = modal::content(app, width);
+        return Some(lines_sheet(
+            title.into(),
+            lines,
+            modal.offset,
+            None,
+            copy::MODAL_HINT,
+        ));
+    }
+    if let Some(current) = &app.overlay {
+        let (desired, count) = overlay::sheet_measure(app, current, area.width);
+        let hint = if app.capturing() {
+            copy::HINT_CAPTURE
+        } else {
+            match current.panel {
+                Panel::Theme => copy::HINT_THEME,
+                Panel::Notes => copy::HINT_NOTES,
+                Panel::Note => copy::HINT_NOTE,
+                Panel::Processes => copy::HINT_PROCESSES,
+                Panel::ProcessOutput => copy::HINT_PROCESS_OUTPUT,
+                Panel::McpDetail | Panel::SkillDetail => copy::HINT_DETAIL,
+                Panel::Shortcuts => {
+                    if current.tab == 0 {
+                        copy::HINT_REFERENCE_COMMANDS
+                    } else {
+                        copy::HINT_REFERENCE_KEYS
+                    }
+                }
+                _ => copy::HINT_PANEL,
+            }
+        };
+        return Some(Sheet {
+            title: current.title().into(),
+            body: SheetBody::Overlay(current),
+            height: if current.floating_reference {
+                // The reference also needs its tabs and column headings.
+                rows(desired + 2).min(floating_sheet_limit(app, area, rows(REFERENCE_ROWS + 4)))
+            } else {
+                sheet_height(area, desired)
+            },
+            count,
+            hint,
+            floating: current.floating_reference,
+        });
+    }
+    if let Some(origin) = app.verification.as_deref() {
+        let panel = prompt::verification(origin, width);
+        return Some(lines_sheet(
+            panel.title.into(),
+            panel.lines,
+            0,
+            None,
+            copy::HINT_VERIFY,
+        ));
+    }
+    let attachments = app.attachments_open();
+    if attachments || app.palette_open() {
+        let cap = floating_sheet_limit(app, area, rows(PALETTE_ROWS + 2));
+        let mut lines = picker_lines(app, width, usize::from(cap.saturating_sub(2)), attachments);
+        if lines.is_empty() {
+            lines.push(Line::from(copy::NOTHING_FOUND));
+        }
+        let (title, hint) = if attachments {
+            (copy::ATTACHMENTS_TITLE, copy::HINT_ATTACHMENTS)
+        } else {
+            (copy::COMMANDS_TITLE, copy::HINT_PALETTE)
+        };
+        return Some(Sheet {
+            title: title.into(),
+            height: rows(lines.len() + 2).min(cap),
+            body: SheetBody::Lines(lines, 0, None),
+            count: None,
+            hint,
+            floating: true,
+        });
+    }
+    None
+}
+
+fn draw_sheet(frame: &mut Frame<'_>, area: Rect, app: &App, sheet: Sheet<'_>) {
+    if area.is_empty() {
+        return;
+    }
+    let [head, body, hint] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(u16::from(area.height >= 3)),
+    ])
+    .areas(area);
+    let width = usize::from(area.width);
     frame.render_widget(
-        Paragraph::new(lines).block(Block::new().padding(Padding::new(2, 2, 1, 0))),
-        area,
+        Paragraph::new(sheet_rule(&sheet.title, sheet.count, width)),
+        head,
     );
+    match sheet.body {
+        SheetBody::Overlay(overlay) => overlay::draw(frame, body, app, overlay),
+        SheetBody::Lines(lines, offset, cursor) => {
+            let offset = offset.min(lines.len().saturating_sub(usize::from(body.height)));
+            frame.render_widget(Paragraph::new(lines).scroll((rows(offset), 0)), body);
+            if let Some((column, row)) = cursor
+                && usize::from(row) >= offset
+                && usize::from(row) - offset < usize::from(body.height)
+                && column < body.width
+            {
+                frame.set_cursor_position((body.x + column, body.y + row - rows(offset)));
+            }
+        }
+    }
+    frame.render_widget(Paragraph::new(hint_line(sheet.hint, width)), hint);
 }
 
 fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let [top, bottom] =
-        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
-    let mode_color = match app.mode {
-        ExecMode::NoRestrictions => theme::colors().warn,
-        ExecMode::AlwaysAsk => theme::colors().muted,
-        ExecMode::SafetyAsk | ExecMode::AutoBypass => theme::colors().accent,
+    let mode = mode_label(app.mode);
+    let effort = crate::state::overlay::effort_label(app.effort);
+    let model = model_line(app);
+    let width = usize::from(area.width);
+    let folder = app
+        .folder
+        .rsplit(['/', '\\'])
+        .find(|part| !part.is_empty())
+        .unwrap_or(&app.folder);
+    let context = app
+        .context_percent
+        .map_or_else(String::new, |value| format!("{value}% · "));
+    let full = format!(" {context}{}  ?", app.folder);
+    let short = format!(" {context}{folder}  ?");
+    let right = if full.width() <= width / 2 {
+        full
+    } else {
+        short
     };
-    let left = vec![
-        Span::styled(" ◆ ", Style::new().fg(mode_color)),
-        Span::styled(mode_label(app.mode), Style::new().fg(mode_color)),
-        Span::styled("  ·  ", theme::faint()),
-        Span::styled(model_line(app), theme::muted()),
-        Span::styled("  ·  ", theme::faint()),
-        Span::styled(
-            crate::state::overlay::effort_label(app.effort),
-            theme::muted(),
-        ),
-    ];
-    let mut left = left;
+    let right = text::truncate(&right, (width / 2).max(1));
+    let left_room = width.saturating_sub(right.width() + 1);
+    let mut left = format!(" ◆ {mode} · {model} · {effort}");
+    if left.width() > left_room {
+        left = format!(" ◆ {model}");
+    }
     let running = app.running_processes();
     if running > 0 {
-        left.push(Span::styled("  ·  ", theme::faint()));
-        left.push(Span::styled(
-            format!("⚙ {}", crate::format::processes(running as u64)),
-            theme::accent(),
-        ));
+        let segment = format!(" · {}", crate::format::processes(running as u64));
+        if left.width() + segment.width() <= left_room {
+            left.push_str(&segment);
+        }
     }
     if let Some(goal) = app.goal.filter(crate::state::GoalState::shown) {
-        left.push(Span::styled("  ·  ", theme::faint()));
-        left.push(if goal.active() {
-            Span::styled(
-                crate::format::goal_progress(
-                    goal.usage.rounds,
-                    goal.budget.rounds,
-                    app.goal_elapsed_ms(),
-                ),
-                theme::accent(),
+        let value = if goal.active() {
+            crate::format::goal_progress(
+                goal.usage.rounds,
+                goal.budget.rounds,
+                app.goal_elapsed_ms(),
             )
         } else {
-            Span::styled(
-                crate::format::with_reason(copy::GOAL_PAUSED, goal.reason),
-                Style::new().fg(theme::colors().warn),
-            )
-        });
+            crate::format::with_reason(copy::GOAL_PAUSED, goal.reason)
+        };
+        let segment = format!(" · {value}");
+        if left.width() + segment.width() <= left_room {
+            left.push_str(&segment);
+        }
     }
-    let used: usize = left.iter().map(|span| span.content.width()).sum();
-    let room = usize::from(top.width).saturating_sub(used + 2);
-    let folder = text::truncate(&app.folder, room);
-    let pad = room.saturating_sub(folder.width());
-    let mut spans = left;
-    spans.push(Span::raw(" ".repeat(pad + 1)));
-    spans.push(Span::styled(folder, theme::faint()));
-    frame.render_widget(Paragraph::new(Line::from(spans)), top);
-
-    let hint = if let Some((tone, message)) = &app.status {
-        let color = match tone {
-            Tone::Info => theme::colors().muted,
-            Tone::Success => theme::colors().ok,
-            Tone::Error => theme::colors().err,
-        };
-        Line::from(Span::styled(format!(" {message}"), Style::new().fg(color)))
-    } else {
-        let hint = if !app.prompts.is_empty() {
-            copy::HINT_PROMPT
-        } else if app.shell_mode() {
-            copy::HINT_SHELL
-        } else if app.shell.is_some() {
-            copy::HINT_SHELL_RUNNING
-        } else if app.consent_pending {
-            copy::CONSENT_PENDING
-        } else if app.verification.is_some() {
-            copy::HINT_VERIFY
-        } else if app.capturing() {
-            copy::HINT_CAPTURE
-        } else if app.keys_open() {
-            copy::HINT_KEYS
-        } else if app
-            .overlay
-            .as_ref()
-            .is_some_and(|overlay| overlay.panel == Panel::Theme)
-        {
-            copy::HINT_THEME
-        } else if let Some(panel) = app.overlay.as_ref().map(|overlay| overlay.panel)
-            && matches!(panel, Panel::Notes | Panel::Note)
-        {
-            if panel == Panel::Notes {
-                copy::HINT_NOTES
-            } else {
-                copy::HINT_NOTE
-            }
-        } else if let Some(panel) = app.overlay.as_ref().map(|overlay| overlay.panel)
-            && matches!(panel, Panel::Processes | Panel::ProcessOutput)
-        {
-            if panel == Panel::Processes {
-                copy::HINT_PROCESSES
-            } else {
-                ""
-            }
-        } else if app.overlay.is_some() {
-            copy::HINT_PANEL
-        } else if app.palette_open() {
-            copy::HINT_PALETTE
-        } else if app.busy() {
-            copy::HINT_RUNNING
-        } else {
-            copy::HINT_IDLE
-        };
-        Line::from(Span::styled(format!(" {hint}"), theme::faint()))
-    };
-    frame.render_widget(Paragraph::new(hint), bottom);
-}
-
-fn prompt_view(frame: &mut Frame<'_>, area: Rect, content: prompt::Panel) {
-    let block = panel(
-        &content.title,
-        theme::colors().warn,
-        theme::colors().prompt_bg,
+    let left = text::truncate(&left, left_room);
+    let gap = width.saturating_sub(left.width() + right.width());
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(left, theme::muted()),
+            Span::raw(" ".repeat(gap)),
+            Span::styled(right, theme::muted()),
+        ])),
+        area,
     );
-    let inner = block.inner(area);
-    frame.render_widget(Clear, area);
-    frame.render_widget(Paragraph::new(content.lines).block(block), area);
-    if let Some((column, row)) = content.cursor {
-        frame.set_cursor_position((inner.x + column, inner.y + row));
-    }
 }
 
 fn splash(frame: &mut Frame<'_>, area: Rect, message: &str, app: &App) {
@@ -659,28 +654,46 @@ fn access(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let Some(current) = app.prompts.front() else {
         return;
     };
-    let art = banner::lines(usize::from(area.width).saturating_sub(4));
     let width = area.width.min(76);
     let panel = prompt::panel(current, usize::from(width.saturating_sub(2)));
-    let panel_height = rows(panel.lines.len() + 2);
-    let art_height = rows(art.len() + 1);
-    let total = art_height + panel_height;
-    let top = area.y + area.height.saturating_sub(total) / 2;
+    let panel_height = sheet_height(area, panel.lines.len());
+    let art_height = area.height.saturating_sub(panel_height);
+    let art = banner::lines(if art_height >= 6 {
+        usize::from(area.width).saturating_sub(4)
+    } else {
+        0
+    });
     frame.render_widget(
         Paragraph::new(art).alignment(ratatui::layout::Alignment::Center),
         Rect {
-            y: top,
-            height: art_height.min(area.height),
+            height: art_height,
             ..area
         },
     );
     let target = Rect {
         x: area.x + (area.width - width) / 2,
-        y: (top + art_height).min(area.bottom().saturating_sub(1)),
+        y: area.y + art_height,
         width,
-        height: panel_height.min(area.height.saturating_sub(art_height)),
+        height: panel_height,
     };
-    prompt_view(frame, target, panel);
+    let offset = panel
+        .lines
+        .len()
+        .saturating_sub(usize::from(target.height.saturating_sub(2)))
+        .saturating_sub(app.prompt_scroll);
+    draw_sheet(
+        frame,
+        target,
+        app,
+        Sheet {
+            title: panel.title.into(),
+            body: SheetBody::Lines(panel.lines, offset, panel.cursor),
+            count: None,
+            hint: copy::HINT_PROMPT,
+            height: target.height,
+            floating: false,
+        },
+    );
 }
 
 fn highlight(frame: &mut Frame<'_>, app: &App) {
@@ -704,34 +717,97 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
     highlight(frame, app);
 }
 
-fn chat_areas(app: &App, area: Rect) -> (Option<prompt::Panel>, [Rect; 4]) {
-    let width = usize::from(area.width.saturating_sub(2));
-    let panel = app
-        .prompts
-        .front()
-        .map(|current| prompt::panel(current, width))
-        .or_else(|| {
-            app.verification
-                .as_deref()
-                .map(|origin| prompt::verification(origin, width))
-        });
-    let bottom_height = panel
-        .as_ref()
-        .map_or_else(
-            || input_height(app, area.width),
-            |panel| rows(panel.lines.len() + 2),
-        )
-        .min(area.height.saturating_sub(4));
-    let queue_height = rows(queue_lines(app, usize::from(area.width)).len())
-        .min(area.height.saturating_sub(bottom_height + 4));
-    let areas = Layout::vertical([
+fn chat_areas(app: &App, area: Rect, sheet: u16, floating: bool) -> [Rect; 6] {
+    let panel_open = sheet > 0;
+    let status = u16::from(!panel_open || floating);
+    let bottom = if panel_open && !floating {
+        0
+    } else {
+        input_height(app, area.width).min(area.height.saturating_sub(status))
+    };
+    let feedback = u16::from(
+        (app.status.is_some() || !floating && idle_hint(app, sheet).is_some())
+            && app.prompts.is_empty()
+            && area.height > bottom + sheet + status,
+    );
+    let queue = if panel_open || floating {
+        0
+    } else {
+        rows(queue_lines(app, usize::from(area.width)).len())
+            .min(area.height.saturating_sub(bottom + feedback + 2))
+    };
+    Layout::vertical([
         Constraint::Fill(1),
-        Constraint::Length(queue_height),
-        Constraint::Length(bottom_height),
-        Constraint::Length(2),
+        Constraint::Length(queue),
+        Constraint::Length(feedback),
+        Constraint::Length(sheet),
+        Constraint::Length(bottom),
+        Constraint::Length(status),
     ])
-    .areas(area);
-    (panel, areas)
+    .areas(area)
+}
+
+pub(crate) fn scroll_transcript(app: &App, delta: isize, at: Option<(u16, u16)>) -> usize {
+    if app.phase != Phase::Chat {
+        return app.scroll;
+    }
+    let area = Rect::new(0, 0, app.viewport.0, app.viewport.1);
+    let sheet = active_sheet(app, area);
+    let height = sheet.as_ref().map_or(0, |sheet| sheet.height);
+    let floating = sheet.as_ref().is_some_and(|sheet| sheet.floating);
+    let [body, ..] = chat_areas(app, area, height, floating);
+    if body.is_empty()
+        || at.is_some_and(|(x, y)| !body.contains(ratatui::layout::Position::new(x, y)))
+    {
+        return app.scroll;
+    }
+    let text = transcript_text_area(body);
+    let max = transcript::lines(app, usize::from(text.width))
+        .len()
+        .saturating_sub(usize::from(text.height));
+    app.scroll.min(max).saturating_add_signed(delta).min(max)
+}
+
+fn idle_hint(app: &App, sheet: u16) -> Option<&'static str> {
+    if sheet > 0 {
+        None
+    } else if app.consent_pending {
+        Some(copy::CONSENT_PENDING)
+    } else if app.shell_mode() {
+        Some(copy::HINT_SHELL)
+    } else {
+        None
+    }
+}
+
+pub fn detail_scroll_bounds(app: &App, detail: &crate::state::overlay::Overlay) -> (usize, usize) {
+    let area = Rect::new(0, 0, app.viewport.0, app.viewport.1);
+    let body = Rect {
+        height: sheet_limit(area).saturating_sub(2),
+        ..area
+    };
+    overlay::detail_scroll_bounds(body, detail)
+}
+
+pub fn modal_max_scroll(app: &App) -> usize {
+    let area = Rect::new(0, 0, app.viewport.0, app.viewport.1);
+    let page = usize::from(sheet_limit(area).saturating_sub(2));
+    modal::content(app, usize::from(area.width))
+        .1
+        .len()
+        .saturating_sub(page)
+}
+
+pub fn prompt_scroll_limit(app: &App) -> usize {
+    let area = Rect::new(0, 0, app.viewport.0, app.viewport.1);
+    let room = usize::from(sheet_limit(area).saturating_sub(2));
+    app.prompts.front().map_or(0, |current| {
+        let panel = prompt::panel(current, usize::from(area.width));
+        panel.cursor.map_or_else(
+            || panel.lines.len().saturating_sub(room),
+            |(_, row)| usize::from(row).saturating_add(1).saturating_sub(room),
+        )
+    })
 }
 
 pub fn link_at(app: &App, area: Rect, x: u16, y: u16) -> Option<String> {
@@ -739,18 +815,19 @@ pub fn link_at(app: &App, area: Rect, x: u16, y: u16) -> Option<String> {
         || app.overlay.is_some()
         || app.palette_open()
         || app.attachments_open()
-        || app.keys_open()
-        || app.help
         || app.modal.is_some()
         || app.show_welcome()
     {
         return None;
     }
-    let (_, [body, ..]) = chat_areas(app, area);
+    let height = active_sheet(app, area).map_or(0, |sheet| sheet.height);
+    let [body, ..] = chat_areas(app, area, height, false);
+    let body = transcript_text_area(body);
+    let (lines, links) = transcript::layout(app, usize::from(body.width));
+    let body = transcript_area(body, lines.len());
     if !body.contains(ratatui::layout::Position::new(x, y)) {
         return None;
     }
-    let (lines, links) = transcript::layout(app, usize::from(body.width));
     let height = usize::from(body.height);
     let bottom = lines.len().saturating_sub(height);
     let offset = bottom.saturating_sub(app.scroll.min(bottom));
@@ -771,30 +848,38 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
         Phase::Connecting(message) => splash(frame, area, message, app),
         Phase::Access => access(frame, area, app),
         Phase::Chat => {
-            let (panel, [body, queued, bottom, status]) = chat_areas(app, area);
-            if queued.height > 0 {
-                queue_view(frame, queued, app);
+            let sheet = active_sheet(app, area);
+            let height = sheet.as_ref().map_or(0, |sheet| sheet.height);
+            let floating = sheet.as_ref().is_some_and(|sheet| sheet.floating);
+            let [body, queued, feedback, sheet_area, composer, status] =
+                chat_areas(app, area, height, floating);
+            transcript_view(frame, body, app);
+            queue_view(frame, queued, app);
+            if let Some((tone, message)) = &app.status {
+                let color = match tone {
+                    Tone::Info => theme::colors().muted,
+                    Tone::Success => theme::colors().ok,
+                    Tone::Error => theme::colors().err,
+                };
+                let line = text::truncate(message, usize::from(feedback.width));
+                frame.render_widget(
+                    Paragraph::new(Span::styled(line, Style::new().fg(color))),
+                    feedback,
+                );
+            } else if let Some(hint) = idle_hint(app, height) {
+                frame.render_widget(
+                    Paragraph::new(hint_line(hint, usize::from(feedback.width))),
+                    feedback,
+                );
             }
-            match &app.overlay {
-                Some(current) => overlay::draw(frame, body, app, current),
-                None => transcript_view(frame, body, app),
+            if let Some(sheet) = sheet {
+                draw_sheet(frame, sheet_area, app, sheet);
             }
-            match panel {
-                Some(panel) => prompt_view(frame, bottom, panel),
-                None => input_view(frame, bottom, app),
+            if !composer.is_empty() {
+                input_view(frame, composer, app);
             }
-            if app.palette_open() {
-                palette_view(frame, body, app);
-            }
-            if app.attachments_open() {
-                attachment_view(frame, body, app);
-            }
-            if app.keys_open() {
-                keys_view(frame, body, app);
-            }
-            footer(frame, status, app);
-            if app.help || app.modal.is_some() {
-                modal::draw(frame, area, app);
+            if !status.is_empty() {
+                footer(frame, status, app);
             }
         }
     }
@@ -802,51 +887,3 @@ fn draw_screen(frame: &mut Frame<'_>, app: &App) {
 
 #[cfg(test)]
 mod tests;
-
-fn attachment_view(frame: &mut Frame<'_>, above: Rect, app: &App) {
-    let choices = app.attachment_choices();
-    let selected = app.attachment_selected.min(choices.len().saturating_sub(1));
-    let start = selected.saturating_sub(PALETTE_ROWS - 1);
-    let mut lines: Vec<Line<'static>> = choices
-        .iter()
-        .enumerate()
-        .skip(start)
-        .take(PALETTE_ROWS)
-        .map(|(index, a)| {
-            let kind = if a.image() {
-                copy::IMAGE_KIND
-            } else {
-                copy::STORE_KIND
-            };
-            Line::from(Span::styled(
-                text::truncate(
-                    &format!(" {} · {kind}", a.name()),
-                    usize::from(above.width.saturating_sub(4)),
-                ),
-                if index == selected {
-                    theme::selected()
-                } else {
-                    theme::text()
-                },
-            ))
-        })
-        .collect();
-    if lines.is_empty() {
-        lines.push(Line::from(copy::NOTHING_FOUND));
-    }
-    let height = rows(lines.len() + 2).min(above.height);
-    let area = Rect {
-        y: above.bottom().saturating_sub(height),
-        height,
-        ..above
-    };
-    frame.render_widget(Clear, area);
-    frame.render_widget(
-        Paragraph::new(lines).block(panel(
-            copy::ATTACHMENTS_TITLE,
-            theme::colors().accent,
-            theme::colors().panel_bg,
-        )),
-        area,
-    );
-}

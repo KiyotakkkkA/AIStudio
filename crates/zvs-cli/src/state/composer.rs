@@ -21,18 +21,7 @@ impl App {
     }
 
     pub fn clamp_modal(&mut self) {
-        let (_, _, body) = crate::ui::modal::regions(ratatui::layout::Rect::new(
-            0,
-            0,
-            self.viewport.0,
-            self.viewport.1,
-        ));
-        let width = usize::from(body.width.max(1));
-        let height = usize::from(body.height);
-        let max = crate::ui::modal::content(self, width)
-            .1
-            .len()
-            .saturating_sub(height);
+        let max = crate::ui::modal_max_scroll(self);
         if let Some(modal) = &mut self.modal {
             modal.offset = modal.offset.min(max);
         }

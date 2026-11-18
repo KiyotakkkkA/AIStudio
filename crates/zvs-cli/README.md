@@ -32,7 +32,9 @@ aistudio --version | --help
 ## Pipeline: start-up and connection
 
 1. `args::parse` turns the command line into `Args`. `mcp add` runs once without a UI and exits.
-2. `runtime::run` enters the alternate screen and starts `session`.
+2. `runtime::run` opens a Ratatui inline viewport and starts `session`. The transcript scrolls
+   within the viewport while the composer and status bar stay in place. The runtime prints the
+   transcript to the terminal when the session exits.
 3. `launch::connect` resolves the pipe name (`zvs_pipe::pipe_name`, keyed by the user's SID)
    and tries to open it. If nothing is listening, it looks for `zvs-studio.exe` next to the
    CLI or one folder up (`app_candidates`), starts it detached with `CLI_LAUNCH_ARG`, and
@@ -43,6 +45,10 @@ aistudio --version | --help
    mismatch and the session stops with a message, rather than talking a wrong dialect.
 5. After the handshake the CLI asks the host to open a session for the working folder
    (`cli.open`), which reports whether the folder is granted, and loads providers and policy.
+
+The CLI follows the terminal background. Set `ZVS_CLI_BACKGROUND=light` or
+`ZVS_CLI_BACKGROUND=dark` if the terminal does not report it through `COLORFGBG`.
+`NO_COLOR` disables color, and 256-color terminals use indexed colors when true color is unavailable.
 
 ## Protocol
 

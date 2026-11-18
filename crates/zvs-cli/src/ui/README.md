@@ -11,26 +11,29 @@ In chat it splits the area vertically:
 
 ```
 ┌──────────────────────────────────┐
-│ body     transcript or overlay   │  Fill(1)
+│ body     newest transcript lines │  Fill(1)
 │ queued   messages waiting to send│  Length(queue height)
-│ bottom   composer or prompt      │  Length(bottom height)
-│ status   model · mode · context  │  Length(2)
+│ sheet    active picker or prompt │  Length(content, capped)
+│ composer                         │  Length(input height)
+│ status   mode · model · context  │  Length(1)
 └──────────────────────────────────┘
 ```
 
-An open overlay panel replaces the transcript in the body. An approval, question or
-verification prompt replaces the composer in the bottom area. Modals (help, keys) draw on
-top of everything in a centred box (`modal::regions`).
+Approvals and detail views share a sheet anchored to the bottom of the viewport. It occupies
+at least 75% of the viewport and takes the place of the composer and status bar. The `/`
+palette, `@` picker, and `?` reference use a compact sheet above the focused composer. Each
+sheet ends with its keyboard hints. Wheel events over the chat scroll the transcript. The
+chat scrollbar has a transparent track, and the composer and footer stay in place.
 
 ## Files
 
 | File            | Contents                                                                                      |
 | --------------- | --------------------------------------------------------------------------------------------- |
-| `mod.rs`        | `draw`, the status line, the queue, help and key panels                                       |
+| `mod.rs`        | `draw`, the composer, the shared sheet, the queue, and the status line                        |
 | `transcript.rs` | Transcript lines: messages, reasoning, tool call cards, subagent blocks, shell runs, spinners |
 | `overlay.rs`    | Panel rows with an aligned key column, process output, selection                              |
 | `prompt.rs`     | Approval, question and verification panels with their choices                                 |
-| `modal.rs`      | Modal frame and content                                                                       |
+| `modal.rs`      | Plan, subagent, and warning content for the shared sheet                                      |
 | `banner.rs`     | The start-up wordmark, shrunk or dropped to fit the width                                     |
 | `text.rs`       | `wrap`, `truncate`, inline styling and the minimal Markdown renderer                          |
 | `theme.rs`      | `Colors` per `CliTheme`, the active theme, named styles, `ember` gradient, `dim`              |

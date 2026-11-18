@@ -1,21 +1,16 @@
-use super::{text::wrap, theme};
+use super::text::wrap;
 use crate::{
     copy,
     state::{App, modal::Content, transcript::subagent_run},
 };
-use ratatui::{
-    Frame,
-    layout::{Margin, Rect},
-    text::{Line, Span},
-    widgets::{Block, Clear, Padding, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
-};
+use ratatui::text::Line;
 use zvs_contract::AgenticPlanStepStatus;
 
 pub fn content(app: &App, width: usize) -> (&'static str, Vec<Line<'static>>) {
-    let help = Content::Help;
-    let kind = app.modal.as_ref().map_or(&help, |m| &m.content);
-    match kind {
-        Content::Help => (copy::HELP_TITLE, super::help_lines(app, width)),
+    let Some(modal) = &app.modal else {
+        return ("", Vec::new());
+    };
+    match &modal.content {
         Content::Warning(message) => (
             copy::ATTACHMENTS_TITLE,
             wrap(message, width).into_iter().map(Line::from).collect(),
@@ -99,63 +94,5 @@ pub fn content(app: &App, width: usize) -> (&'static str, Vec<Line<'static>>) {
                     .collect(),
             )
         }
-    }
-}
-
-fn panel() -> Block<'static> {
-    Block::new()
-        .padding(Padding::new(2, 2, 1, 1))
-        .style(theme::text().bg(theme::colors().panel_bg))
-}
-
-pub fn regions(area: Rect) -> (Rect, Rect, Rect) {
-    let target = area.inner(Margin::new(2.min(area.width / 4), 1.min(area.height / 4)));
-    let inner = panel().inner(target);
-    let body = Rect {
-        y: inner.y + 2.min(inner.height),
-        height: inner.height.saturating_sub(3),
-        width: inner.width.saturating_sub(1),
-        ..inner
-    };
-    (target, inner, body)
-}
-
-pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App) {
-    let (target, inner, body) = regions(area);
-    let (title, lines) = content(app, usize::from(body.width.max(1)));
-    let max = lines.len().saturating_sub(usize::from(body.height));
-    let offset = app.modal.as_ref().map_or(0, |m| m.offset).min(max);
-    frame.render_widget(Clear, target);
-    frame.render_widget(panel(), target);
-    if inner.height > 0 {
-        frame.render_widget(
-            Paragraph::new(Span::styled(title, theme::strong())),
-            Rect { height: 1, ..inner },
-        );
-    }
-    frame.render_widget(
-        Paragraph::new(lines.clone()).scroll((u16::try_from(offset).unwrap_or(u16::MAX), 0)),
-        body,
-    );
-    let mut scroll = ScrollbarState::new(lines.len())
-        .position(offset)
-        .viewport_content_length(usize::from(body.height));
-    frame.render_stateful_widget(
-        Scrollbar::new(ScrollbarOrientation::VerticalRight),
-        Rect {
-            width: inner.width,
-            ..body
-        },
-        &mut scroll,
-    );
-    if inner.height > 0 {
-        frame.render_widget(
-            Paragraph::new(Span::styled(copy::MODAL_HINT, theme::faint())),
-            Rect {
-                y: inner.bottom().saturating_sub(1),
-                height: 1,
-                ..inner
-            },
-        );
     }
 }

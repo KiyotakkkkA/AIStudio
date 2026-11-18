@@ -2,7 +2,6 @@ use super::Key;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Content {
-    Help,
     GoalPlan,
     Subagent(String),
     Warning(String),
