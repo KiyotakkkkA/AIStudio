@@ -101,6 +101,7 @@ function AppFrame() {
             <NavRail
               groups={visibleNavGroups(browserSettings.enabled)}
               identity={RAIL_IDENTITY}
+              onOpenProfile={() => navigation.go(ROUTES.profile)}
               collapsed={ui.railCollapsed}
               theme={ui.theme}
               themePicker={ui.railThemePicker}

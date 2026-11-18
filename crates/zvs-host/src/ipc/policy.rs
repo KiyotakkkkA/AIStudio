@@ -126,6 +126,7 @@ pub const POLICY: &[ChannelPolicy] = &[
     studio("browserSites.put", Effect::Loosen),
     studio("browserSites.remove", Effect::Act),
     studio("browserSites.setDefault", Effect::Loosen),
+    console("chat.activity", Effect::Read, Scope::Any),
     console("chat.answer", Effect::Act, Scope::Run("id")),
     console("chat.attach", Effect::Read, Scope::Dialog("conversationId")),
     console("chat.bindFolder", Effect::Act, Scope::Dialog("id")),

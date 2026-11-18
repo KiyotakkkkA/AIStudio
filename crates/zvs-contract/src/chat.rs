@@ -1113,6 +1113,36 @@ impl Validate for ChatStatsDto {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatActivityDto {
+    pub first_day: Timestamp,
+    pub daily_tokens: Vec<u64>,
+    pub total_tokens: u64,
+    pub peak_daily_tokens: u64,
+    pub longest_turn_ms: u64,
+    pub longest_streak: u64,
+    pub current_streak: u64,
+}
+
+impl Validate for ChatActivityDto {
+    fn validate(&self) -> Result<(), AppError> {
+        check::timestamp("firstDay", self.first_day)?;
+        if self.first_day % 86_400_000 != 0 {
+            return Err(invalid("firstDay", "UTC midnight"));
+        }
+        check::int_range("dailyTokens", self.daily_tokens.len() as u64, 1, 371)?;
+        for &tokens in &self.daily_tokens {
+            check::safe_integer("dailyTokens", tokens)?;
+        }
+        check::safe_integer("totalTokens", self.total_tokens)?;
+        check::safe_integer("peakDailyTokens", self.peak_daily_tokens)?;
+        check::safe_integer("longestTurnMs", self.longest_turn_ms)?;
+        check::safe_integer("longestStreak", self.longest_streak)?;
+        check::safe_integer("currentStreak", self.current_streak)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TruncateConversationInput {

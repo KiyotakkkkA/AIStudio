@@ -1552,11 +1552,24 @@ async fn branching_copies_the_dialog_up_to_the_message_into_a_new_conversation()
         .expect("pins");
     harness.chat.pin(&parent, true).expect("pins the dialog");
 
+    let activity = harness.chat.activity().expect("activity");
+    assert_eq!(
+        activity.total_tokens,
+        messages[1].tokens_in
+            + messages[1].tokens_out
+            + messages[3].tokens_in
+            + messages[3].tokens_out
+    );
+    assert!(activity.total_tokens > 0);
     let branch = harness
         .chat
         .branch(&parent, &messages[1].id)
         .expect("branches");
 
+    assert_eq!(
+        harness.chat.activity().expect("activity after branching"),
+        activity
+    );
     assert_ne!(branch.id, parent);
     assert!(!branch.pinned);
     assert!(branch.title.ends_with(BRANCH_TITLE_SUFFIX));

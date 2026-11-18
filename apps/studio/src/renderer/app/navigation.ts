@@ -103,5 +103,4 @@ export function visibleNavGroups(browser: boolean): readonly NavGroupModel[] {
 export const RAIL_IDENTITY: RailIdentity = {
   initials: "ZV",
   name: "Локальный профиль",
-  hint: "Локальное пространство · зашифровано",
 };

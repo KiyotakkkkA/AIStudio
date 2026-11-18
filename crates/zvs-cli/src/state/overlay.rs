@@ -19,6 +19,7 @@ pub enum Panel {
     Effort,
     Resume,
     Context,
+    Activity,
     Skills,
     SkillDetail,
     Mcp,
@@ -166,6 +167,7 @@ pub struct Overlay {
     pub capturing: Option<Shortcut>,
     pub conversations: Vec<ConversationDto>,
     pub context: Option<ChatContextDto>,
+    pub activity: Option<zvs_contract::ChatActivityDto>,
     pub usage: Option<ProviderUsageDto>,
     pub skills: Vec<SkillDto>,
     pub servers: Vec<McpServerDto>,
@@ -1068,6 +1070,7 @@ impl Overlay {
             conversations: Vec::new(),
             context: None,
             usage: None,
+            activity: None,
             skills: Vec::new(),
             servers: Vec::new(),
             detail: None,
@@ -1087,6 +1090,7 @@ impl Overlay {
             Panel::Effort => copy::EFFORT_TITLE,
             Panel::Resume => copy::RESUME_TITLE,
             Panel::Context => copy::CONTEXT_TITLE,
+            Panel::Activity => copy::ACTIVITY_TITLE,
             Panel::Skills | Panel::SkillDetail => copy::SKILLS_TITLE,
             Panel::Mcp | Panel::McpDetail => copy::MCP_TITLE,
             Panel::Processes => copy::PROCESSES_TITLE,
@@ -1107,7 +1111,7 @@ impl Overlay {
             Panel::Models => "◆",
             Panel::Effort => "◐",
             Panel::Resume => "↺",
-            Panel::Context => "▤",
+            Panel::Context | Panel::Activity => "▤",
             Panel::Skills | Panel::SkillDetail => "✦",
             Panel::Mcp | Panel::McpDetail => "⧉",
             Panel::Notes | Panel::Note => "✎",
@@ -1142,6 +1146,7 @@ impl Overlay {
             Panel::Config => fixed(&[copy::TAB_CONVERSATIONS, copy::TAB_GENERAL]),
             Panel::Shortcuts => fixed(&[copy::COMMANDS_TITLE, copy::KEYS_TITLE]),
             Panel::Connect
+            | Panel::Activity
             | Panel::Effort
             | Panel::Theme
             | Panel::ProcessOutput
@@ -1161,7 +1166,7 @@ impl Overlay {
             Panel::Context => context_rows(self),
             Panel::Skills => skill_rows(self),
             Panel::Mcp => server_rows(self),
-            Panel::McpDetail | Panel::SkillDetail => Vec::new(),
+            Panel::McpDetail | Panel::SkillDetail | Panel::Activity => Vec::new(),
             Panel::Processes => process_rows(self),
             Panel::ProcessOutput => output_rows(self),
             Panel::Notes => note_rows(self),

@@ -100,6 +100,11 @@ pub fn files(count: u64) -> String {
 
 /// Unix milliseconds as a UTC `DD.MM.YYYY` day.
 pub fn date(millis: i64) -> String {
+    let (day, month, year) = date_parts(millis);
+    format!("{day:02}.{month:02}.{year}")
+}
+
+pub(crate) fn date_parts(millis: i64) -> (i64, i64, i64) {
     let days = millis.div_euclid(86_400_000) + 719_468;
     let era = days.div_euclid(146_097);
     let of_era = days - era * 146_097;
@@ -113,7 +118,7 @@ pub fn date(millis: i64) -> String {
         month_index - 9
     };
     let year = year_of_era + era * 400 + i64::from(month <= 2);
-    format!("{day:02}.{month:02}.{year}")
+    (day, month, year)
 }
 
 pub fn percent(part: u64, whole: u64) -> String {

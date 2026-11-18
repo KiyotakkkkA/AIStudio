@@ -249,6 +249,7 @@ pub enum Request {
     GetServer(McpServerId),
     Servers,
     Usage(ProviderId),
+    Activity,
     SetSkill {
         id: SkillId,
         enabled: bool,
@@ -327,6 +328,7 @@ pub enum Msg {
     Attached(Result<Option<ChatAttachDto>, AppError>),
     Context(Result<ChatContextDto, AppError>),
     Usage(Result<Option<ProviderUsageDto>, AppError>),
+    Activity(Result<zvs_contract::ChatActivityDto, AppError>),
     Skills(Result<Vec<SkillDto>, AppError>),
     SkillDetail(SkillId, Result<zvs_contract::SkillDetailDto, AppError>),
     ServerDetail(McpServerId, Result<McpServerDetailDto, AppError>),
@@ -1076,6 +1078,13 @@ impl App {
             Msg::Usage(result) => {
                 if let (Ok(usage), Some(overlay)) = (result, self.overlay_for(Panel::Context)) {
                     overlay.usage = usage;
+                }
+                Vec::new()
+            }
+            Msg::Activity(result) => {
+                if let Some(overlay) = self.overlay_for(Panel::Activity) {
+                    overlay.activity = result.ok();
+                    overlay.loading = false;
                 }
                 Vec::new()
             }
@@ -2187,6 +2196,7 @@ impl App {
                     self.status = Some((Tone::Info, copy::DESKTOP_NO_CONVERSATION.to_owned()));
                 }
             },
+            Command::Status => return self.open_panel(Panel::Activity),
             Command::Context => return self.open_panel(Panel::Context),
             Command::Goal => return self.goal_command(""),
             Command::Skills => return self.open_panel(Panel::Skills),
@@ -2426,6 +2436,7 @@ impl App {
             Panel::Mcp => vec![Request::Servers],
             Panel::Permissions => vec![Request::Policy],
             Panel::Config => vec![Request::Assistant],
+            Panel::Activity => vec![Request::Activity],
             Panel::Context => match &self.model {
                 Some(model) => vec![
                     Request::Context {
@@ -2779,7 +2790,14 @@ impl App {
         let Some(overlay) = self.overlay.as_ref() else {
             return Vec::new();
         };
-        if matches!(overlay.panel, Panel::McpDetail | Panel::SkillDetail) {
+        if matches!(
+            overlay.panel,
+            Panel::McpDetail | Panel::SkillDetail | Panel::Activity
+        ) {
+            if overlay.panel == Panel::Activity && matches!(key, Key::Esc | Key::Enter) {
+                self.overlay = None;
+                return Vec::new();
+            }
             let (limit, page) = match key {
                 Key::Up | Key::Down | Key::PageUp | Key::PageDown => {
                     crate::ui::detail_scroll_bounds(self, overlay)

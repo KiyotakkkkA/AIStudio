@@ -8,6 +8,14 @@ use zvs_contract::{
 use crate::data::schema::columns::{EnumColumn, json_text};
 use crate::data::schema::{CompactionRow, ConversationRow, MessageRow};
 
+pub const DAY_MS: i64 = 86_400_000;
+
+pub struct ActivityDay {
+    pub day: i64,
+    pub tokens: u64,
+    pub longest_turn_ms: u64,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConversationPatch {
     pub title: Option<String>,
@@ -254,6 +262,31 @@ impl<'c> ChatRepository<'c> {
             .prepare_cached("DELETE FROM conversation WHERE id = ?1")?
             .execute([id])?;
         Ok(())
+    }
+
+    pub fn activity_days(&self, now: Timestamp) -> rusqlite::Result<Vec<ActivityDay>> {
+        // Branches copy the reply and its run ID. Count each completed run once.
+        let mut statement = self.connection.prepare(
+            "WITH turns AS (
+                SELECT MIN(created_at) / ?1 AS day,
+                       MAX(MAX(tokens_in, 0) + MAX(tokens_out, 0)) AS tokens,
+                       MAX(MAX(duration_ms, 0)) AS duration
+                FROM message
+                WHERE role = 'assistant' AND run_id IS NOT NULL AND partial = 0
+                    AND created_at BETWEEN 0 AND ?2
+                GROUP BY run_id
+            )
+            SELECT day, SUM(tokens), MAX(duration) FROM turns GROUP BY day ORDER BY day",
+        )?;
+        statement
+            .query_map(params![DAY_MS, now], |row| {
+                Ok(ActivityDay {
+                    day: row.get(0)?,
+                    tokens: row.get::<_, i64>(1)?.try_into().unwrap_or_default(),
+                    longest_turn_ms: row.get::<_, i64>(2)?.try_into().unwrap_or_default(),
+                })
+            })?
+            .collect()
     }
 
     pub fn messages(&self, conversation_id: &str) -> rusqlite::Result<Vec<MessageRow>> {

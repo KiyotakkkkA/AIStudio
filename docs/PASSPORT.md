@@ -395,6 +395,9 @@ so the rules below treat the console as a less trusted caller than the studio wi
   `/mcp inspect`: it is read-only and returns the same server record `mcp.list` already gives
   the console, plus the discovered tools, resources and prompts; the console shows env and
   header names only, never their values.
+  Chat activity (2026-11-18): `chat.activity` is allowed for `/status`. It takes no input
+  and returns workspace-wide token totals, reply durations, streaks and UTC daily counts
+  from saved, completed chat replies. It returns no dialog identifiers, prompts or messages.
   Limits (2026-10-31): `providers.usage` is allowed for the `/context` panel. It is read-only,
   takes only a provider id and returns the same `ProviderUsageDto` the studio meter shows;
   no credential, account detail or provider setting leaves the host.

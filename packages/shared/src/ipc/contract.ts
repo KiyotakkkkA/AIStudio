@@ -24,6 +24,7 @@ import {
 import {
   ChatContextDto,
   ChatContextInput,
+  ChatActivityDto,
   ChatStatsDto,
   ChatCommandDto,
   ChatGoalInput,
@@ -379,6 +380,7 @@ export const contract = defineContract({
   },
   "chat.conversations.branch": { input: BranchConversationInput, output: ConversationDto },
   "chat.context": { input: ChatContextInput, output: ChatContextDto },
+  "chat.activity": { input: z.void(), output: ChatActivityDto },
   "chat.stats": { input: ChatContextInput, output: ChatStatsDto },
   "chat.commands": { input: z.void(), output: z.array(ChatCommandDto) },
   "chat.images.pick": { input: ConversationRef, output: ImageAttachments },

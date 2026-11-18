@@ -494,6 +494,16 @@ export const ChatHistoryEntryDto = z.object({
   carried: z.array(ChatCarriedPartDto).default([]),
 });
 export type ChatHistoryEntryDto = z.infer<typeof ChatHistoryEntryDto>;
+export const ChatActivityDto = z.object({
+  firstDay: Timestamp.multipleOf(86_400_000),
+  dailyTokens: z.array(z.number().int().nonnegative()).min(1).max(371),
+  totalTokens: z.number().int().nonnegative(),
+  peakDailyTokens: z.number().int().nonnegative(),
+  longestTurnMs: z.number().int().nonnegative(),
+  longestStreak: z.number().int().nonnegative(),
+  currentStreak: z.number().int().nonnegative(),
+});
+export type ChatActivityDto = z.infer<typeof ChatActivityDto>;
 export const ChatStatsDto = z.object({
   context: ChatContextDto,
   tokenizer: z.string().min(1),

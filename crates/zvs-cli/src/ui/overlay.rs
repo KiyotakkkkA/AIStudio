@@ -521,6 +521,13 @@ fn draw_process(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay)
 }
 
 fn detail_lines(overlay: &Overlay, width: usize) -> Vec<Line<'static>> {
+    if overlay.panel == Panel::Activity {
+        return match &overlay.activity {
+            Some(activity) => super::activity::lines(activity, width),
+            None if overlay.loading => detail_text(copy::LOADING, width, theme::muted()),
+            None => detail_text(copy::ACTIVITY_FAILED, width, theme::muted()),
+        };
+    }
     let content = match &overlay.detail {
         Some(Detail::Server(_, Some(Ok(detail)))) => {
             return super::transcript::server_card(detail, true, None, width);
@@ -598,7 +605,10 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
         draw_process(frame, area, app, overlay);
         return;
     }
-    if matches!(overlay.panel, Panel::McpDetail | Panel::SkillDetail) {
+    if matches!(
+        overlay.panel,
+        Panel::McpDetail | Panel::SkillDetail | Panel::Activity
+    ) {
         let lines = detail_lines(overlay, usize::from(area.width));
         let max_scroll = lines.len().saturating_sub(usize::from(area.height));
         let offset = overlay.detail_scroll.min(max_scroll);
@@ -633,7 +643,10 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &App, overlay: &Overlay) {
 pub(super) fn sheet_measure(app: &App, overlay: &Overlay, width: u16) -> (usize, Option<usize>) {
     let view = app.view();
     let width = usize::from(content_area(Rect::new(0, 0, width, 1), overlay.panel).width);
-    if matches!(overlay.panel, Panel::McpDetail | Panel::SkillDetail) {
+    if matches!(
+        overlay.panel,
+        Panel::McpDetail | Panel::SkillDetail | Panel::Activity
+    ) {
         return (detail_lines(overlay, width).len(), None);
     }
     let rows = overlay.rows(&view);

@@ -16,6 +16,7 @@ export const ROUTES = {
   runs: "/runs",
   permissions: "/permissions",
   settings: "/settings",
+  profile: "/profile",
 } as const;
 
 export type RoutePath = (typeof ROUTES)[keyof typeof ROUTES];

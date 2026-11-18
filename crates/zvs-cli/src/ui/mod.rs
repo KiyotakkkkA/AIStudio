@@ -1,6 +1,7 @@
+pub mod activity;
 pub mod banner;
 pub mod modal;
-pub mod overlay;
+mod overlay;
 pub mod prompt;
 mod scrollbar;
 pub mod text;
@@ -482,7 +483,7 @@ fn active_sheet(app: &App, area: Rect) -> Option<Sheet<'_>> {
                 Panel::Note => copy::HINT_NOTE,
                 Panel::Processes => copy::HINT_PROCESSES,
                 Panel::ProcessOutput => copy::HINT_PROCESS_OUTPUT,
-                Panel::McpDetail | Panel::SkillDetail => copy::HINT_DETAIL,
+                Panel::McpDetail | Panel::SkillDetail | Panel::Activity => copy::HINT_DETAIL,
                 Panel::Shortcuts => {
                     if current.tab == 0 {
                         copy::HINT_REFERENCE_COMMANDS

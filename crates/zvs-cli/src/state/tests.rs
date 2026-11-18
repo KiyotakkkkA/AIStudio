@@ -567,6 +567,35 @@ fn command(app: &mut App, text: &str) -> Vec<Request> {
 }
 
 #[test]
+fn status_loads_workspace_activity_without_a_conversation_or_model() {
+    let mut app = ready();
+    app.model = None;
+    app.conversation = None;
+    assert!(matches!(
+        command(&mut app, "/status").as_slice(),
+        [Request::Activity]
+    ));
+    let overlay = app.overlay.as_ref().expect("activity panel");
+    assert_eq!(overlay.panel, Panel::Activity);
+    assert!(overlay.loading);
+    let activity = zvs_contract::ChatActivityDto {
+        first_day: 0,
+        daily_tokens: vec![12, 25],
+        total_tokens: 37,
+        peak_daily_tokens: 25,
+        longest_turn_ms: 2000,
+        longest_streak: 2,
+        current_streak: 2,
+    };
+    app.update(Msg::Activity(Ok(activity.clone())));
+    let overlay = app.overlay.as_ref().expect("loaded activity");
+    assert_eq!(overlay.activity.as_ref(), Some(&activity));
+    assert!(!overlay.loading);
+    app.update(Msg::Key(Key::Esc));
+    assert!(app.overlay.is_none());
+}
+
+#[test]
 fn models_opens_a_panel_and_enter_picks_the_model() {
     let mut app = ready();
     app.model = None;

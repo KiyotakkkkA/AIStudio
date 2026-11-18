@@ -27,6 +27,7 @@ import CliStore from "../features/preferences/CliStore";
 import CliAccessStore from "../features/preferences/CliAccessStore";
 import AppSettingsStore from "../features/preferences/AppSettingsStore";
 import MemoryStore from "../features/memory/MemoryStore";
+import ActivityStore from "../features/profile/ActivityStore";
 import ProfileStore from "../features/preferences/ProfileStore";
 import ExecPolicyStore from "../features/execPolicy/ExecPolicyStore";
 import SubagentPreferencesStore from "../features/subagents/SubagentPreferencesStore";
@@ -70,6 +71,7 @@ export class RootStore {
   readonly cliAccess: CliAccessStore;
   readonly appSettings: AppSettingsStore;
   readonly memory: MemoryStore;
+  readonly activity: ActivityStore;
   readonly profile: ProfileStore;
   readonly execPolicy: ExecPolicyStore;
   readonly subagents: SubagentPreferencesStore;
@@ -112,6 +114,7 @@ export class RootStore {
       () => this.appSettings.values["memory.enabled"] && this.appSettings.values["memory.model"],
     );
     this.memory = new MemoryStore(environment.ipc);
+    this.activity = new ActivityStore(environment.ipc);
     this.profile = new ProfileStore(environment.ipc);
     this.execPolicy = new ExecPolicyStore(environment.ipc);
     this.subagents = new SubagentPreferencesStore(environment.ipc);

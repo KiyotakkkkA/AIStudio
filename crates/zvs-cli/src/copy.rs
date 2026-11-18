@@ -142,6 +142,20 @@ pub const COPILOT_EFFORT_LOW_HINT: &str = "Низкий уровень расс�
 pub const COPILOT_EFFORT_AUTO_HINT: &str = "Уровень рассуждения по умолчанию для выбранной модели";
 pub const COPILOT_EFFORT_HIGH_HINT: &str = "Высокий уровень рассуждения";
 pub const CMD_RESUME: &str = "Продолжить диалог этой папки";
+pub const CMD_STATUS: &str = "Активность по токенам";
+pub const ACTIVITY_TITLE: &str = "Активность по токенам · UTC";
+pub const ACTIVITY_FAILED: &str = "Не удалось загрузить активность.";
+pub const ACTIVITY_TOTAL: &str = "За всё время";
+pub const ACTIVITY_PEAK: &str = "Пик за день";
+pub const ACTIVITY_LONGEST_TURN: &str = "Самый долгий ответ";
+pub const ACTIVITY_LONGEST_STREAK: &str = "Самая длинная серия";
+pub const ACTIVITY_CURRENT_STREAK: &str = "Текущая серия";
+pub const ACTIVITY_DAY_LABELS: [&str; 7] = ["пн ", "   ", "ср ", "   ", "пт ", "   ", "   "];
+pub const ACTIVITY_LESS: &str = "Меньше";
+pub const ACTIVITY_MORE: &str = "Больше";
+pub const ACTIVITY_MONTHS: [&str; 12] = [
+    "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
+];
 pub const CMD_CONTEXT: &str = "Заполнение контекста";
 pub const CMD_SKILLS: &str = "Навыки";
 pub const CMD_PROCESSES: &str = "Фоновые процессы агента";

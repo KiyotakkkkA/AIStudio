@@ -4014,6 +4014,14 @@ impl ChatService {
         Ok(self.preview(input).await?.measure().0)
     }
 
+    pub fn activity(&self) -> Result<zvs_contract::ChatActivityDto, AppError> {
+        let now = self.inner.now();
+        let days = self
+            .inner
+            .read(|repositories| Ok(repositories.chat.activity_days(now)?))?;
+        Ok(activity::summarize(now, days))
+    }
+
     pub async fn stats(&self, input: &ChatContextInput) -> Result<ChatStatsDto, AppError> {
         let preview = self.preview(input).await?;
         let (context, trimmed, carried) = preview.measure();
@@ -4286,6 +4294,7 @@ impl ChatService {
     }
 }
 
+mod activity;
 pub(crate) mod compact;
 pub(crate) mod queue;
 pub(crate) mod subagent;

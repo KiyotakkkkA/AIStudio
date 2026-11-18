@@ -164,6 +164,10 @@ pub fn register(server: &mut IpcServer) {
             },
         )
         .handle(
+            "chat.activity",
+            |services: Arc<Services>, _input: ()| async move { services.chat.activity() },
+        )
+        .handle(
             "chat.stats",
             |services: Arc<Services>, input: ChatContextInput| async move {
                 services.chat.stats(&input).await

@@ -164,6 +164,7 @@ mod tests {
                 "browserSites.put",
                 "browserSites.remove",
                 "browserSites.setDefault",
+                "chat.activity",
                 "chat.answer",
                 "chat.attach",
                 "chat.bindFolder",

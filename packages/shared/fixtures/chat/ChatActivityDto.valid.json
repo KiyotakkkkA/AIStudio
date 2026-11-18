@@ -1,0 +1,14 @@
+[
+  {
+    "name": "chat activity",
+    "value": {
+      "firstDay": 1794787200000,
+      "dailyTokens": [128, 0, 400],
+      "totalTokens": 528,
+      "peakDailyTokens": 400,
+      "longestTurnMs": 76000,
+      "longestStreak": 1,
+      "currentStreak": 1
+    }
+  }
+]

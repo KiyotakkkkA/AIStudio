@@ -19,7 +19,6 @@ export interface NavGroupModel {
 export interface RailIdentity {
   readonly initials: string;
   readonly name: string;
-  readonly hint: string;
 }
 
 export type RailTheme = "system" | "light" | "dark";

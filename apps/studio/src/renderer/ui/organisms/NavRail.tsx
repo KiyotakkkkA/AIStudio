@@ -1,8 +1,14 @@
-import { mdiMonitor, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
-import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import {
+  mdiAccountCircleOutline,
+  mdiMonitor,
+  mdiWeatherNight,
+  mdiWhiteBalanceSunny,
+} from "@mdi/js";
+import { Dropdown, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { motion } from "motion/react";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
+import { ActionMenu, ActionMenuItem } from "../molecules/ActionMenu";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
 import { useFx, useTransition } from "../motion/fx";
@@ -16,6 +22,7 @@ const THEME_OPTIONS: readonly { value: RailTheme; label: string; icon: string }[
 export interface NavRailProps {
   readonly groups: readonly NavGroupModel[];
   readonly identity: RailIdentity;
+  readonly onOpenProfile: () => void;
   readonly collapsed: boolean;
   readonly theme: RailTheme;
   readonly themePicker: boolean;
@@ -27,6 +34,7 @@ export interface NavRailProps {
 export default function NavRail({
   groups,
   identity,
+  onOpenProfile,
   collapsed,
   theme,
   themePicker,
@@ -115,25 +123,29 @@ export default function NavRail({
           </div>
         )}
 
-        <div
-          className={`flex items-center gap-2.5 ${
-            collapsed ? "justify-center" : "rounded-card bg-main-900/60 py-2 pr-1.5 pl-2"
-          }`}
-        >
-          <div className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent-medium">
-            {identity.initials}
-          </div>
-          {collapsed ? null : (
-            <>
-              <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate text-[13px] font-medium text-main-100">
-                  {identity.name}
-                </span>
-                <span className="truncate text-[11px] text-main-500">{identity.hint}</span>
-              </div>
-            </>
-          )}
-        </div>
+        <Dropdown menuWidth={collapsed ? 160 : 220} menuPlacement="top-left">
+          <Dropdown.Trigger
+            aria-label={identity.name}
+            className={[
+              "flex items-center gap-2.5 border-0 text-left hover:bg-main-800",
+              collapsed ? "justify-center bg-transparent p-0" : "w-full bg-main-900/60 p-2",
+            ].join(" ")}
+          >
+            <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent-medium">
+              {identity.initials}
+            </span>
+            {collapsed ? null : (
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-main-100">
+                {identity.name}
+              </span>
+            )}
+          </Dropdown.Trigger>
+          <ActionMenu label={identity.name}>
+            <ActionMenuItem icon={mdiAccountCircleOutline} onClick={onOpenProfile}>
+              Профиль
+            </ActionMenuItem>
+          </ActionMenu>
+        </Dropdown>
       </div>
     </motion.aside>
   );

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "negative daily activity",
+    "value": {
+      "firstDay": 1794787200000,
+      "dailyTokens": [-1],
+      "totalTokens": 528,
+      "peakDailyTokens": 400,
+      "longestTurnMs": 76000,
+      "longestStreak": 1,
+      "currentStreak": 1
+    }
+  },
+  {
+    "name": "day does not start at UTC midnight",
+    "value": {
+      "firstDay": 1794787200001,
+      "dailyTokens": [128, 0, 400],
+      "totalTokens": 528,
+      "peakDailyTokens": 400,
+      "longestTurnMs": 76000,
+      "longestStreak": 1,
+      "currentStreak": 1
+    }
+  }
+]

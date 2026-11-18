@@ -442,6 +442,7 @@ pub async fn execute(link: Link, request: Request, folder: String) -> Msg {
             }
             Msg::Context(link.call("chat.context", &input).await)
         }
+        Request::Activity => Msg::Activity(link.call("chat.activity", &()).await),
         Request::Skills => Msg::Skills(link.call("skills.list", &()).await),
         Request::GetSkill(id) => Msg::SkillDetail(
             id,
