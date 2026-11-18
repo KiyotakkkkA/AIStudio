@@ -937,6 +937,16 @@ impl App {
                             ),
                         ));
                     }
+                    Err(error)
+                        if error.code == zvs_contract::AppErrorCode::Conflict
+                            && error
+                                .details
+                                .as_ref()
+                                .and_then(|details| details.get("reason"))
+                                == Some(&serde_json::json!("browser_disabled")) =>
+                    {
+                        self.transcript.notice(Tone::Info, error.message);
+                    }
                     Err(error) => self.fail(&error),
                 }
                 Vec::new()

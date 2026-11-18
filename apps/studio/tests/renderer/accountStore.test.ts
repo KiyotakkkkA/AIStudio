@@ -9,6 +9,7 @@ import {
   type Contract,
 } from "@zvs/shared";
 import { createEventRouter } from "../../src/renderer/app/EventRouter.ts";
+import { ACCOUNT_NEEDS_BROWSER } from "../../src/renderer/features/providers/providerErrors.ts";
 import { AccountStore } from "../../src/renderer/features/providers/AccountStore.ts";
 import { createFakeBridge } from "../../../../test/helpers/fakeBridge.ts";
 import { ADAPTERS } from "./providerFixtures.ts";
@@ -247,4 +248,20 @@ test("nothing the store keeps about an account carries a token, cookie or partit
       `the account DTO must not expose ${forbidden}`,
     );
   }
+});
+
+test("a disabled browser explains the setting instead of reporting a busy provider", async () => {
+  const { bridge, store } = storeWith();
+  bridge.handle("accounts.link", () => {
+    throw new AppError(AppErrorCode.CONFLICT, "host copy", {
+      details: { reason: "browser_disabled" },
+    });
+  });
+  await store.load();
+
+  await store.link("qwen-web");
+
+  assert.equal(store.linking, null);
+  assert.equal(store.busy, false);
+  assert.equal(store.error, ACCOUNT_NEEDS_BROWSER);
 });

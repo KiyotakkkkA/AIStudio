@@ -1,6 +1,9 @@
 import { AppErrorCode } from "@zvs/shared";
 import { isIpcError } from "@zvs/ipc";
 
+export const ACCOUNT_NEEDS_BROWSER =
+  "Для входа в аккаунт включите встроенный браузер в разделе «Параметры» → «Браузер».";
+
 const UNKNOWN_PROVIDER_ERROR = "Не удалось выполнить операцию. Попробуйте ещё раз.";
 
 const COPY: Partial<Record<AppErrorCode, string>> = {
@@ -20,6 +23,9 @@ const COPY: Partial<Record<AppErrorCode, string>> = {
 
 export function providerErrorCopy(error: unknown): string {
   if (!isIpcError(error)) return UNKNOWN_PROVIDER_ERROR;
+  if (error.code === AppErrorCode.CONFLICT && error.details?.reason === "browser_disabled") {
+    return ACCOUNT_NEEDS_BROWSER;
+  }
   return COPY[error.code] ?? UNKNOWN_PROVIDER_ERROR;
 }
 

@@ -41,7 +41,8 @@ impl AccountBrowser for WorkspaceOpener {
 
     async fn open_tab(&self, url: &str) -> Result<(), AppError> {
         if !self.1.enabled() {
-            return Err(AppError::new(AppErrorCode::Conflict, ACCOUNT_NEEDS_BROWSER));
+            return Err(AppError::new(AppErrorCode::Conflict, ACCOUNT_NEEDS_BROWSER)
+                .with_detail("reason", "browser_disabled"));
         }
         let workspace = self.0.clone();
         let url = url.to_owned();

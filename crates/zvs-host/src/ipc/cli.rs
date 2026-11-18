@@ -14,6 +14,7 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "cli.accounts.link",
             |services: Arc<Services>, input: AccountLinkInput| async move {
+                super::accounts::require_browser(&services, input.adapter)?;
                 cli::link_account(&services, input.adapter).await
             },
         )

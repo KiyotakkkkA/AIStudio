@@ -55,6 +55,10 @@ export const ACCOUNT_VENDOR_MARKS: Record<AccountFamily, VendorMarkStyle> = {
   },
 };
 
+export function accountNeedsBrowser(adapter: AccountFamily): boolean {
+  return adapter === "qwen-web" || adapter === "zai-web";
+}
+
 export function adapterLabel(adapter: AccountFamily): string {
   return ACCOUNT_ADAPTER_LABELS[adapter];
 }

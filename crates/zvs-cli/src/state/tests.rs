@@ -2515,3 +2515,22 @@ fn answers_list_web_and_note_sources_but_not_store_fragments() {
     assert_eq!(sources.len(), 2);
     assert!(matches!(sources[0], zvs_contract::ChatSourceDto::Note(_)));
 }
+
+#[test]
+fn a_browser_required_connection_reports_information_and_releases_input() {
+    let mut app = ready();
+    app.linking = Some(AccountFamily::QwenWeb);
+    let message = "Включите встроенный браузер";
+    app.update(Msg::AccountLinked(
+        AccountFamily::QwenWeb,
+        Err(AppError::new(zvs_contract::AppErrorCode::Conflict, message)
+            .with_detail("reason", "browser_disabled")),
+    ));
+    assert_eq!(app.linking, None);
+    assert!(matches!(
+        app.transcript.entries.last(),
+        Some(Entry::Notice { tone: Tone::Info, text }) if text == message
+    ));
+    typed(&mut app, "x");
+    assert_eq!(app.input.text(), "x");
+}

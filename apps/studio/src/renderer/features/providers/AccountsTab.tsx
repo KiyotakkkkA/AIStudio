@@ -1,17 +1,18 @@
-import { mdiAccountCircleOutline, mdiShieldSyncOutline } from "@mdi/js";
+import { mdiAccountCircleOutline, mdiCancel, mdiShieldSyncOutline } from "@mdi/js";
 import { Loader, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
-import type { AccountFamily } from "@zvs/shared";
+import type { AccountDto, AccountFamily } from "@zvs/shared";
 import Button from "../../ui/atoms/buttons/Button";
 import Icon from "../../ui/atoms/Icon";
 import EmptyState from "../../ui/molecules/EmptyState";
 import { useAppNavigation } from "../../hooks/useAppNavigation";
 import { ROUTES } from "../../app/routes";
 import { useStore } from "../../stores/useStore";
+import { BROWSER_ENABLED_ID } from "../browser/browserSettingsCopy";
 import AccountCard from "./AccountCard";
 import AccountLoginMenu from "./AccountLoginMenu";
-import { adapterLabel, secondsLeftLabel } from "./accountPresentation";
+import { accountNeedsBrowser, adapterLabel, secondsLeftLabel } from "./accountPresentation";
 import Alert from "../../ui/molecules/Alert";
 import { ListSkeleton } from "../../ui/organisms/PageSkeletons";
 import { awaitingData } from "../../ui/molecules/LoadingSkeleton";
@@ -32,6 +33,37 @@ function AccountsTab() {
     if (browserSettings.enabled) navigation.go(ROUTES.browser);
     else ui.openPreferences("browser");
   };
+
+  const renderAccount = (account: AccountDto) => (
+    <AccountCard
+      key={account.id}
+      account={account}
+      now={now}
+      checking={accounts.refreshingId === account.id}
+      unlinking={accounts.unlinkingId === account.id}
+      onRelink={() => {
+        if (accountNeedsBrowser(account.adapter) && !browserSettings.enabled) {
+          ui.revealPreference("browser", BROWSER_ENABLED_ID);
+        } else {
+          void accounts.link(account.adapter, account.id);
+        }
+      }}
+      onRecheck={() => {
+        void accounts.refresh(account.id);
+      }}
+      onUnlink={() => {
+        void accounts.unlink(account.id);
+      }}
+      onOpenSites={openSites}
+    />
+  );
+
+  const independentAccounts = accounts.accounts.filter(
+    (account) => !accountNeedsBrowser(account.adapter),
+  );
+  const browserAccounts = accounts.accounts.filter((account) =>
+    accountNeedsBrowser(account.adapter),
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -108,7 +140,29 @@ function AccountsTab() {
       <ScrollArea className="flex min-h-0 flex-1 flex-col gap-3 pr-0.5">
         {awaitingData(accounts) ? <ListSkeleton rows={3} /> : null}
 
-        {accounts.isEmpty ? (
+        {independentAccounts.length > 0 ? (
+          <div className="grid gap-3 xl:grid-cols-2">{independentAccounts.map(renderAccount)}</div>
+        ) : null}
+
+        {!browserSettings.enabled ? (
+          <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
+            <EmptyState
+              icon={mdiCancel}
+              title="Встроенный браузер выключен"
+              description="Для управления аккаунтами Qwen и Z.ai включите встроенный браузер."
+              action={
+                <Button
+                  tone="ghost"
+                  onClick={() => ui.revealPreference("browser", BROWSER_ENABLED_ID)}
+                >
+                  Перейти к настройке браузера
+                </Button>
+              }
+            />
+          </div>
+        ) : null}
+
+        {accounts.isEmpty && browserSettings.enabled ? (
           <div className="flex flex-1 items-center justify-center rounded-card bg-main-800 px-3">
             <EmptyState
               icon={mdiAccountCircleOutline}
@@ -119,27 +173,9 @@ function AccountsTab() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 xl:grid-cols-2">
-          {accounts.accounts.map((account) => (
-            <AccountCard
-              key={account.id}
-              account={account}
-              now={now}
-              checking={accounts.refreshingId === account.id}
-              unlinking={accounts.unlinkingId === account.id}
-              onRelink={() => {
-                void accounts.link(account.adapter, account.id);
-              }}
-              onRecheck={() => {
-                void accounts.refresh(account.id);
-              }}
-              onUnlink={() => {
-                void accounts.unlink(account.id);
-              }}
-              onOpenSites={openSites}
-            />
-          ))}
-        </div>
+        {browserSettings.enabled && browserAccounts.length > 0 ? (
+          <div className="grid gap-3 xl:grid-cols-2">{browserAccounts.map(renderAccount)}</div>
+        ) : null}
       </ScrollArea>
     </div>
   );

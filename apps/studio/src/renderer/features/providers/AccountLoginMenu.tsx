@@ -6,8 +6,9 @@ import type { AccountFamily } from "@zvs/shared";
 import Icon from "../../ui/atoms/Icon";
 import ConfirmDialog from "../../ui/molecules/ConfirmDialog";
 import { useStore } from "../../stores/useStore";
+import { BROWSER_ENABLED_ID } from "../browser/browserSettingsCopy";
 import VendorMark from "./VendorMark";
-import { adapterLabel, adapterDescription } from "./accountPresentation";
+import { adapterLabel, adapterDescription, accountNeedsBrowser } from "./accountPresentation";
 
 const TRIGGER = [
   "h-8 w-auto justify-center gap-1.75 rounded-control border-0 px-3.25",
@@ -16,11 +17,15 @@ const TRIGGER = [
 ].join(" ");
 
 function AccountLoginMenu() {
-  const { accounts } = useStore();
+  const { accounts, browserSettings, ui } = useStore();
   const [replacing, setReplacing] = useState<AccountFamily | null>(null);
   const disabled = accounts.busy || accounts.families.length === 0;
 
   const start = (adapter: AccountFamily): void => {
+    if (accountNeedsBrowser(adapter) && !browserSettings.enabled) {
+      ui.revealPreference("browser", BROWSER_ENABLED_ID);
+      return;
+    }
     if (adapter === "openai" || accounts.accountFor(adapter) === null) {
       void accounts.link(adapter);
       return;
@@ -54,7 +59,8 @@ function AccountLoginMenu() {
               key={family}
               role="menuitem"
               rounded="rounded-lg"
-              className="text-[13px] text-main-100"
+              className="text-[13px] text-main-100 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={accountNeedsBrowser(family) && !browserSettings.enabled}
               onClick={() => {
                 start(family);
               }}
