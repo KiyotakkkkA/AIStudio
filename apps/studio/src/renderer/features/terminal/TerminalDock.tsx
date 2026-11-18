@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState, type PointerEvent } from "react";
 import { observer } from "mobx-react-lite";
+import { AnimatePresence, motion } from "motion/react";
 import { Dropdown } from "@kiyotakkkka/zvs-uikit-lib";
 import type { Terminal } from "@xterm/xterm";
-import type { BackgroundShellDto, TerminalSessionDto } from "@zvs/shared";
+import type { BackgroundShellDto, TerminalSessionDto, TerminalShell } from "@zvs/shared";
 import {
   mdiChevronDown,
   mdiRobotOutline,
@@ -12,6 +13,11 @@ import {
   mdiPlus,
   mdiRestart,
   mdiStopCircleOutline,
+  mdiPowershell,
+  mdiMicrosoftWindows,
+  mdiConsoleLine,
+  mdiGit,
+  mdiLinux,
 } from "@mdi/js";
 import Icon from "../../ui/atoms/Icon";
 import IconButton from "../../ui/atoms/buttons/IconButton";
@@ -43,6 +49,7 @@ import {
 } from "./terminalCopy";
 import Alert from "../../ui/molecules/Alert";
 import type BackgroundShellStore from "../backgroundShells/BackgroundShellStore";
+import { useFx, useTransition } from "../../ui/motion/fx";
 import {
   AGENT_TAB,
   CLOSE_TAB,
@@ -53,6 +60,14 @@ import {
 } from "../backgroundShells/backgroundShellsCopy";
 
 const THREAD_MIN = 220;
+
+const SHELL_ICONS: Record<TerminalShell, string> = {
+  pwsh: mdiPowershell,
+  powershell: mdiMicrosoftWindows,
+  cmd: mdiConsoleLine,
+  gitBash: mdiGit,
+  wsl: mdiLinux,
+};
 
 function statusOf(session: TerminalSessionDto): { tone: "ok" | "idle" | "err"; label: string } {
   if (session.status === "running") return { tone: "ok", label: STATUS_RUNNING };
@@ -182,10 +197,11 @@ export default observer(function TerminalDock({
   readonly background?: BackgroundShellStore;
 }) {
   const terminal = useRef<Terminal | null>(null);
+  const { motion: level } = useFx();
+  const reveal = useTransition("reveal");
   const onReady = useCallback((instance: Terminal | null) => {
     terminal.current = instance;
   }, []);
-  if (!store.open) return null;
   const viewed = background?.viewed ?? null;
   const active = viewed === null ? store.active : null;
   const error = store.error ?? background?.error ?? null;
@@ -212,184 +228,206 @@ export default observer(function TerminalDock({
   };
 
   return (
-    <section
-      aria-label={DOCK_LABEL}
-      style={{ height: `${String(store.height)}px` }}
-      className="relative flex min-h-0 flex-none flex-col border-t border-line bg-main-900"
-    >
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={RESIZE_DOCK}
-        onPointerDown={startResize}
-        className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize hover:bg-accent-line"
-      />
-      <div className="flex h-10 flex-none items-center gap-1 border-b border-line px-3">
-        <div
-          role="tablist"
-          aria-label={TABS_LABEL}
-          className="flex min-w-0 flex-1 items-center gap-1 scrollbar-none overflow-x-auto"
+    <AnimatePresence initial={false}>
+      {store.open ? (
+        <motion.section
+          key="terminal-dock"
+          aria-label={DOCK_LABEL}
+          initial={level === "none" ? false : { height: 0, y: "100%", opacity: 0 }}
+          animate={{ height: store.height, y: 0, opacity: 1 }}
+          exit={
+            level === "none"
+              ? { height: 0, y: 0, opacity: 1 }
+              : { height: 0, y: "100%", opacity: 0 }
+          }
+          transition={level === "none" ? { duration: 0 } : reveal}
+          className="relative flex min-h-0 flex-none flex-col overflow-hidden border-t border-line bg-main-900"
         >
-          {store.sessions.map((session) => (
-            <SessionTab key={session.id} store={store} session={session} background={background} />
-          ))}
-          {background?.tabs.map((shell) => (
-            <ShellTab key={shell.id} background={background} shell={shell} />
-          ))}
-          {available ? (
-            <div className="flex flex-none items-center">
-              <IconButton
-                label={NEW_SESSION}
-                path={mdiPlus}
-                iconSize={16}
-                disabled={store.creating}
-                onClick={() => void store.create(null)}
-              />
-              <Dropdown
-                menuWidth={220}
-                menuPlacement="bottom-left"
-                onOpenChange={(open) => {
-                  if (open && store.shells.length === 0) void store.loadShells();
-                }}
-              >
-                <IconDropdownButton
-                  label={NEW_SESSION_WITH}
-                  path={mdiChevronDown}
-                  iconSize={14}
-                  size="xs"
-                  disabled={store.creating}
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label={RESIZE_DOCK}
+            onPointerDown={startResize}
+            className="absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize hover:bg-accent-line"
+          />
+          <div className="flex h-10 flex-none items-center gap-1 border-b border-line px-3">
+            <div
+              role="tablist"
+              aria-label={TABS_LABEL}
+              className="flex min-w-0 flex-1 items-center gap-1 scrollbar-none overflow-x-auto"
+            >
+              {store.sessions.map((session) => (
+                <SessionTab
+                  key={session.id}
+                  store={store}
+                  session={session}
+                  background={background}
                 />
-                <Dropdown.Menu
-                  role="menu"
-                  aria-label={NEW_SESSION_WITH}
-                  rounded="rounded-lg"
-                  className="rounded-card border-line bg-main-900 p-1 shadow-pop"
-                >
-                  {store.shells.map((shell) => (
-                    <Dropdown.Item
-                      key={shell}
-                      role="menuitem"
+              ))}
+              {background?.tabs.map((shell) => (
+                <ShellTab key={shell.id} background={background} shell={shell} />
+              ))}
+              {available ? (
+                <div className="flex flex-none items-center">
+                  <IconButton
+                    label={NEW_SESSION}
+                    path={mdiPlus}
+                    iconSize={16}
+                    disabled={store.creating}
+                    onClick={() => void store.create(null)}
+                  />
+                  <Dropdown
+                    menuWidth={220}
+                    menuPlacement="bottom-left"
+                    onOpenChange={(open) => {
+                      if (open && store.shells.length === 0) void store.loadShells();
+                    }}
+                  >
+                    <IconDropdownButton
+                      label={NEW_SESSION_WITH}
+                      path={mdiChevronDown}
+                      iconSize={14}
+                      size="xs"
+                      disabled={store.creating}
+                    />
+                    <Dropdown.Menu
+                      role="menu"
+                      aria-label={NEW_SESSION_WITH}
                       rounded="rounded-lg"
-                      className="text-[13px] text-main-100"
-                      onClick={() => void store.create(shell)}
+                      className="rounded-card border-line bg-main-900 p-1 shadow-pop"
                     >
-                      {SHELL_LABELS[shell]}
-                    </Dropdown.Item>
-                  ))}
-                </Dropdown.Menu>
-              </Dropdown>
+                      {store.shells.map((shell) => (
+                        <Dropdown.Item
+                          key={shell}
+                          role="menuitem"
+                          rounded="rounded-lg"
+                          className="h-8 text-[13px] text-main-100"
+                          onClick={() => void store.create(shell)}
+                        >
+                          <span className="flex h-full items-center gap-2 whitespace-nowrap">
+                            <span className="flex size-5 flex-none items-center justify-center">
+                              <Icon path={SHELL_ICONS[shell]} size={16} className="text-main-400" />
+                            </span>
+                            <span className="leading-none">{SHELL_LABELS[shell]}</span>
+                          </span>
+                        </Dropdown.Item>
+                      ))}
+                    </Dropdown.Menu>
+                  </Dropdown>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        {viewed === null || background === undefined ? null : (
-          <div className="flex flex-none items-center gap-0.5">
-            <IconButton
-              label={STOP}
-              path={mdiStopCircleOutline}
-              disabled={viewed.status !== "running" || background.isStopping(viewed.id)}
-              onClick={() => void background.stop(viewed.id)}
-            />
-            <IconButton
-              label={COPY}
-              path={mdiContentCopy}
-              onClick={() => {
-                if (terminal.current !== null) copySelection(terminal.current);
-              }}
-            />
-          </div>
-        )}
-        {active === null ? null : (
-          <div className="flex flex-none items-center gap-0.5">
-            <IconButton
-              label={INTERRUPT}
-              path={mdiStopCircleOutline}
-              disabled={active.status !== "running"}
-              onClick={() => store.interrupt(active.id)}
-            />
-            <IconButton
-              label={COPY}
-              path={mdiContentCopy}
-              onClick={() => {
-                if (terminal.current !== null) copySelection(terminal.current);
-              }}
-            />
-            <IconButton
-              label={CLEAR}
-              path={mdiEraser}
-              onClick={() => void store.clear(active.id)}
-            />
-            <IconButton
-              label={RESTART}
-              path={mdiRestart}
-              onClick={() => void store.restart(active.id)}
-            />
-          </div>
-        )}
-        <IconButton
-          tooltip="top-right"
-          label={HIDE_DOCK}
-          path={mdiClose}
-          iconSize={16}
-          onClick={store.hide}
-        />
-      </div>
-      {error === null ? null : (
-        <Alert
-          bar
-          onDismiss={() => {
-            store.dismissError();
-            background?.dismissError();
-          }}
-          dismissLabel={DISMISS_ERROR}
-        >
-          {error}
-        </Alert>
-      )}
-      <div className="relative min-h-0 flex-1">
-        {!available ? (
-          <p className="px-4 py-3 text-[12.5px] text-main-500">{NO_DIALOG}</p>
-        ) : viewed !== null && background !== undefined ? (
-          <>
-            <TerminalView
-              key={viewed.id}
-              store={background}
-              id={viewed.id}
-              onReady={onReady}
-              readOnly
-            />
-            <div className="pointer-events-none absolute right-3 bottom-2 flex items-center gap-2 rounded-control bg-main-800 px-3 py-1 text-[12px] text-main-300 shadow-card">
-              {viewed.status === "running"
-                ? READ_ONLY_HINT
-                : statusLabel(viewed.status, viewed.exitCode)}
-            </div>
-          </>
-        ) : active !== null ? (
-          <>
-            <TerminalView key={active.id} store={store} id={active.id} onReady={onReady} />
-            {active.status === "exited" ? (
-              <div className="absolute right-3 bottom-2 flex items-center gap-2 rounded-control bg-main-800 py-1 pr-1 pl-3 text-[12px] text-main-300 shadow-card">
-                {exitLabel(active.exitCode)}
-                <button
-                  type="button"
-                  onClick={() => void store.restart(active.id)}
-                  className="rounded-control px-2 py-0.5 text-accent-medium hover:bg-main-700"
-                >
-                  {RESTART}
-                </button>
+            {viewed === null || background === undefined ? null : (
+              <div className="flex flex-none items-center gap-0.5">
+                <IconButton
+                  label={STOP}
+                  path={mdiStopCircleOutline}
+                  disabled={viewed.status !== "running" || background.isStopping(viewed.id)}
+                  onClick={() => void background.stop(viewed.id)}
+                />
+                <IconButton
+                  label={COPY}
+                  path={mdiContentCopy}
+                  onClick={() => {
+                    if (terminal.current !== null) copySelection(terminal.current);
+                  }}
+                />
               </div>
-            ) : null}
-          </>
-        ) : store.creating ? (
-          <p role="status" className="px-4 py-3 text-[12.5px] text-main-500">
-            {STARTING}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1 px-4 py-3">
-            <p className="text-[12.5px] text-main-300">{EMPTY}</p>
-            <p className="text-[12px] text-main-500">{EMPTY_HINT}</p>
+            )}
+            {active === null ? null : (
+              <div className="flex flex-none items-center gap-0.5">
+                <IconButton
+                  label={INTERRUPT}
+                  path={mdiStopCircleOutline}
+                  disabled={active.status !== "running"}
+                  onClick={() => store.interrupt(active.id)}
+                />
+                <IconButton
+                  label={COPY}
+                  path={mdiContentCopy}
+                  onClick={() => {
+                    if (terminal.current !== null) copySelection(terminal.current);
+                  }}
+                />
+                <IconButton
+                  label={CLEAR}
+                  path={mdiEraser}
+                  onClick={() => void store.clear(active.id)}
+                />
+                <IconButton
+                  label={RESTART}
+                  path={mdiRestart}
+                  onClick={() => void store.restart(active.id)}
+                />
+              </div>
+            )}
+            <IconButton
+              tooltip="top-right"
+              label={HIDE_DOCK}
+              path={mdiClose}
+              iconSize={16}
+              onClick={store.hide}
+            />
           </div>
-        )}
-      </div>
-    </section>
+          {error === null ? null : (
+            <Alert
+              bar
+              onDismiss={() => {
+                store.dismissError();
+                background?.dismissError();
+              }}
+              dismissLabel={DISMISS_ERROR}
+            >
+              {error}
+            </Alert>
+          )}
+          <div className="relative min-h-0 flex-1">
+            {!available ? (
+              <p className="px-4 py-3 text-[12.5px] text-main-500">{NO_DIALOG}</p>
+            ) : viewed !== null && background !== undefined ? (
+              <>
+                <TerminalView
+                  key={viewed.id}
+                  store={background}
+                  id={viewed.id}
+                  onReady={onReady}
+                  readOnly
+                />
+                <div className="pointer-events-none absolute right-3 bottom-2 flex items-center gap-2 rounded-control bg-main-800 px-3 py-1 text-[12px] text-main-300 shadow-card">
+                  {viewed.status === "running"
+                    ? READ_ONLY_HINT
+                    : statusLabel(viewed.status, viewed.exitCode)}
+                </div>
+              </>
+            ) : active !== null ? (
+              <>
+                <TerminalView key={active.id} store={store} id={active.id} onReady={onReady} />
+                {active.status === "exited" ? (
+                  <div className="absolute right-3 bottom-2 flex items-center gap-2 rounded-control bg-main-800 py-1 pr-1 pl-3 text-[12px] text-main-300 shadow-card">
+                    {exitLabel(active.exitCode)}
+                    <button
+                      type="button"
+                      onClick={() => void store.restart(active.id)}
+                      className="rounded-control px-2 py-0.5 text-accent-medium hover:bg-main-700"
+                    >
+                      {RESTART}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            ) : store.creating ? (
+              <p role="status" className="px-4 py-3 text-[12.5px] text-main-500">
+                {STARTING}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1 px-4 py-3">
+                <p className="text-[12.5px] text-main-300">{EMPTY}</p>
+                <p className="text-[12px] text-main-500">{EMPTY_HINT}</p>
+              </div>
+            )}
+          </div>
+        </motion.section>
+      ) : null}
+    </AnimatePresence>
   );
 });

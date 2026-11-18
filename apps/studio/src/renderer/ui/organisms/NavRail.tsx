@@ -1,9 +1,11 @@
 import { mdiMonitor, mdiWeatherNight, mdiWhiteBalanceSunny } from "@mdi/js";
 import { ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
+import { motion } from "motion/react";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
+import { useFx, useTransition } from "../motion/fx";
 
 const THEME_OPTIONS: readonly { value: RailTheme; label: string; icon: string }[] = [
   { value: "light", label: "Светлая тема", icon: mdiWhiteBalanceSunny },
@@ -32,11 +34,14 @@ export default function NavRail({
   onSelect,
   onThemeChange,
 }: NavRailProps) {
+  const { motion: level } = useFx();
+  const layout = useTransition("layout");
   return (
-    <aside
-      className={`flex h-full flex-none flex-col bg-main-950 ${
-        collapsed ? "w-rail-collapsed" : "w-rail"
-      }`}
+    <motion.aside
+      initial={false}
+      animate={{ width: collapsed ? 64 : 244 }}
+      transition={level === "none" ? { duration: 0 } : layout}
+      className="flex h-full flex-none flex-col overflow-hidden bg-main-950"
     >
       <div
         className={`flex h-16 flex-none items-center gap-2.5 ${
@@ -130,6 +135,6 @@ export default function NavRail({
           )}
         </div>
       </div>
-    </aside>
+    </motion.aside>
   );
 }

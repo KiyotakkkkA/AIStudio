@@ -14,7 +14,7 @@ import {
 } from "@mdi/js";
 import { ContextMenu, Dropdown, Modal, ScrollArea } from "@kiyotakkkka/zvs-uikit-lib";
 import { Fragment, useState, type MouseEvent } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import ActivePill from "../../ui/motion/ActivePill";
 import { useFx, useTransition } from "../../ui/motion/fx";
 import Button from "../../ui/atoms/buttons/Button";
@@ -61,7 +61,9 @@ export default observer(function ConversationList({ store }: { readonly store: C
   const [renameTitle, setRenameTitle] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<ConversationDto | null>(null);
   const { motion: level } = useFx();
+  const isPresent = useIsPresent();
   const settle = useTransition("layout");
+  const reveal = useTransition("reveal");
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const week = new Date(today);
@@ -100,11 +102,18 @@ export default observer(function ConversationList({ store }: { readonly store: C
       run: () => setDeleteTarget(conversation),
     },
   ];
-  if (!store.listOpen) return null;
   return (
-    <aside
+    <motion.aside
       aria-label="Диалоги"
-      className="flex w-66 shrink-0 flex-col bg-main-800 max-[850px]:w-50"
+      initial={level === "none" ? false : { x: "-100%", opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={level === "none" ? { x: 0, opacity: 1 } : { x: "-100%", opacity: 0 }}
+      transition={reveal}
+      className={
+        isPresent
+          ? "col-start-1 row-start-1 flex h-full min-h-0 w-full flex-col bg-main-800"
+          : "absolute inset-y-0 left-0 z-10 flex w-66 flex-col bg-main-800 shadow-pop max-[850px]:w-50"
+      }
     >
       <div className="flex h-14 shrink-0 items-center gap-2.5 pr-2.5 pl-4">
         <span className="flex size-7 flex-none items-center justify-center rounded-control bg-accent-soft text-accent-medium">
@@ -374,6 +383,6 @@ export default observer(function ConversationList({ store }: { readonly store: C
           void store.removeConversation(deleteTarget.id).then(() => setDeleteTarget(null));
         }}
       />
-    </aside>
+    </motion.aside>
   );
 });
