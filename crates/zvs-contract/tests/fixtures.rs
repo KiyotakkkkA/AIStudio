@@ -857,6 +857,10 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ChatContextDto>,
     ),
     (
+        "profile/ProfileAvatarDto",
+        round_trip::<zvs_contract::ProfileAvatarDto>,
+    ),
+    (
         "chat/ChatActivityDto",
         round_trip::<zvs_contract::ChatActivityDto>,
     ),

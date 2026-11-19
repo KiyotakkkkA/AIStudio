@@ -56,6 +56,14 @@ export default class ProfileStore {
     return this.aboutDraft.trim() !== this.about;
   }
 
+  async loadAvatar(): Promise<string | null> {
+    try {
+      return (await this.ipc.call("profile.avatar", undefined)).svg;
+    } catch {
+      return null;
+    }
+  }
+
   private async read(key: string): Promise<Json | undefined> {
     try {
       return (await this.ipc.call("settings.get", { key })).value;

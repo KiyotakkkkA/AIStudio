@@ -3,6 +3,7 @@ import { observer } from "mobx-react-lite";
 import { useEffect } from "react";
 import { useStore } from "../../stores/useStore";
 import type { RailIdentity } from "../../ui/organisms/NavRailTypes";
+import ProfileAvatar from "../../ui/atoms/ProfileAvatar";
 import { plural } from "../connections/connectionPresentation";
 import ActivityCalendar from "./ActivityCalendar";
 
@@ -20,8 +21,10 @@ function duration(ms: number) {
 
 export default observer(function ProfileActivity({
   identity,
+  avatarUrl,
 }: {
   readonly identity: RailIdentity;
+  readonly avatarUrl: string | null;
 }) {
   const { activity: store } = useStore();
   useEffect(() => {
@@ -40,12 +43,11 @@ export default observer(function ProfileActivity({
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-9 px-5 py-10 sm:px-8 sm:py-14">
         <header className="flex flex-col items-center gap-3">
-          <div
-            aria-hidden="true"
-            className="flex size-20 items-center justify-center rounded-full bg-accent-soft text-3xl font-semibold text-accent-medium"
-          >
-            {identity.initials}
-          </div>
+          <ProfileAvatar
+            initials={identity.initials}
+            url={avatarUrl}
+            className="size-20 text-3xl"
+          />
           <h1 className="text-xl font-semibold text-main-50">{identity.name}</h1>
         </header>
         {stats && (

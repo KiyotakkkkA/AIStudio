@@ -332,6 +332,7 @@ import {
   VectorEvalRunInput,
   VectorEvalSetDto,
 } from "../vectorStores/index.js";
+import { ProfileAvatarDto } from "../profile.js";
 
 export const SecretFilter = z.object({
   scope: SecretScope.optional(),
@@ -651,6 +652,7 @@ export const contract = defineContract({
   "storage.resetChallenge": { input: z.void(), output: StorageResetConfirmation },
   "storage.reset": { input: StorageResetConfirmation, output: z.void() },
   "storage.clearCache": { input: z.void(), output: StorageClearCacheOutput },
+  "profile.avatar": { input: z.void(), output: ProfileAvatarDto },
   "providers.usage": { input: ProviderRef, output: ProviderUsageDto.nullable() },
   "accounts.list": { input: z.void(), output: z.array(AccountDto) },
   "accounts.link": { input: AccountLinkInput, output: AccountLinkResult },

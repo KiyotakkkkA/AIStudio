@@ -40,6 +40,7 @@ pub mod notes;
 pub mod notifications;
 pub mod primitives;
 pub mod process;
+pub mod profile;
 pub mod providers;
 pub mod questions;
 pub mod queue;
@@ -254,6 +255,7 @@ pub use process::{
     PROCESS_PACKAGES_MAX, PROCESS_REASON_MAX, PROCESS_SOURCE_MAX, ProcessApprovalDto,
     ProcessPlanDto, ProcessResultDto,
 };
+pub use profile::{PROFILE_AVATAR_MAX, ProfileAvatarDto};
 pub use providers::{
     CreateProviderInput, DiscoveredModelDto, ModelCapability, ModelDto, ProbeOutcomeDto,
     ProbeRequest, ProbeResultDto, ProviderCapability, ProviderConnectionInput, ProviderDto,

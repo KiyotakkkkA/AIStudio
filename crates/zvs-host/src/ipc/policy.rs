@@ -308,6 +308,7 @@ pub const POLICY: &[ChannelPolicy] = &[
     studio("notes.save", Effect::Act),
     studio("notifications.clear", Effect::Act),
     studio("notifications.pending", Effect::Read),
+    studio("profile.avatar", Effect::Read),
     studio("providers.adapters", Effect::Read),
     studio("providers.create", Effect::Act),
     console("providers.get", Effect::Read, Scope::Any),

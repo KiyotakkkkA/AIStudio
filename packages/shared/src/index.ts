@@ -44,6 +44,7 @@ export * from "./memory.js";
 export * from "./notes.js";
 export * from "./agentic.js";
 export * from "./providers/index.js";
+export * from "./profile.js";
 export * from "./accounts.js";
 export * from "./vectorStores/index.js";
 export * from "./graph/index.js";

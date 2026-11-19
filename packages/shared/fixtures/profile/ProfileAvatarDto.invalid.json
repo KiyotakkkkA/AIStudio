@@ -1,0 +1,10 @@
+[
+  {
+    "name": "empty avatar",
+    "value": { "svg": "" }
+  },
+  {
+    "name": "missing image",
+    "value": {}
+  }
+]

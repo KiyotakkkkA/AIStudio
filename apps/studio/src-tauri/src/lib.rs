@@ -1471,6 +1471,9 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
     let services = Arc::new(Services {
         system,
         storage,
+        profile_avatar: zvs_host::services::profile::avatar::ProfileAvatarService::new(
+            paths.cache_dir.clone(),
+        ),
         data_transfer,
         accounts,
         settings,

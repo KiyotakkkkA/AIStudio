@@ -8,6 +8,7 @@ import { Dropdown, ScrollArea, Switcher } from "@kiyotakkkka/zvs-uikit-lib";
 import { motion } from "motion/react";
 import AppLogo from "../atoms/AppLogo";
 import Icon from "../atoms/Icon";
+import ProfileAvatar from "../atoms/ProfileAvatar";
 import { ActionMenu, ActionMenuItem } from "../molecules/ActionMenu";
 import NavRailItem from "../molecules/NavRailItem";
 import type { NavGroupModel, NavItemModel, RailIdentity, RailTheme } from "./NavRailTypes";
@@ -22,6 +23,7 @@ const THEME_OPTIONS: readonly { value: RailTheme; label: string; icon: string }[
 export interface NavRailProps {
   readonly groups: readonly NavGroupModel[];
   readonly identity: RailIdentity;
+  readonly avatarUrl: string | null;
   readonly onOpenProfile: () => void;
   readonly collapsed: boolean;
   readonly theme: RailTheme;
@@ -34,6 +36,7 @@ export interface NavRailProps {
 export default function NavRail({
   groups,
   identity,
+  avatarUrl,
   onOpenProfile,
   collapsed,
   theme,
@@ -109,9 +112,11 @@ export default function NavRail({
               collapsed ? "justify-center px-0" : "justify-start px-1"
             }`}
           >
-            <span className="flex size-7 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-medium">
-              {identity.initials}
-            </span>
+            <ProfileAvatar
+              initials={identity.initials}
+              url={avatarUrl}
+              className="size-7 text-xs"
+            />
           </Dropdown.Trigger>
           <ActionMenu label={identity.name}>
             <ActionMenuItem icon={mdiAccountCircleOutline} onClick={onOpenProfile}>

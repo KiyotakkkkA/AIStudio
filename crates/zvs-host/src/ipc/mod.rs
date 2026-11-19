@@ -21,6 +21,7 @@ pub mod memory;
 pub mod notes;
 pub mod notifications;
 mod policy;
+pub mod profile;
 pub mod providers;
 pub mod runs;
 pub mod runtimes;
@@ -50,6 +51,7 @@ pub fn register(server: &mut IpcServer) {
     settings::register(server);
     secrets::register(server);
     providers::register(server);
+    profile::register(server);
     accounts::register(server);
     vector_stores::register(server);
     graph_relations::register(server);
@@ -306,6 +308,7 @@ mod tests {
                 "notes.save",
                 "notifications.clear",
                 "notifications.pending",
+                "profile.avatar",
                 "providers.adapters",
                 "providers.create",
                 "providers.get",

@@ -1,3 +1,5 @@
+pub mod avatar;
+
 use serde_json::Value;
 use zvs_contract::AppError;
 use zvs_contract::validate::{invalid, js_trim};

@@ -191,6 +191,7 @@
   "notes.save",
   "notifications.clear",
   "notifications.pending",
+  "profile.avatar",
   "providers.adapters",
   "providers.create",
   "providers.get",

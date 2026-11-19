@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MotionConfig } from "motion/react";
 import { Outlet } from "react-router-dom";
 import { useAppNavigation } from "../hooks/useAppNavigation";
@@ -15,9 +15,24 @@ import CliConsentModal from "../features/preferences/CliConsentModal";
 import StudioTitleBar from "./StudioTitleBar";
 
 function AppFrame() {
-  const { ui, chat, appSettings, browserSettings, cliAccess } = useStore();
+  const { ui, chat, appSettings, browserSettings, cliAccess, profile } = useStore();
   const navigation = useAppNavigation();
   const restoredOnce = useRef(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let url: string | undefined;
+    void profile.loadAvatar().then((svg) => {
+      if (disposed || svg === null) return;
+      url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+      setAvatarUrl(url);
+    });
+    return () => {
+      disposed = true;
+      if (url !== undefined) URL.revokeObjectURL(url);
+    };
+  }, [profile]);
 
   const follow = useCallback(
     (path: unknown, conversationId?: unknown) => {
@@ -101,6 +116,7 @@ function AppFrame() {
             <NavRail
               groups={visibleNavGroups(browserSettings.enabled)}
               identity={RAIL_IDENTITY}
+              avatarUrl={avatarUrl}
               onOpenProfile={() => navigation.go(ROUTES.profile)}
               collapsed={ui.railCollapsed}
               theme={ui.theme}
@@ -111,7 +127,7 @@ function AppFrame() {
             />
           }
         >
-          <Outlet />
+          <Outlet context={avatarUrl} />
         </AppShell>
         <CliConsentModal />
       </MotionConfig>

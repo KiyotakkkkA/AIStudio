@@ -612,26 +612,21 @@ pub fn test_services(system: SystemService) -> TestServices {
         notifications: Some(notifications.clone()),
         files_dir: workspace.join("scenario-files"),
     }));
-    let data_transfer = crate::services::data_transfer::DataTransferService::new(
+    let paths =
         crate::platform::paths::StudioPaths::resolve(&crate::platform::paths::PathEnvironment {
             state_dir: workspace.join("state"),
             resource_dir: workspace.join("resources"),
             executable_dir: workspace.join("bin"),
             packaged: false,
-        }),
+        });
+    let data_transfer = crate::services::data_transfer::DataTransferService::new(
+        paths.clone(),
         database.shared(),
         clock.clone(),
     )
     .expect("data transfer service");
     let storage = crate::services::StorageService::new(
-        crate::services::StorageRoots::resolve(&crate::platform::paths::StudioPaths::resolve(
-            &crate::platform::paths::PathEnvironment {
-                state_dir: workspace.join("state"),
-                resource_dir: workspace.join("resources"),
-                executable_dir: workspace.join("bin"),
-                packaged: false,
-            },
-        )),
+        crate::services::StorageRoots::resolve(&paths),
         database.shared(),
         clock.clone(),
     );
@@ -639,6 +634,9 @@ pub fn test_services(system: SystemService) -> TestServices {
         services: Arc::new(Services {
             system,
             storage,
+            profile_avatar: crate::services::profile::avatar::ProfileAvatarService::new(
+                paths.cache_dir.clone(),
+            ),
             data_transfer,
             accounts,
             settings,

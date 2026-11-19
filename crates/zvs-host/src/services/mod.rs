@@ -93,6 +93,7 @@ use crate::workspace::{ExplorerService, FolderAccessService};
 pub struct Services {
     pub system: SystemService,
     pub storage: StorageService,
+    pub profile_avatar: profile::avatar::ProfileAvatarService,
     pub data_transfer: data_transfer::DataTransferService,
     pub accounts: AccountService,
     pub settings: SettingService,
