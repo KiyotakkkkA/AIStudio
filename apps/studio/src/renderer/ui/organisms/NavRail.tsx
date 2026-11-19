@@ -95,12 +95,16 @@ export default function NavRail({
         </nav>
       </ScrollArea>
 
-      <div className={`flex flex-none flex-col gap-2 ${collapsed ? "items-center p-2.5" : "p-3"}`}>
+      <div
+        className={`flex flex-none flex-col gap-1 rounded-card border border-line bg-main-900 p-1 ${
+          collapsed ? "m-2.5" : "m-3"
+        }`}
+      >
         {collapsed || !themePicker ? null : (
           <div
             role="radiogroup"
             aria-label="Тема оформления"
-            className="flex gap-0.5 rounded-control bg-main-900/60 p-0.75"
+            className="grid grid-cols-3 gap-0.5 rounded-control bg-main-950 p-0.5"
           >
             {THEME_OPTIONS.map((option) => (
               <button
@@ -111,34 +115,28 @@ export default function NavRail({
                 aria-label={option.label}
                 title={option.label}
                 onClick={() => onThemeChange(option.value)}
-                className={`flex h-6.5 flex-1 items-center justify-center rounded-[6px] ${
+                className={`flex h-7 cursor-pointer items-center justify-center rounded-md anim-on:transition-colors ${
                   theme === option.value
-                    ? "bg-main-900 text-accent-medium shadow-[0_1px_2px_rgb(40_25_10/0.1)]"
-                    : "text-main-500 hover:text-main-200"
+                    ? "bg-main-800 text-accent-medium"
+                    : "text-main-400 hover:bg-main-900 hover:text-main-100"
                 }`}
               >
-                <Icon path={option.icon} size={14} />
+                <Icon path={option.icon} size={15} />
               </button>
             ))}
           </div>
         )}
 
-        <Dropdown menuWidth={collapsed ? 160 : 220} menuPlacement="top-left">
+        <Dropdown className="w-full" menuWidth={collapsed ? 160 : 220} menuPlacement="top-left">
           <Dropdown.Trigger
+            icon={false}
+            rounded=""
             aria-label={identity.name}
-            className={[
-              "flex items-center gap-2.5 border-0 text-left hover:bg-main-800",
-              collapsed ? "justify-center bg-transparent p-0" : "w-full bg-main-900/60 p-2",
-            ].join(" ")}
+            className="h-9 cursor-pointer justify-center gap-0 rounded-control border-0 bg-transparent p-0 hover:bg-main-800 aria-expanded:bg-main-800 anim-on:transition-colors"
           >
-            <span className="flex size-8 flex-none items-center justify-center rounded-full bg-accent-soft text-[11.5px] font-semibold text-accent-medium">
+            <span className="flex size-7 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-medium">
               {identity.initials}
             </span>
-            {collapsed ? null : (
-              <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-main-100">
-                {identity.name}
-              </span>
-            )}
           </Dropdown.Trigger>
           <ActionMenu label={identity.name}>
             <ActionMenuItem icon={mdiAccountCircleOutline} onClick={onOpenProfile}>
