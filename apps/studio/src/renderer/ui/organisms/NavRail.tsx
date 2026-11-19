@@ -129,14 +129,18 @@ export default function NavRail({
             }}
             label="Тема оформления"
             rounded=""
-            className="shrink-0 gap-0.5 border-0 bg-transparent p-0"
+            className="shrink-0 gap-0.5 rounded-control border-line bg-main-900 p-0.75"
           >
             {THEME_OPTIONS.map((option) => (
               <Switcher.Option
                 key={option.value}
                 value={option.value}
                 aria-label={option.label}
-                className="size-8 rounded-control p-0 text-main-400 enabled:hover:bg-main-850 aria-checked:bg-main-850 aria-checked:text-accent-medium"
+                className={`h-7 w-8 rounded-md p-0 ${
+                  theme === option.value
+                    ? "bg-main-700 text-main-50"
+                    : "text-main-400 enabled:hover:bg-main-850 enabled:hover:text-main-100"
+                }`}
               >
                 <Icon path={option.icon} size={15} />
               </Switcher.Option>
