@@ -106,7 +106,6 @@ export default function ActivityCalendar({ activity }: { readonly activity: Chat
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-main-400">
-        <span>Даты по UTC</span>
         {view === "daily" && (
           <div className="flex items-center gap-1">
             <span className="mr-1">Меньше</span>
