@@ -9,9 +9,10 @@ validation, archives and persistence.
 
 Categories are conversations, vector stores, scenarios, skills, memory, connections and
 portable application settings. Connections include provider configuration, discovered model
-metadata, MCP configuration and integration configuration. Model binaries and run history
-are excluded. Conversation transfer includes messages, tool-call records, compactions and
-managed attachments, work files, outputs and notes. Run snapshots are excluded.
+metadata, MCP configuration and integration configuration. Conversation transfer includes
+messages, tool-call records, compactions, managed attachments, work files, outputs, notes and
+summaries of finished chat runs referenced by assistant replies. Model binaries, execution
+graphs, run inputs and outputs, run steps, events and snapshots are excluded.
 
 Store transfer includes configuration and copies of indexed source documents. Index files
 are rebuilt. Imported document identities survive rebuilding so dialog citations retain
@@ -24,22 +25,29 @@ must be assigned again. Portable settings are an explicit allowlist maintained i
 transfer repository. Selecting settings replaces those values; other categories are added.
 Imported providers, MCP servers, integrations, skills and scenarios start disabled.
 
-## Format version 1
+## Format versions
 
 `.dbox` is a gzip-compressed TAR archive using the existing `flate2` and `tar` dependencies.
 The first two regular members are `manifest.json` and `data.json`; the remaining members
 are content-addressed files at `blobs/<lowercase-sha256>`. Duplicate content is written once.
 
-The manifest contains `format: "zvs-dbox"`, `version: 1`, the SHA-256 of `data.json` and its
+The manifest contains `format: "zvs-dbox"`, `version: 2`, the SHA-256 of `data.json` and its
 byte length. The data document contains the same format and version, `producerVersion`,
 `createdAt`, selected `categories`, `records` and `files`. Record kinds and fields are frozen
-by the explicit version-1 `TABLES` mapping in `data/repositories/data_transfer.rs`, independent
+by the versioned `TABLES` mapping in `data/repositories/data_transfer.rs`, independent
 of the row readers and SQLite's schema introspection. JSON-valued fields are JSON strings;
 other fields are strings, numbers or null. Future database changes must preserve this
 mapping or add an explicit format reader/migration. Unknown format versions are rejected.
 Field interpretation includes the record kind: `chat_compaction.summary` is plain text and
 `chat_compaction.trigger` is `manual` or `auto`; `scenario_version.summary` and
 `scenario.trigger` are JSON. Compaction summaries are preserved verbatim during import.
+
+Version 2 adds `message.run_id` and a `run` record to the conversations category. One run record
+carries its ID, optional conversation owner, terminal status and creation, start and finish times.
+Import assigns a new ID to each run, restores it as a historical chat run and uses the same ID for
+every reply that references it. Branch copies therefore count once in activity statistics. A
+missing original conversation leaves the run owner empty. Version 1 archives remain importable
+with an empty run reference on restored messages.
 
 Each file descriptor contains `category`, its entity `owner`, a relative `path`, original
 absolute and stored paths, SHA-256 and byte length. Original paths are used only to rewrite

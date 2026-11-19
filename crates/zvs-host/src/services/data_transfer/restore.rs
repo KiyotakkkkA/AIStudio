@@ -200,6 +200,8 @@ fn prepare(
                     | "conversation_id"
                     | "message_id"
                     | "boundary_message_id"
+                    | "run_id"
+                    | "subject_id"
             ) {
                 if let Some(old) = value.as_str() {
                     if let Some(next) = ids.get(old) {
@@ -439,6 +441,11 @@ pub fn restore(
         })
         .cloned()
         .collect();
+    if package.version == 1 {
+        for record in records.iter_mut().filter(|record| record.kind == "message") {
+            set(record, "run_id", Value::Null);
+        }
+    }
     ids.extend(id_map(&records)?);
     let batch = uuid::Uuid::new_v4().to_string();
     let mut journal = Journal {
@@ -531,7 +538,9 @@ pub fn restore(
             }
         }
         prepare(&mut records, &repository, &ids, paths, &file_paths)?;
-        for record in &records {
+        let runs = records.iter().filter(|record| record.kind == "run");
+        let other = records.iter().filter(|record| record.kind != "run");
+        for record in runs.chain(other) {
             repository.insert(record)?;
         }
         for record in &records {

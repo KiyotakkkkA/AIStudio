@@ -83,7 +83,7 @@ impl DataTransferService {
             })?;
             let mut package = Package {
                 format: "zvs-dbox".to_owned(),
-                version: 1,
+                version: archive::VERSION,
                 producer_version: env!("CARGO_PKG_VERSION").to_owned(),
                 created_at: inner.clock.now(),
                 categories,
@@ -143,7 +143,7 @@ impl DataTransferService {
                 repository.check_idle()?;
                 let mut package = Package {
                     format: "zvs-dbox".to_owned(),
-                    version: 1,
+                    version: archive::VERSION,
                     producer_version: env!("CARGO_PKG_VERSION").to_owned(),
                     created_at: inner.clock.now(),
                     categories: selection.categories.clone(),

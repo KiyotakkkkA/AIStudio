@@ -58,7 +58,10 @@ export const DATA_CATEGORIES: readonly TransferCategory[] = [
 ];
 
 export const DATA_CATEGORY_COPY: Record<TransferCategory, { label: string; hint: string }> = {
-  conversations: { label: "Диалоги", hint: "Сообщения, вложения, заметки и созданные файлы" },
+  conversations: {
+    label: "Диалоги",
+    hint: "Сообщения, статистика, вложения, заметки и созданные файлы",
+  },
   stores: { label: "Хранилища", hint: "Настройки и проиндексированные документы" },
   scenarios: { label: "Сценарии", hint: "Версии и черновики" },
   skills: { label: "Навыки", hint: "Инструкции и файлы" },

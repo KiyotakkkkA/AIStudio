@@ -69,7 +69,7 @@ fn package(
         .expect("exported records");
     let mut package = Package {
         format: "zvs-dbox".to_owned(),
-        version: 1,
+        version: archive::VERSION,
         producer_version: "test".to_owned(),
         created_at: 1,
         categories,
@@ -184,6 +184,175 @@ fn archive_round_trip_restores_files_and_links_without_rewriting_message_text() 
     .expect_err("duplicate refused");
     assert_eq!(duplicate.code, AppErrorCode::Conflict);
     assert_eq!(duplicate.details.expect("reason")["reason"], "duplicate");
+}
+
+#[test]
+fn dialog_runs_are_exported_once_and_keep_branch_activity_deduplicated() {
+    use crate::data::repositories::{ChatRepository, RunRepository};
+    use zvs_contract::RunStatus;
+
+    let source = fixture();
+    seed(&source);
+    let branch = uuid::Uuid::new_v4().to_string();
+    let run = uuid::Uuid::new_v4().to_string();
+    let unrelated = uuid::Uuid::new_v4().to_string();
+    let scenario = uuid::Uuid::new_v4().to_string();
+    let active = uuid::Uuid::new_v4().to_string();
+    source.database.with_connection(|connection| {
+        connection.execute(
+            "INSERT INTO conversation (id,title,provider_id,model_id,settings,system_prompt,attached_store_ids,created_at,updated_at)
+             SELECT ?1,'Branch',provider_id,model_id,settings,system_prompt,attached_store_ids,created_at,updated_at
+             FROM conversation WHERE id = ?2",
+            rusqlite::params![branch, CONVERSATION],
+        )?;
+        for (id, kind, status, finished_at) in [
+            (&run, "chat", "succeeded", Some(3)),
+            (&unrelated, "chat", "succeeded", Some(3)),
+            (&scenario, "scenario", "succeeded", Some(3)),
+            (&active, "chat", "running", None),
+        ] {
+            connection.execute(
+                "INSERT INTO run (id,kind,subject_id,status,graph,input,stream_id,concurrency,created_at,started_at,finished_at)
+                 VALUES (?1,?2,?3,?4,'{\"nodes\":[]}','\"private input\"',?1,1,1,2,?5)",
+                rusqlite::params![id, kind, CONVERSATION, status, finished_at],
+            )?;
+        }
+        for (owner, id, partial) in [
+            (CONVERSATION, &run, 0),
+            (branch.as_str(), &run, 0),
+            (CONVERSATION, &scenario, 1),
+            (CONVERSATION, &active, 1),
+        ] {
+            connection.execute(
+                "INSERT INTO message (id,conversation_id,role,content,sources,tokens_in,tokens_out,duration_ms,run_id,partial,created_at)
+                 VALUES (?1,?2,'assistant','Reply','[]',40,50,600,?3,?4,2)",
+                rusqlite::params![uuid::Uuid::new_v4().to_string(), owner, id, partial],
+            )?;
+        }
+        Ok(())
+    }).expect("seeded runs");
+
+    let blobs = source._directory.join("blobs");
+    let mut package = package(&source, vec![Conversations], &blobs);
+    let runs: Vec<_> = package
+        .records
+        .iter()
+        .filter(|record| record.kind == "run")
+        .collect();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(text(runs[0], "id").unwrap(), run);
+    assert!(
+        !serde_json::to_string(&package)
+            .unwrap()
+            .contains("private input")
+    );
+    assert_eq!(
+        package
+            .records
+            .iter()
+            .filter(|record| {
+                record.kind == "message" && record.fields["run_id"].as_str() == Some(run.as_str())
+            })
+            .count(),
+        2
+    );
+
+    // The input archive may put a reply before the run that it references.
+    let index = package
+        .records
+        .iter()
+        .position(|record| record.kind == "run")
+        .unwrap();
+    let record = package.records.remove(index);
+    package.records.push(record);
+    let path = source._directory.join("runs.dbox");
+    archive::write(&package, &blobs, &path).expect("written");
+    let read_blobs = source._directory.join("read-blobs");
+    let (package, hash) = archive::read(&path, &read_blobs).expect("read");
+    let target = fixture();
+    restore::restore(
+        &target.paths,
+        &target.database,
+        5,
+        &package,
+        &hash,
+        &read_blobs,
+        &[Conversations],
+    )
+    .expect("restored");
+
+    target
+        .database
+        .with_connection(|connection| {
+            let mut statement = connection.prepare(
+            "SELECT c.title,m.run_id FROM message m JOIN conversation c ON c.id=m.conversation_id
+             WHERE m.role='assistant' AND m.partial=0 ORDER BY c.title",
+        )?;
+            let replies = statement
+                .query_map([], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            assert_eq!(replies.len(), 2);
+            assert_ne!(replies[0].0, replies[1].0);
+            assert_eq!(replies[0].1, replies[1].1);
+            assert_ne!(replies[0].1, run);
+            let restored = RunRepository::new(connection)
+                .get(&replies[0].1)?
+                .expect("run");
+            assert_eq!(restored.status, RunStatus::Succeeded);
+            assert_eq!(restored.finished_at, Some(3));
+            let owner: String = connection.query_row(
+                "SELECT id FROM conversation WHERE title='Dialog'",
+                [],
+                |row| row.get(0),
+            )?;
+            assert_eq!(restored.subject_id, Some(owner));
+            let days = ChatRepository::new(connection).activity_days(5)?;
+            assert_eq!(days.len(), 1);
+            assert_eq!(days[0].tokens, 90);
+            assert_eq!(days[0].longest_turn_ms, 600);
+            Ok(())
+        })
+        .expect("activity counts both copies once");
+}
+
+#[test]
+fn v1_dialog_archives_still_restore_without_run_links() {
+    let source = fixture();
+    seed(&source);
+    let blobs = source._directory.join("blobs");
+    let mut package = package(&source, vec![Conversations], &blobs);
+    package.version = 1;
+    for record in package
+        .records
+        .iter_mut()
+        .filter(|record| record.kind == "message")
+    {
+        record.fields.remove("run_id");
+    }
+    let path = source._directory.join("legacy.dbox");
+    archive::write(&package, &blobs, &path).expect("legacy format written");
+    let read_blobs = source._directory.join("legacy-blobs");
+    let (package, hash) = archive::read(&path, &read_blobs).expect("legacy format read");
+    let target = fixture();
+    restore::restore(
+        &target.paths,
+        &target.database,
+        3,
+        &package,
+        &hash,
+        &read_blobs,
+        &[Conversations],
+    )
+    .expect("legacy conversation restored");
+    let run_id: Option<String> = target
+        .database
+        .with_connection(|connection| {
+            Ok(connection.query_row("SELECT run_id FROM message", [], |row| row.get(0))?)
+        })
+        .expect("restored message");
+    assert_eq!(run_id, None);
 }
 
 #[test]
@@ -459,7 +628,7 @@ fn unsafe_members_unknown_records_and_newer_formats_are_rejected() {
     }
     let source = fixture();
     let mut package = package(&source, vec![Settings], &source._directory.join("blobs"));
-    package.version = 2;
+    package.version = archive::VERSION + 1;
     assert!(package.validate().is_err());
     package.version = 1;
     package.records.push(Record {

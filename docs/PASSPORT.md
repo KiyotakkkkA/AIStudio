@@ -543,8 +543,10 @@ repositories.
 - Explicit data transfer uses the versioned `.dbox` format described in [DBOX.md](DBOX.md).
   `dataTransfer.*` is studio-only; the renderer selects categories and uploads bounded
   chunks, while the Rust host validates, exports and restores through a dedicated service
-  and repository. Secrets, account sessions, grants, model binaries and run history are
-  excluded. Import adds fresh entity IDs, starts executable configuration disabled and
+  and repository. Conversation transfers carry summaries of finished chat runs referenced by
+  replies so restored branches retain their shared run identity. Secrets, account sessions,
+  grants, model binaries and run execution data are excluded. Import adds fresh entity IDs,
+  starts executable configuration disabled and
   journals filesystem publication alongside its SQLite transaction. Startup journal
   recovery runs immediately after database preparation, before normal service construction.
 - `run_event` is the replay log, kept lean (TASK_045_EXTRA_5). Kernel step events are stored

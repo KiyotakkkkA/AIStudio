@@ -4,7 +4,7 @@ use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params_from_iter};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zvs_contract::{AppError, AppErrorCode, TransferCategory};
+use zvs_contract::{AppError, AppErrorCode, RunStatus, TransferCategory};
 
 use crate::data::DataError;
 
@@ -23,6 +23,8 @@ pub struct Table {
 }
 
 use TransferCategory::{Connections, Conversations, Memory, Scenarios, Settings, Skills, Stores};
+
+const PORTABLE_CHAT_RUN: &str = "kind = 'chat' AND status IN ('succeeded','failed','cancelled','interrupted') AND finished_at IS NOT NULL";
 
 pub const TABLES: &[Table] = &[
     Table {
@@ -68,9 +70,15 @@ pub const TABLES: &[Table] = &[
         primary: true,
     },
     Table {
+        name: "run",
+        category: Conversations,
+        columns: "id,subject_id,status,created_at,started_at,finished_at",
+        primary: false,
+    },
+    Table {
         name: "message",
         category: Conversations,
-        columns: "id,conversation_id,role,content,reasoning,sources,images,selections,commands,plugins,offered_tools,rounds,tokens_in,tokens_out,tokens_cached,tokens_reasoning,usage_estimated,duration_ms,partial,pinned,event,created_at,recap",
+        columns: "id,conversation_id,role,content,reasoning,sources,images,selections,commands,plugins,offered_tools,rounds,tokens_in,tokens_out,tokens_cached,tokens_reasoning,usage_estimated,duration_ms,partial,pinned,event,created_at,recap,run_id",
         primary: false,
     },
     Table {
@@ -125,6 +133,39 @@ pub const TABLES: &[Table] = &[
 
 pub fn table(kind: &str) -> Option<&'static Table> {
     TABLES.iter().find(|table| table.name == kind)
+}
+
+impl Table {
+    pub fn archive_columns(&self, version: u32) -> Option<&str> {
+        match (version, self.name) {
+            (1, "run") => None,
+            (1, "message") => self.columns.strip_suffix(",run_id"),
+            _ => Some(self.columns),
+        }
+    }
+
+    fn export_query(&self) -> String {
+        match self.name {
+            "run" => format!(
+                "SELECT id, CASE WHEN subject_id IN (SELECT id FROM conversation)
+                                 THEN subject_id END,
+                        status, created_at, started_at, finished_at
+                 FROM run
+                 WHERE {PORTABLE_CHAT_RUN} AND id IN (
+                     SELECT run_id FROM message WHERE role = 'assistant' AND run_id IS NOT NULL
+                 )"
+            ),
+            "message" => {
+                let columns = self.archive_columns(1).expect("legacy message columns");
+                format!(
+                    "SELECT {columns}, CASE WHEN role = 'assistant' THEN (
+                         SELECT id FROM run WHERE run.id = message.run_id AND {PORTABLE_CHAT_RUN}
+                     ) END FROM message"
+                )
+            }
+            _ => format!("SELECT {} FROM {}", self.columns, self.name),
+        }
+    }
 }
 
 pub fn portable_setting(key: &str) -> bool {
@@ -204,6 +245,12 @@ pub fn is_json_field(kind: &str, field: &str) -> bool {
 
 pub fn validate_fields(record: &Record) -> Result<(), AppError> {
     use zvs_contract::validate::check;
+    if record.kind == "run"
+        && !RunStatus::parse(text(record, "status")?)
+            .is_some_and(|status| RunStatus::FINISHED.contains(&status))
+    {
+        return Err(invalid_package());
+    }
     for (key, value) in &record.fields {
         if record.kind == "skill" && key == "version" {
             continue;
@@ -211,7 +258,12 @@ pub fn validate_fields(record: &Record) -> Result<(), AppError> {
         if value.is_null()
             && matches!(
                 key.as_str(),
-                "context_window" | "max_output" | "size_bytes" | "is_free" | "no_training"
+                "context_window"
+                    | "max_output"
+                    | "size_bytes"
+                    | "is_free"
+                    | "no_training"
+                    | "started_at"
             )
         {
             continue;
@@ -220,6 +272,8 @@ pub fn validate_fields(record: &Record) -> Result<(), AppError> {
             key.as_str(),
             "idx"
                 | "created_at"
+                | "started_at"
+                | "finished_at"
                 | "updated_at"
                 | "discovered_at"
                 | "indexed_at"
@@ -367,9 +421,7 @@ impl<'a> TransferRepository<'a> {
             .filter(|table| categories.contains(&table.category))
         {
             let columns: Vec<_> = table.columns.split(',').collect();
-            let mut query = self
-                .connection
-                .prepare(&format!("SELECT {} FROM {}", table.columns, table.name))?;
+            let mut query = self.connection.prepare(&table.export_query())?;
             let mut rows = query.query([])?;
             while let Some(row) = rows.next()? {
                 let mut fields = BTreeMap::new();
@@ -534,12 +586,24 @@ impl<'a> TransferRepository<'a> {
             });
         }
         let placeholders = vec!["?"; columns.len()].join(",");
-        let extra = match spec.name {
-            "provider" | "mcp_server" | "integration_account" | "skill" => ",enabled",
-            "scenario" => ",active",
-            _ => "",
+        let (extra, extra_value) = match spec.name {
+            "provider" | "mcp_server" | "integration_account" | "skill" => (",enabled", ",0"),
+            "scenario" => (",active", ",0"),
+            "run" => {
+                values.push(uuid::Uuid::new_v4().to_string().into());
+                values.push(
+                    record.fields["finished_at"]
+                        .as_i64()
+                        .ok_or_else(invalid_package)?
+                        .into(),
+                );
+                (
+                    ",kind,graph,concurrency,stream_id,pruned_at",
+                    r#", 'chat', '{"nodes":[]}', 1, ?, ?"#,
+                )
+            }
+            _ => ("", ""),
         };
-        let extra_value = if extra.is_empty() { "" } else { ",0" };
         let suffix = if spec.name == "setting" {
             " ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at"
         } else {
@@ -634,6 +698,9 @@ impl<'a> TransferRepository<'a> {
                     "settings": row.settings, "systemPrompt": row.system_prompt,
                     "attachedStoreIds": row.attached_store_ids, "retrievalMode": row.retrieval_mode,
                 })).map_err(|_| invalid_package())?;
+            }
+            "run" => {
+                row!(RunRow).graph.validate()?;
             }
             "message" => {
                 let row = row!(MessageRow);

@@ -14,6 +14,7 @@ use crate::data::repositories::data_transfer::{Record, TABLES, invalid_package, 
 pub const MAX_JSON: u64 = 64 * 1024 * 1024;
 pub const MAX_FILES: usize = 100_000;
 pub const MAX_BYTES: u64 = zvs_contract::data_transfer::TRANSFER_MAX_BYTES;
+pub const VERSION: u32 = 2;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -159,7 +160,7 @@ impl Package {
     pub fn validate(&self) -> Result<(), zvs_contract::AppError> {
         use zvs_contract::Validate;
         if self.format != "zvs-dbox"
-            || self.version != 1
+            || !matches!(self.version, 1 | VERSION)
             || self.records.len() > MAX_FILES
             || self.files.len() > MAX_FILES
         {
@@ -175,10 +176,12 @@ impl Package {
             crate::data::repositories::data_transfer::validate_fields(record)
                 .map_err(|error| error.with_detail("recordKind", record.kind.clone()))?;
             let table = table(&record.kind).ok_or_else(invalid_package)?;
+            let columns = table
+                .archive_columns(self.version)
+                .ok_or_else(invalid_package)?;
             if !self.categories.contains(&table.category)
-                || record.fields.len() != table.columns.split(',').count()
-                || table
-                    .columns
+                || record.fields.len() != columns.split(',').count()
+                || columns
                     .split(',')
                     .any(|field| !record.fields.contains_key(field))
                 || record
@@ -216,6 +219,32 @@ impl Package {
                     .map(|id| (record.kind.as_str(), id))
             })
             .collect();
+        if self.version == VERSION {
+            let mut referenced_runs = HashSet::new();
+            for record in &self.records {
+                match record.kind.as_str() {
+                    "message" if !record.fields["run_id"].is_null() => {
+                        let id = text(record, "run_id")?;
+                        if text(record, "role")? != "assistant" || !owners.contains(&("run", id)) {
+                            return Err(invalid_package());
+                        }
+                        referenced_runs.insert(id);
+                    }
+                    "run"
+                        if !record.fields["subject_id"].is_null()
+                            && !owners.contains(&("conversation", text(record, "subject_id")?)) =>
+                    {
+                        return Err(invalid_package());
+                    }
+                    _ => {}
+                }
+            }
+            for record in self.records.iter().filter(|record| record.kind == "run") {
+                if !referenced_runs.contains(text(record, "id")?) {
+                    return Err(invalid_package());
+                }
+            }
+        }
         let mut names = HashSet::new();
         let mut bytes = 0_u64;
         for file in &self.files {
@@ -369,7 +398,7 @@ pub fn write(
     }
     let manifest = Manifest {
         format: "zvs-dbox".to_owned(),
-        version: 1,
+        version: package.version,
         hash: digest(&data),
         bytes: data.len() as u64,
     };
@@ -436,13 +465,16 @@ pub fn read(source: &Path, blobs: &Path) -> Result<(Package, String), zvs_contra
     let bytes = json("data.json", MAX_JSON)?;
     let hash = digest(&bytes);
     if manifest.format != "zvs-dbox"
-        || manifest.version != 1
+        || !matches!(manifest.version, 1 | VERSION)
         || manifest.hash != hash
         || manifest.bytes != bytes.len() as u64
     {
         return Err(invalid_package());
     }
     let package: Package = serde_json::from_slice(&bytes).map_err(|_| invalid_package())?;
+    if package.version != manifest.version {
+        return Err(invalid_package());
+    }
     package.validate()?;
     let mut expected = BTreeMap::new();
     for member in &package.files {
