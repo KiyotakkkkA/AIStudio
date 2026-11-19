@@ -77,12 +77,21 @@ fn shade(character: char, color: ratatui::style::Color) -> Style {
     }
 }
 
-pub fn lines(available: usize) -> Vec<Line<'static>> {
-    if available < width() {
-        let span_count = COMPACT.chars().count().max(1);
-        return vec![Line::from(
+pub fn lines(available: usize, height: u16) -> Vec<Line<'static>> {
+    if available == 0 || height == 0 {
+        return Vec::new();
+    }
+    if available < width() || height < 6 {
+        let title = if available >= COMPACT.len() {
             COMPACT
+        } else {
+            "AI STUDIO"
+        };
+        let span_count = title.len();
+        return vec![Line::from(
+            title
                 .chars()
+                .take(available)
                 .enumerate()
                 .map(|(index, character)| {
                     let position = index as f64 / span_count as f64;
@@ -129,7 +138,8 @@ mod tests {
 
     #[test]
     fn a_narrow_terminal_gets_the_one_line_title() {
-        assert_eq!(lines(40).len(), 1);
-        assert_eq!(lines(100).len(), 6);
+        assert_eq!(lines(40, 10).len(), 1);
+        assert_eq!(lines(100, 5).len(), 1);
+        assert_eq!(lines(100, 10).len(), 6);
     }
 }

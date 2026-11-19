@@ -1,13 +1,11 @@
 use std::io::{self, IsTerminal};
 use std::time::Duration;
 
-use ratatui::crossterm::cursor::MoveTo;
 use ratatui::crossterm::event::{
     self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
 };
 use ratatui::crossterm::execute;
-use ratatui::crossterm::terminal::{Clear, ClearType};
 use ratatui::widgets::{Paragraph, Widget};
 use ratatui::{TerminalOptions, Viewport};
 use serde_json::{Value, json};
@@ -147,7 +145,12 @@ pub fn translate(batch: &[Event]) -> Vec<Msg> {
 }
 
 fn read_terminal(signals: &mpsc::UnboundedSender<Signal>) {
-    loop {
+    while !signals.is_closed() {
+        match event::poll(Duration::from_millis(100)) {
+            Ok(true) => {}
+            Ok(false) => continue,
+            Err(_) => return,
+        }
         let Ok(first) = event::read() else {
             return;
         };
@@ -747,12 +750,9 @@ async fn session(
     terminal: &mut ratatui::DefaultTerminal,
     folder: String,
     resume: Option<zvs_contract::ConversationId>,
-) -> std::io::Result<(Option<Exit>, Option<zvs_contract::ConversationId>)> {
-    let (signals, mut received) = mpsc::unbounded_channel::<Signal>();
-    {
-        let signals = signals.clone();
-        std::thread::spawn(move || read_terminal(&signals));
-    }
+    signals: mpsc::UnboundedSender<Signal>,
+    mut received: mpsc::UnboundedReceiver<Signal>,
+) -> io::Result<App> {
     {
         let signals = signals.clone();
         tokio::spawn(async move {
@@ -846,6 +846,7 @@ async fn session(
         while let Ok(next) = received.try_recv() {
             batch.push(next);
         }
+        let mut resized = false;
         for signal in batch {
             let requests = match signal {
                 Signal::Linked((connected, incoming)) => {
@@ -854,6 +855,10 @@ async fn session(
                     app.update(Msg::Connected)
                 }
                 Signal::App(message) => match *message {
+                    message @ Msg::Resize(..) => {
+                        resized = true;
+                        app.update(message)
+                    }
                     Msg::Scroll(delta, x, y) => {
                         if viewport.contains(ratatui::layout::Position::new(x, y)) {
                             app.update(Msg::Scroll(delta, x - viewport.x, y - viewport.y))
@@ -879,13 +884,15 @@ async fn session(
                 &signals,
             );
             if app.exit.is_some() {
-                write_history(terminal, &app)?;
-                let conversation = app.conversation.as_ref().map(|known| known.id);
-                return Ok((app.exit.take(), conversation));
+                return Ok(app);
             }
         }
+        if resized {
+            // A shrink and grow can end at the old size after the emulator has reflowed the frame.
+            terminal.resize(terminal.size()?.into())?;
+        }
     }
-    Ok((None, app.conversation.as_ref().map(|known| known.id)))
+    Ok(app)
 }
 
 fn write_history<B: ratatui::backend::Backend>(
@@ -893,7 +900,8 @@ fn write_history<B: ratatui::backend::Backend>(
     app: &App,
 ) -> Result<(), B::Error> {
     ui::theme::activate(app.active_theme());
-    let width = usize::from(terminal.size()?.width);
+    terminal.autoresize()?;
+    let width = usize::from(terminal.get_frame().area().width);
     let mut lines = ui::transcript::history(app, width);
     if lines.first().is_some_and(|line| line.width() == 0) {
         lines.remove(0);
@@ -904,7 +912,8 @@ fn write_history<B: ratatui::backend::Backend>(
             Paragraph::new(batch.to_vec()).render(buffer.area, buffer);
         })?;
     }
-    Ok(())
+    let cursor = terminal.get_frame().area().as_position();
+    terminal.set_cursor_position(cursor)
 }
 
 async fn add_server(input: CreateMcpServerInput) -> i32 {
@@ -999,23 +1008,10 @@ pub async fn run() -> i32 {
     let folder = std::env::current_dir()
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let height = ratatui::crossterm::terminal::size()
-        .map_or(20, |(_, height)| height.saturating_sub(2).max(1));
-    if let Err(error) = execute!(
-        io::stdout(),
-        Clear(ClearType::All),
-        Clear(ClearType::Purge),
-        MoveTo(0, 0)
-    ) {
-        eprintln!("{error}");
-        return 1;
-    }
-    let mut terminal = match ratatui::try_init_with_options(TerminalOptions {
-        viewport: Viewport::Inline(height),
-    }) {
+    let mut terminal = match ratatui::try_init() {
         Ok(terminal) => terminal,
         Err(error) => {
-            let _ = ratatui::crossterm::terminal::disable_raw_mode();
+            let _ = ratatui::try_restore();
             eprintln!("{error}");
             return 1;
         }
@@ -1026,28 +1022,45 @@ pub async fn run() -> i32 {
         previous_hook(panic);
     }));
     let _ = execute!(io::stdout(), EnableBracketedPaste, EnableMouseCapture);
-    let outcome = session(&mut terminal, folder, resume).await;
-    let _ = terminal.clear();
+    let (signals, received) = mpsc::unbounded_channel();
+    let input_signals = signals.clone();
+    let input = std::thread::spawn(move || read_terminal(&input_signals));
+    let outcome = session(&mut terminal, folder, resume, signals, received).await;
+    let _ = input.join();
     let _ = terminal.show_cursor();
     let _ = execute!(io::stdout(), DisableMouseCapture, DisableBracketedPaste);
-    let _ = ratatui::crossterm::terminal::disable_raw_mode();
-    let (exit, conversation) = match outcome {
-        Ok(parts) => parts,
+    let restored = ratatui::try_restore();
+    let app = match outcome.and_then(|app| {
+        restored?;
+        print_history(&app)?;
+        Ok(app)
+    }) {
+        Ok(app) => app,
         Err(error) => {
             eprintln!("{error}");
             return 1;
         }
     };
-    if let Some(id) = conversation {
+    if let Some(id) = app.conversation.as_ref().map(|known| known.id) {
         println!("{}: aistudio --resume {id}", copy::RESUME_HINT);
     }
-    match exit {
+    match app.exit {
         Some(Exit::Message(message)) => {
             eprintln!("{message}");
             1
         }
         _ => 0,
     }
+}
+
+fn print_history(app: &App) -> io::Result<()> {
+    let mut terminal = ratatui::Terminal::with_options(
+        ratatui::backend::CrosstermBackend::new(io::stdout()),
+        TerminalOptions {
+            viewport: Viewport::Inline(1),
+        },
+    )?;
+    write_history(&mut terminal, app)
 }
 
 async fn send_attachments(
@@ -1109,11 +1122,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn exiting_an_inline_session_writes_contiguous_history() {
+    fn exiting_writes_contiguous_history_to_the_shell_screen() {
+        use ratatui::backend::{Backend, TestBackend};
+
+        let mut backend = TestBackend::with_lines(["previous shell output"]);
+        backend.resize(48, 18);
+        backend.set_cursor_position((0, 17)).unwrap();
         let mut terminal = ratatui::Terminal::with_options(
-            ratatui::backend::TestBackend::new(48, 18),
+            backend,
             TerminalOptions {
-                viewport: Viewport::Inline(14),
+                viewport: Viewport::Inline(1),
             },
         )
         .unwrap();
@@ -1127,6 +1145,8 @@ mod tests {
             });
         app.transcript.push_user("second prompt");
         write_history(&mut terminal, &app).unwrap();
+        let cursor = terminal.get_frame().area().as_position();
+        assert_eq!(terminal.get_cursor_position().unwrap(), cursor);
         let backend = terminal.backend();
         let rows: Vec<String> = backend
             .scrollback()
@@ -1139,6 +1159,7 @@ mod tests {
             .iter()
             .position(|row| row.contains("first answer"))
             .unwrap();
+        assert!(rows[0].contains("previous shell output"));
         assert!(rows[answer + 1].trim().is_empty());
         assert!(rows[answer + 2].contains("second prompt"));
     }

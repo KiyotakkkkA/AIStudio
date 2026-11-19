@@ -32,9 +32,9 @@ aistudio --version | --help
 ## Pipeline: start-up and connection
 
 1. `args::parse` turns the command line into `Args`. `mcp add` runs once without a UI and exits.
-2. `runtime::run` opens a Ratatui inline viewport and starts `session`. The transcript scrolls
-   within the viewport while the composer and status bar stay in place. The runtime prints the
-   transcript to the terminal when the session exits.
+2. `runtime::run` opens a Ratatui viewport on the alternate screen and starts `session`. The
+   transcript scrolls within the viewport while the composer and status bar stay in place. The
+   runtime restores the shell screen and prints the transcript when the session exits.
 3. `launch::connect` resolves the pipe name (`zvs_pipe::pipe_name`, keyed by the user's SID)
    and tries to open it. If nothing is listening, it looks for `zvs-studio.exe` next to the
    CLI or one folder up (`app_candidates`), starts it detached with `CLI_LAUNCH_ARG`, and

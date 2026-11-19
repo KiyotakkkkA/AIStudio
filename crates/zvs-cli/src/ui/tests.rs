@@ -74,12 +74,47 @@ fn the_welcome_screen_shows_the_art_folder_model_and_version() {
 }
 
 #[test]
+fn the_welcome_banner_is_centered_above_the_composer() {
+    let app = ready(WorkingFolderAccess::Granted);
+    let [body, ..] = chat_areas(&app, Rect::new(0, 0, 100, 40), 0, false);
+    let screen = render(&app, 100, 40);
+    let top = screen
+        .lines()
+        .position(|line| line.contains("█████"))
+        .unwrap();
+    let title = screen
+        .lines()
+        .position(|line| line.contains(copy::TITLE))
+        .unwrap();
+    assert!(top.abs_diff(usize::from(body.bottom()) - title - 1) <= 1);
+}
+
+#[test]
 fn the_access_prompt_lists_its_three_answers() {
     let screen = render(&ready(WorkingFolderAccess::Missing), 100, 30);
     println!("{screen}");
     assert!(screen.contains(copy::ACCESS_TITLE));
     assert!(screen.contains(copy::ACCESS_CONVERSATION));
     assert!(screen.contains(copy::ACCESS_DENY));
+}
+
+#[test]
+fn the_access_banner_and_prompt_share_a_centered_group() {
+    let screen = render(&ready(WorkingFolderAccess::Missing), 100, 42);
+    let top = screen.lines().position(|line| !line.is_empty()).unwrap();
+    let bottom = screen
+        .lines()
+        .enumerate()
+        .filter_map(|(row, line)| (!line.is_empty()).then_some(row))
+        .last()
+        .unwrap();
+    let prompt = screen
+        .lines()
+        .position(|line| line.contains(copy::ACCESS_TITLE))
+        .unwrap();
+    assert!(top >= 8);
+    assert_eq!(prompt - top, 8);
+    assert!(top.abs_diff(41 - bottom) <= 1);
 }
 
 #[test]

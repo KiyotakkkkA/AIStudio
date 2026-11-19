@@ -26,6 +26,7 @@ const INPUT_MAX_LINES: usize = 8;
 const PALETTE_ROWS: usize = 8;
 const REFERENCE_ROWS: usize = 18;
 const QUEUE_ROWS: usize = 5;
+const ACCESS_WIDTH: u16 = 76;
 
 pub use crate::state::overlay::mode_label;
 
@@ -52,27 +53,19 @@ fn model_line(app: &App) -> String {
 }
 
 fn welcome(frame: &mut Frame<'_>, area: Rect) {
-    let width = usize::from(area.width);
-    let mut lines = banner::lines(if area.height >= 8 {
-        width.saturating_sub(4)
-    } else {
-        0
-    });
-    lines.push(Line::default());
+    let mut lines = banner::lines(
+        usize::from(area.width).saturating_sub(4),
+        area.height.saturating_sub(2),
+    );
+    if !lines.is_empty() {
+        lines.push(Line::default());
+    }
     lines.push(Line::from(vec![
         Span::styled(copy::TITLE, theme::strong()),
         Span::styled(format!("  ·  {}", copy::SUBTITLE), theme::muted()),
         Span::styled(format!("  ·  {}", crate::version::label()), theme::faint()),
     ]));
-    lines.push(Line::default());
-    lines.push(Line::default());
-    let height = rows(lines.len());
-    let top = area.y + area.height.saturating_sub(height) / 3;
-    let target = Rect {
-        y: top,
-        height: height.min(area.height),
-        ..area
-    };
+    let target = centered(area, area.width, rows(lines.len()));
     frame.render_widget(
         Paragraph::new(lines).alignment(ratatui::layout::Alignment::Center),
         target,
@@ -635,8 +628,13 @@ fn footer(frame: &mut Frame<'_>, area: Rect, app: &App) {
 }
 
 fn splash(frame: &mut Frame<'_>, area: Rect, message: &str, app: &App) {
-    let mut lines = banner::lines(usize::from(area.width).saturating_sub(4));
-    lines.push(Line::default());
+    let mut lines = banner::lines(
+        usize::from(area.width).saturating_sub(4),
+        area.height.saturating_sub(2),
+    );
+    if !lines.is_empty() {
+        lines.push(Line::default());
+    }
     lines.push(Line::from(vec![
         Span::styled(
             format!("{} ", transcript::spinner(app.frame)),
@@ -655,25 +653,25 @@ fn access(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let Some(current) = app.prompts.front() else {
         return;
     };
-    let width = area.width.min(76);
+    let width = area.width.min(ACCESS_WIDTH);
     let panel = prompt::panel(current, usize::from(width.saturating_sub(2)));
-    let panel_height = sheet_height(area, panel.lines.len());
-    let art_height = area.height.saturating_sub(panel_height);
-    let art = banner::lines(if art_height >= 6 {
-        usize::from(area.width).saturating_sub(4)
-    } else {
-        0
-    });
+    let panel_height = rows(panel.lines.len() + 2).min(area.height);
+    let spare = area.height - panel_height;
+    let gap = if spare >= 3 { 2 } else { 0 };
+    let art = banner::lines(usize::from(area.width).saturating_sub(4), spare - gap);
+    let art_height = rows(art.len());
+    let gap = if art_height > 0 { gap } else { 0 };
+    let group = centered(area, area.width, art_height + gap + panel_height);
     frame.render_widget(
         Paragraph::new(art).alignment(ratatui::layout::Alignment::Center),
         Rect {
             height: art_height,
-            ..area
+            ..group
         },
     );
     let target = Rect {
         x: area.x + (area.width - width) / 2,
-        y: area.y + art_height,
+        y: group.y + art_height + gap,
         width,
         height: panel_height,
     };
@@ -801,9 +799,14 @@ pub fn modal_max_scroll(app: &App) -> usize {
 
 pub fn prompt_scroll_limit(app: &App) -> usize {
     let area = Rect::new(0, 0, app.viewport.0, app.viewport.1);
-    let room = usize::from(sheet_limit(area).saturating_sub(2));
+    let (width, height) = if app.phase == Phase::Access {
+        (area.width.min(ACCESS_WIDTH).saturating_sub(2), area.height)
+    } else {
+        (area.width, sheet_limit(area))
+    };
+    let room = usize::from(height.saturating_sub(2));
     app.prompts.front().map_or(0, |current| {
-        let panel = prompt::panel(current, usize::from(area.width));
+        let panel = prompt::panel(current, usize::from(width));
         panel.cursor.map_or_else(
             || panel.lines.len().saturating_sub(room),
             |(_, row)| usize::from(row).saturating_add(1).saturating_sub(room),
