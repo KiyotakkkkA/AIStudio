@@ -304,6 +304,12 @@ kind on top of it.
 - [ ] **TASK_084** — Unified answer sources: one `ChatSourceDto` union, `sources` column and kind registry replacing per-origin `citations`/`webSources`
 - [x] **TASK_085** — Dialog notes: durable Markdown knowledge, on-demand reading, management panel and answer sources without inline note citations *(after TASK_039_EXTRA_1, TASK_045_EXTRA_1, TASK_045_EXTRA_5, TASK_084; no TASK_083 dependency)*
 
+## Phase C — Shared dialogs and standalone CLI
+
+- [ ] **TASK_086** — Move Desktop dialogs to JSONL and rebuild fast indexes at boot. Cut over without legacy SQLite dialog compatibility.
+- [ ] **TASK_087** — Add the shared AI Studio state root and rename the desktop product to AI Studio Desktop (after TASK_086).
+- [ ] **TASK_088** — Build the standalone CLI with local OpenAI and Copilot, Desktop handoff, and a bridge for browser and vector capabilities (after TASK_086 and TASK_087).
+
 ## Milestones
 
 | Milestone            | After    | What you can do                                      |
