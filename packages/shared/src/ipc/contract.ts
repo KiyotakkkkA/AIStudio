@@ -47,6 +47,8 @@ import {
   ConversationDto,
   ConversationExportDto,
   ConversationRef,
+  GetConversationInput,
+  SearchConversationsInput,
   ExportConversationInput,
   RetrievalMode,
   CreateConversationInput,
@@ -352,7 +354,11 @@ export type SettingKey = z.infer<typeof SettingKey>;
 
 export const contract = defineContract({
   "chat.conversations.list": { input: z.void(), output: z.array(ConversationDto) },
-  "chat.conversations.get": { input: ConversationRef, output: ConversationDetailDto },
+  "chat.conversations.get": { input: GetConversationInput, output: ConversationDetailDto },
+  "chat.conversations.search": {
+    input: SearchConversationsInput,
+    output: z.array(ConversationRef.shape.id),
+  },
   "chat.conversations.export": { input: ExportConversationInput, output: ConversationExportDto },
   "chat.conversations.create": { input: CreateConversationInput, output: ConversationDto },
   "chat.conversations.remove": { input: ConversationRef, output: z.void() },

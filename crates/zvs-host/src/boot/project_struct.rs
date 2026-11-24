@@ -160,7 +160,7 @@ fn routes() -> Vec<Route> {
     ]
 }
 
-fn layout(root: &Path) -> StudioPaths {
+pub(super) fn layout(root: &Path) -> StudioPaths {
     StudioPaths::resolve(&PathEnvironment {
         state_dir: root.to_path_buf(),
         resource_dir: PathBuf::new(),

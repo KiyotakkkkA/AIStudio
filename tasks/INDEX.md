@@ -306,7 +306,7 @@ kind on top of it.
 
 ## Phase C — Shared dialogs and standalone CLI
 
-- [ ] **TASK_086** — Move Desktop dialogs to JSONL and rebuild fast indexes at boot. Cut over without legacy SQLite dialog compatibility.
+- [x] **TASK_086** — Move Desktop dialogs to JSONL and rebuild fast indexes at boot. Convert supported SQLite dialog history during the layout 1 → 2 upgrade.
 - [ ] **TASK_087** — Add the shared AI Studio state root and rename the desktop product to AI Studio Desktop (after TASK_086).
 - [ ] **TASK_088** — Build the standalone CLI with local OpenAI and Copilot, Desktop handoff, and a bridge for browser and vector capabilities (after TASK_086 and TASK_087).
 

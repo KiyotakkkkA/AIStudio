@@ -57,9 +57,13 @@ shared grants and one per owner for dialog grants, so a site rule or a tier row 
 JSON in `detail`. Migration 0043 copies with `INSERT OR IGNORE`, so a duplicate in an old table
 keeps its first row instead of stopping the upgrade.
 
-`chat_compaction` (migration 0044) holds one row per compaction: the boundary message, the
-summary, the counts and the summarizer. Both foreign keys cascade, so removing a dialog or
-truncating through the boundary removes the row. The same migration adds `message.recap`.
+`conversation`, `message`, `message_tool_call` and `chat_compaction` are a projection of
+regular dialog history (migration 0046). The `Database` transaction captures changes to these
+tables, syncs the corresponding `history.jsonl` commit and publishes the projection. The
+history owns stable IDs and run links. Foreign keys still remove compactions and calls when
+their message is removed, and remove scoped grants and memory when the owning dialog is deleted.
+`dialogs_schema.sql` and `dialogs_search.sql` are part of the migration 0046 checksum and
+are reused during projection rebuild. Future schema changes use a new migration.
 
 ## Errors
 

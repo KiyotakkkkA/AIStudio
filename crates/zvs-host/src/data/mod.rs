@@ -1,4 +1,5 @@
 mod database;
+pub(crate) mod dialogs;
 mod migrate;
 pub mod repositories;
 pub mod schema;

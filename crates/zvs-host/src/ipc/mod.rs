@@ -183,6 +183,7 @@ mod tests {
                 "chat.conversations.pin",
                 "chat.conversations.remove",
                 "chat.conversations.rename",
+                "chat.conversations.search",
                 "chat.conversations.truncate",
                 "chat.conversations.updateRelations",
                 "chat.conversations.updateRetrieval",

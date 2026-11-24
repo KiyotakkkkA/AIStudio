@@ -13,7 +13,7 @@ use crate::platform::clock::FakeClock;
 use crate::platform::events::EventBus;
 use crate::platform::logger::silent_logger;
 use crate::services::SystemService;
-use crate::testing::{FakeScript, TestServices, test_services};
+use crate::testing::{FakeScript, TestServices, test_services_with_history};
 
 struct Channels {
     host: TestServices,
@@ -22,7 +22,7 @@ struct Channels {
 }
 
 fn registered() -> Channels {
-    let host = test_services(SystemService::new(
+    let host = test_services_with_history(SystemService::new(
         Arc::new(FakeClock::default()),
         EventBus::default(),
         Duration::ZERO,
@@ -137,6 +137,68 @@ async fn a_turn_through_the_channels_answers_titles_the_conversation_and_matches
             .await,
     );
     assert_eq!(listed.len(), 1);
+    let last_page: ConversationDetailDto = data(
+        &channels
+            .server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.get",
+                json!({ "id": created.id, "limit": 1 }),
+            )
+            .await,
+    );
+    assert_eq!(last_page.messages[0].content, "Hello world");
+    let earlier: ConversationDetailDto = data(
+        &channels
+            .server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.get",
+                json!({ "id": created.id, "before": last_page.older, "limit": 1 }),
+            )
+            .await,
+    );
+    assert_eq!(earlier.messages[0].content, "First question");
+    assert!(earlier.older.is_none());
+    let hits: Vec<zvs_contract::ConversationId> = data(
+        &channels
+            .server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.search",
+                json!({ "query": "world" }),
+            )
+            .await,
+    );
+    assert_eq!(hits, [created.id]);
+    let folders = channels.host.artifacts.folders();
+    let owned = folders
+        .work(&created.id.to_string())
+        .expect("owned workspace");
+    std::fs::create_dir_all(&owned).expect("creates workspace");
+    std::fs::write(owned.join("file.txt"), "kept").expect("writes owned file");
+    let branch: ConversationDto = data(
+        &channels
+            .server
+            .dispatch(
+                crate::ipc::Caller::Studio,
+                "chat.conversations.branch",
+                json!({ "id": created.id, "messageId": detail.messages[0].id }),
+            )
+            .await,
+    );
+    let branch_folder = folders
+        .folder(&branch.id.to_string())
+        .expect("branch folder");
+    assert!(
+        branch_folder
+            .join(crate::dialog_history::HISTORY_FILE)
+            .is_file()
+    );
+    assert_eq!(
+        std::fs::read_to_string(branch_folder.join("work/file.txt")).expect("reads owned file"),
+        "kept"
+    );
     let cancelled = channels
         .server
         .dispatch(

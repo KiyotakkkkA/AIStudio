@@ -42,12 +42,13 @@ Field interpretation includes the record kind: `chat_compaction.summary` is plai
 `chat_compaction.trigger` is `manual` or `auto`; `scenario_version.summary` and
 `scenario.trigger` are JSON. Compaction summaries are preserved verbatim during import.
 
-Version 2 adds `message.run_id` and a `run` record to the conversations category. One run record
+Version 2 carries dialog records projected from JSONL, including `message.run_id` and `run`
+records for completed chat runs. One run record
 carries its ID, optional conversation owner, terminal status and creation, start and finish times.
 Import assigns a new ID to each run, restores it as a historical chat run and uses the same ID for
 every reply that references it. Branch copies therefore count once in activity statistics. A
-missing original conversation leaves the run owner empty. Version 1 archives remain importable
-with an empty run reference on restored messages.
+missing original conversation leaves the run owner empty. Version 1 remains importable for
+archives outside the conversations category.
 
 Each file descriptor contains `category`, its entity `owner`, a relative `path`, original
 absolute and stored paths, SHA-256 and byte length. Original paths are used only to rewrite
@@ -86,8 +87,9 @@ configurations. Store embedding providers and message/dialog ownership remain re
 Before publishing files, the host writes and synchronizes a journal under
 `data/transfer-journals`. New conversation and skill directories and an import-owned document
 directory under `data/imports/<batch>` are created without replacing existing directories.
-Files and database records are validated before commit. A transaction failure rolls back
-records and removes the new directories. Startup recovery runs after migrations and before
+Files and database records are validated before commit. Dialog history is synced to the new
+folders before publishing the SQLite transaction. A transaction failure rolls back records and
+removes the new directories. Startup recovery runs after migrations and before
 normal service construction: an uncommitted journal removes its directories; a committed
 journal preserves them and is retired. Imported document copies are accounted for in vector
 storage usage and are independent of cache clearing.

@@ -95,6 +95,7 @@ import { approvalView } from "./approvalModel";
 
 const ACCOUNT_OPTION_PREFIX = "account:";
 const LAST_CONVERSATION_KEY = "chat.conversation.last";
+const HISTORY_PAGE_SIZE = 50;
 export const SELECTIONS_FULL = "К сообщению можно приложить не больше 8 фрагментов.";
 export const GENERATION_FAILED = "Не удалось получить ответ. Повторите запрос.";
 
@@ -134,6 +135,9 @@ export default class ChatStore {
   connectingAccountId: AccountId | null = null;
   composer = new ConversationVm();
   query = "";
+  searching = false;
+  private searchRevision = 0;
+  private searchMatches = new Set<ConversationId>();
   sidePanel: SidePanel = "context";
   panelOpen = true;
   browserWidth = BROWSER_DOCK_DEFAULT_WIDTH;
@@ -141,6 +145,7 @@ export default class ChatStore {
   pinsOpen = true;
   artifactTarget: { messageId: MessageId; artifactId: string; nonce: number } | null = null;
   loading = false;
+  loadingOlder = false;
   sending = false;
   compacting = false;
   autoCompacting = false;
@@ -872,26 +877,99 @@ export default class ChatStore {
   }
   get visibleConversations() {
     return this.conversations
-      .filter((conversation) =>
-        conversation.title.toLowerCase().includes(this.query.trim().toLowerCase()),
+      .filter(
+        (conversation) =>
+          conversation.title.toLowerCase().includes(this.query.trim().toLowerCase()) ||
+          this.searchMatches.has(conversation.id),
       )
       .slice()
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
   setQuery(value: string) {
     this.query = value;
+    this.searchMatches.clear();
+    const revision = ++this.searchRevision;
+    const query = value.trim();
+    this.searching = query.length >= 2 && query.length <= 200;
+    if (this.searching) void this.searchHistory(query, revision);
+  }
+  private async searchHistory(query: string, revision: number) {
+    const matches = await this.ipc.call("chat.conversations.search", { query }).catch(() => []);
+    runInAction(() => {
+      if (this.searchRevision !== revision) return;
+      this.searchMatches = new Set(matches);
+      this.searching = false;
+    });
   }
   toggleList() {
     this.listOpen = !this.listOpen;
   }
   get pinnedMessages(): MessageDto[] {
-    return this.active?.messages.filter((message) => message.pinned) ?? [];
+    return (
+      this.active?.pinnedMessages ?? this.active?.messages.filter((message) => message.pinned) ?? []
+    );
   }
   get pinsShown() {
     return this.pinsOpen && this.pinnedMessages.length > 0;
   }
   togglePins() {
     this.pinsOpen = !this.pinsOpen;
+  }
+  async loadOlder() {
+    const active = this.active;
+    if (active?.older === undefined || this.loadingOlder || this.loading) return false;
+    const revision = this.revision;
+    this.loadingOlder = true;
+    try {
+      const page = await this.ipc.call("chat.conversations.get", {
+        id: active.id,
+        before: active.older,
+        limit: HISTORY_PAGE_SIZE,
+      });
+      return runInAction(() => {
+        const current = this.active;
+        if (this.revision !== revision || current === null || current.older !== active.older)
+          return false;
+        this.active = {
+          ...current,
+          messages: [...page.messages, ...current.messages],
+          older: page.older,
+        };
+        return true;
+      });
+    } catch (error) {
+      runInAction(() => {
+        if (this.revision === revision) this.error = errorCopy(error);
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        if (this.revision === revision) this.loadingOlder = false;
+      });
+    }
+  }
+  async revealMessage(messageId: string) {
+    const active = this.active;
+    if (active === null) return false;
+    if (active.messages.some((message) => message.id === messageId)) return true;
+    const revision = this.revision;
+    try {
+      const detail = await this.ipc.call("chat.conversations.get", { id: active.id });
+      return runInAction(() => {
+        if (
+          this.revision !== revision ||
+          !detail.messages.some((message) => message.id === messageId)
+        )
+          return false;
+        this.active = detail;
+        return true;
+      });
+    } catch (error) {
+      runInAction(() => {
+        if (this.revision === revision) this.error = errorCopy(error);
+      });
+      return false;
+    }
   }
   get dialogArtifacts(): DialogArtifact[] {
     return dialogArtifacts(this.active?.messages ?? []);
@@ -1155,6 +1233,7 @@ export default class ChatStore {
   async select(id: ConversationId) {
     if (this.generating) return;
     const revision = ++this.revision;
+    this.loadingOlder = false;
     this.loading = true;
     this.error = null;
     this.folderError = null;
@@ -1164,7 +1243,7 @@ export default class ChatStore {
     void this.queue.load(id);
     try {
       const [active, live] = await Promise.all([
-        this.ipc.call("chat.conversations.get", { id }),
+        this.ipc.call("chat.conversations.get", { id, limit: HISTORY_PAGE_SIZE }),
         this.attachment(id),
       ]);
       void this.ipc
@@ -1217,6 +1296,7 @@ export default class ChatStore {
     this.queue.reset();
     this.remember(null);
     this.loading = false;
+    this.loadingOlder = false;
     this.error = null;
     this.folderError = null;
     this.folderPrompt = null;
@@ -1279,6 +1359,14 @@ export default class ChatStore {
           messages: this.active.messages.map((message) =>
             message.id === messageId ? { ...message, pinned: updated.pinned } : message,
           ),
+          ...(this.active.pinnedMessages === undefined
+            ? {}
+            : {
+                pinnedMessages: [
+                  ...this.active.pinnedMessages.filter((message) => message.id !== messageId),
+                  ...(updated.pinned ? [updated] : []),
+                ].sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)),
+              }),
         };
       });
     } catch (error) {
@@ -1978,7 +2066,7 @@ export default class ChatStore {
     }
     await this.refreshing;
     const [active, live] = await Promise.all([
-      this.ipc.call("chat.conversations.get", { id }).catch(() => null),
+      this.ipc.call("chat.conversations.get", { id, limit: HISTORY_PAGE_SIZE }).catch(() => null),
       this.attachment(id),
     ]);
     runInAction(() => {
@@ -2006,7 +2094,10 @@ export default class ChatStore {
     if (!id) return;
     this.loading = true;
     try {
-      const active = await this.ipc.call("chat.conversations.get", { id });
+      const active = await this.ipc.call("chat.conversations.get", {
+        id,
+        limit: HISTORY_PAGE_SIZE,
+      });
       runInAction(() => {
         if (revision !== this.revision) return;
         this.active = active;
@@ -2057,7 +2148,7 @@ export default class ChatStore {
 
   private async refreshGoal(id: ConversationId) {
     try {
-      const fresh = await this.ipc.call("chat.conversations.get", { id });
+      const fresh = await this.ipc.call("chat.conversations.get", { id, limit: 1 });
       runInAction(() => {
         this.replaceConversation(fresh);
       });
@@ -2101,6 +2192,7 @@ export default class ChatStore {
     this.ready = false;
     ++this.revision;
     this.loading = false;
+    this.loadingOlder = false;
     this.flush();
     if (full || this.run === null) {
       this.unsubscribe?.();

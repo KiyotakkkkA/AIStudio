@@ -136,14 +136,6 @@ pub fn table(kind: &str) -> Option<&'static Table> {
 }
 
 impl Table {
-    pub fn archive_columns(&self, version: u32) -> Option<&str> {
-        match (version, self.name) {
-            (1, "run") => None,
-            (1, "message") => self.columns.strip_suffix(",run_id"),
-            _ => Some(self.columns),
-        }
-    }
-
     fn export_query(&self) -> String {
         match self.name {
             "run" => format!(
@@ -156,7 +148,10 @@ impl Table {
                  )"
             ),
             "message" => {
-                let columns = self.archive_columns(1).expect("legacy message columns");
+                let columns = self
+                    .columns
+                    .strip_suffix(",run_id")
+                    .expect("message columns include a run link");
                 format!(
                     "SELECT {columns}, CASE WHEN role = 'assistant' THEN (
                          SELECT id FROM run WHERE run.id = message.run_id AND {PORTABLE_CHAT_RUN}

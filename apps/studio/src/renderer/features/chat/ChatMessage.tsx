@@ -52,11 +52,11 @@ const TAB_LABELS_MAPPING = new Map<string, string>([
   [SELECTIONS_KEY, SELECTIONS_TAB],
   [WEB_KEY, WEB_SOURCES_TAB],
   [NOTES_KEY, NOTES_PANEL],
-])
+]);
 
 const resolveTabLabel = (key: string, defaultFn: (key: string) => string) => {
   return TAB_LABELS_MAPPING.get(key) ?? defaultFn(key);
-}
+};
 
 function citationPlace(citation: ChatCitationDto): string {
   return [
@@ -280,7 +280,10 @@ export default function ChatMessage({
             onChange={setActiveTab}
             options={tabs.map((id) => ({
               value: id,
-              label: resolveTabLabel(id, () => stores.find((store) => store.id === id)?.name ?? "Хранилище")
+              label: resolveTabLabel(
+                id,
+                () => stores.find((store) => store.id === id)?.name ?? "Хранилище",
+              ),
             }))}
             label="Группы источников"
             classNames={{

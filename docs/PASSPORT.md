@@ -547,21 +547,32 @@ repositories.
   replies so restored branches retain their shared run identity. Secrets, account sessions,
   grants, model binaries and run execution data are excluded. Import adds fresh entity IDs,
   starts executable configuration disabled and
-  journals filesystem publication alongside its SQLite transaction. Startup journal
-  recovery runs immediately after database preparation, before normal service construction.
+  journals filesystem publication alongside its SQLite transaction. Version 2 imports
+  ordinary dialogs into JSONL. Startup journal recovery runs immediately after database
+  preparation, before replaying committed dialog history and constructing services.
 - `run_event` is the replay log, kept lean (TASK_045_EXTRA_5). Kernel step events are stored
   without `input` and `output`; `runs.events` puts them back from the `step` row (the output
   only when the event's status is the row's). Tokens reach the renderer one by one, but they
   are stored merged per kind: a merged row is written when another event commits, the kind
   changes, or 250 ms have passed. The row carries the last token's `seq`, so the log has gaps.
   `RunService::record` adds the tail that has not been written yet for a live run. The chat
-  appends to the message row at most every 250 ms, using SQL concatenation. Chat tool-call
+  batches text deltas at most every 250 ms and records usage with each delta. Chat tool-call
   progress is a `step` event `{ domain: "tool-call", index, call }` with one call. The full
   list is stored one row per call in `message_tool_call (message_id, idx)`: a change rewrites
   only that call, and reading a message assembles the list in order. An agentic session's
   model transcript is stored the same way in `agentic_transcript (session_id, seq)`: a save
   appends only the new entries, and the session row no longer carries it, so updates, plan
   edits and listings do not read or rewrite the history.
+- The Tauri-free dialog history repository uses `history.jsonl` in the owned dialog folder.
+  Version 1 records carry the dialog ID and a batch of changes. A newline ends a commit.
+  Replay applies complete commits in order and ignores an incomplete final record. One OS file
+  lock per dialog serializes writers. SQLite stores a rebuildable projection with the byte
+  offset of the last indexed commit. A writer syncs the log before publishing the index
+  transaction. The Desktop projection in `studio.sqlite` supports pinned and workspace order,
+  message search, activity and cursor-based history. The layout 1 → 2 step converts supported
+  SQLite histories, validates them in a staged index, and publishes each JSONL into its existing
+  dialog folder. Startup rebuilds the Desktop projection from JSONL. Scoped grants and memory link
+  to projected dialog IDs. The message history retains run IDs after audit retention prunes a run.
 - One folder per conversation or agentic session: `<app data>/conversations/<id>/` with
   `work/` (the chat folder), `outputs/manifest.json` (created files, recorded by reference,
   never copied) and `snapshots/<runId>/` (`fs.apply` originals). A run without a conversation
@@ -575,7 +586,9 @@ repositories.
   shutdown. Before opening any database, logger or webview on the next launch, the host
   removes all state-root contents, recreates the current layout stamp (to prevent legacy
   reimport), then removes the marker. Failed or interrupted deletion retains the marker
-  for retry; files outside the state root are untouched.
+  for retry. Hosts hold a shared OS lock on the state root and reset requires exclusive access.
+  The sibling lock file survives reset. A pending reset prevents new hosts from opening the
+  state root and resumes after its current users close.
 
 Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 `vector_document`, `conversation`, `message`, `scenario`, `scenario_version`, `run`, `step`,

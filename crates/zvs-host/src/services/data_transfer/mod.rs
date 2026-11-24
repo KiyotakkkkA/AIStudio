@@ -1,5 +1,7 @@
 mod archive;
 mod restore;
+
+pub use restore::recover;
 #[cfg(test)]
 mod tests;
 

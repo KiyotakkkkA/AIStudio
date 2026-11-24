@@ -954,14 +954,20 @@ impl LoopCompactor for ChatCompactor<'_> {
 }
 
 impl ChatService {
-    fn compaction_observer(&self, conversation: String) -> RunObserver {
+    fn compaction_observer(
+        &self,
+        conversation: String,
+        lease: Option<Arc<crate::dialog_history::DialogWriter>>,
+    ) -> RunObserver {
         let waker = super::Waker::of(self);
         let inner = Arc::downgrade(&self.inner);
+        let lease = std::sync::Mutex::new(lease);
         Arc::new(move |event: &HostEvent| {
             if let HostEventDraft::End { outcome } = &event.body {
                 if let Some(inner) = inner.upgrade() {
                     inner.release_compaction(&conversation);
                 }
+                drop(lease.lock().unwrap_or_else(PoisonError::into_inner).take());
                 waker.turn_ended(&conversation, outcome.status);
             }
         })
@@ -980,6 +986,10 @@ impl ChatService {
             return Err(AppError::new(AppErrorCode::Conflict, GOAL_RUNNING));
         }
         self.inner.require_idle(&key)?;
+        let lease = self
+            .inner
+            .database
+            .reserve_dialog(&key, super::ACTIVE_TURN)?;
         plan(&detail, None, CompactionTrigger::Manual)?;
         {
             let mut compactions = self
@@ -1010,7 +1020,7 @@ impl ChatService {
                     ..StartRunInput::new(RunKind::Job, graph)
                 },
                 |_, _| Ok(()),
-                Some(self.compaction_observer(key.clone())),
+                Some(self.compaction_observer(key.clone(), lease)),
             )
         });
         match started {
@@ -1039,8 +1049,12 @@ impl ChatService {
     ) -> Result<ConversationDetailDto, AppError> {
         input.validate()?;
         let key = input.conversation_id.to_string();
-        let detail = self.inner.get(&key)?;
         self.inner.require_idle(&key)?;
+        let _lease = self
+            .inner
+            .database
+            .reserve_dialog(&key, super::ACTIVE_TURN)?;
+        let detail = self.inner.get(&key)?;
         let view = compacted_view(&detail.messages, &detail.compactions);
         let Some(latest) = view.latest else {
             return Err(AppError::new(AppErrorCode::NotFound, COMPACTION_NOT_FOUND));

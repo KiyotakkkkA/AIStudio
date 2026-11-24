@@ -785,6 +785,8 @@ fn resuming_loads_the_conversation_and_reattaches() {
     app.update(Msg::Conversations(Ok(vec![own.clone()])));
     assert_eq!(app.update(Msg::Key(Key::Enter)), [Request::Load(id)]);
     let detail = ConversationDetailDto {
+        older: None,
+        pinned_messages: None,
         compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
@@ -1795,6 +1797,8 @@ fn resuming_a_dialog_with_a_paused_goal_restores_the_footer() {
         ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
     });
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        older: None,
+        pinned_messages: None,
         compactions: Vec::new(),
         conversation: own.clone(),
         messages: Vec::new(),
@@ -1809,6 +1813,8 @@ fn resuming_a_dialog_with_a_paused_goal_restores_the_footer() {
         ..ChatGoalDto::new("собрать проект", GoalBudgetDto::default(), 1)
     });
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        older: None,
+        pinned_messages: None,
         compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
@@ -1863,6 +1869,8 @@ fn goal_plan_is_available_from_restored_and_live_goal_data() {
     goal.plan = vec![serde_json::from_value(json!({ "id":"p1", "title":"Проверка", "status":"running", "stepIds":[], "summary":null })).unwrap()];
     own.goal = Some(goal);
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        older: None,
+        pinned_messages: None,
         compactions: Vec::new(),
         conversation: own,
         messages: Vec::new(),
@@ -2281,6 +2289,8 @@ fn compact_runs_as_a_job_then_reloads_the_dialog_and_reports_the_saving() {
     }))
     .expect("a compaction");
     app.update(Msg::Loaded(Ok(ConversationDetailDto {
+        older: None,
+        pinned_messages: None,
         conversation: known,
         messages: vec![message],
         compactions: vec![compaction],

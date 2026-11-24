@@ -567,23 +567,69 @@ impl Inner {
     }
 
     fn get(&self, id: &str) -> Result<ConversationDetailDto, AppError> {
-        let (row, messages, grants, compactions) = self.read(|repositories| {
-            Ok((
-                repositories.chat.get(id)?,
-                repositories.chat.messages(id)?,
-                repositories.folder_grants.list()?,
-                repositories.chat.compactions(id)?,
-            ))
-        })?;
-        let row =
-            row.ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))?;
+        self.get_page(id, None, None)
+    }
+
+    fn get_page(
+        &self,
+        id: &str,
+        before: Option<&str>,
+        limit: Option<u16>,
+    ) -> Result<ConversationDetailDto, AppError> {
+        let (row, messages, grants, compactions, older, pinned_messages) =
+            self.read(|repositories| {
+                let row = repositories
+                    .chat
+                    .get(id)?
+                    .ok_or_else(|| AppError::new(AppErrorCode::NotFound, CONVERSATION_NOT_FOUND))?;
+                let (messages, older, pinned_messages) = match limit {
+                    Some(limit) => {
+                        let mut messages = repositories
+                            .chat
+                            .message_page(id, before, limit + 1)
+                            .map_err(|error| match error {
+                                rusqlite::Error::QueryReturnedNoRows => DataError::App(
+                                    AppError::new(AppErrorCode::NotFound, MESSAGE_NOT_FOUND),
+                                ),
+                                error => error.into(),
+                            })?;
+                        let more = messages.len() > usize::from(limit);
+                        messages.truncate(usize::from(limit));
+                        messages.reverse();
+                        let older = if more {
+                            messages.first().and_then(|row| MessageId::parse(&row.id))
+                        } else {
+                            None
+                        };
+                        let pinned = if before.is_none() {
+                            Some(repositories.chat.pinned_messages(id)?)
+                        } else {
+                            None
+                        };
+                        (messages, older, pinned)
+                    }
+                    None => (repositories.chat.messages(id)?, None, None),
+                };
+                Ok((
+                    row,
+                    messages,
+                    repositories.folder_grants.list()?,
+                    repositories.chat.compactions(id)?,
+                    older,
+                    pinned_messages,
+                ))
+            })?;
+        let to_messages = |rows: Vec<MessageRow>| {
+            rows.into_iter()
+                .map(message_dto)
+                .collect::<Result<Vec<_>, _>>()
+        };
         Ok(ConversationDetailDto {
             conversation: conversation_dto(row, &grants)?,
-            messages: messages
-                .into_iter()
-                .map(message_dto)
-                .collect::<Result<_, _>>()?,
+            messages: to_messages(messages)?,
             compactions: compaction_dtos(compactions),
+            older,
+            pinned_messages: pinned_messages.map(to_messages).transpose()?,
         })
     }
 
@@ -3031,6 +3077,19 @@ impl ChatService {
             .collect()
     }
 
+    pub fn search(
+        &self,
+        input: &zvs_contract::SearchConversationsInput,
+    ) -> Result<Vec<ConversationId>, AppError> {
+        input.validate()?;
+        let ids = self
+            .inner
+            .read(|repositories| Ok(repositories.chat.search(input.query.trim())?))?;
+        ids.into_iter()
+            .map(|id| ConversationId::parse(&id).ok_or_else(|| malformed("id")))
+            .collect()
+    }
+
     pub fn memory(&self) -> MemoryService {
         self.inner.memory.clone()
     }
@@ -3041,6 +3100,18 @@ impl ChatService {
 
     pub fn get(&self, id: &ConversationId) -> Result<ConversationDetailDto, AppError> {
         self.inner.get(&id.to_string())
+    }
+
+    pub fn get_page(
+        &self,
+        input: &zvs_contract::GetConversationInput,
+    ) -> Result<ConversationDetailDto, AppError> {
+        input.validate()?;
+        self.inner.get_page(
+            &input.id.to_string(),
+            input.before.map(|id| id.to_string()).as_deref(),
+            input.limit,
+        )
     }
 
     pub fn create(&self, input: &CreateConversationInput) -> Result<ConversationDto, AppError> {
@@ -3254,9 +3325,10 @@ impl ChatService {
         conversation_id: &ConversationId,
         message_id: &MessageId,
     ) -> Result<ConversationDetailDto, AppError> {
-        let conversation = self.get(conversation_id)?;
         let id = conversation_id.to_string();
         self.inner.require_idle(&id)?;
+        let _lease = self.inner.database.reserve_dialog(&id, ACTIVE_TURN)?;
+        let conversation = self.get(conversation_id)?;
         if !conversation
             .messages
             .iter()
@@ -3282,9 +3354,19 @@ impl ChatService {
         conversation_id: &ConversationId,
         message_id: &MessageId,
     ) -> Result<ConversationDto, AppError> {
+        self.branch_with_files(conversation_id, message_id, None)
+    }
+
+    pub(crate) fn branch_with_files(
+        &self,
+        conversation_id: &ConversationId,
+        message_id: &MessageId,
+        artifacts: Option<&crate::artifacts::ArtifactStore>,
+    ) -> Result<ConversationDto, AppError> {
         let id = conversation_id.to_string();
-        let parent = self.inner.conversation(&id)?;
         self.inner.require_idle(&id)?;
+        let _lease = self.inner.database.reserve_dialog(&id, ACTIVE_TURN)?;
+        let parent = self.inner.conversation(&id)?;
         let message = message_id.to_string();
         let now = self.inner.now();
         let branch_id = new_id().hyphenated().to_string();
@@ -3350,9 +3432,17 @@ impl ChatService {
                     })?;
                 }
             }
+            if let Some(artifacts) = artifacts {
+                crate::chat_files::copy_chat_dir(artifacts, &id, &branch_id)?;
+            }
             Ok(Some(created))
-        })?;
-        created
+        });
+        if created.is_err()
+            && let Some(artifacts) = artifacts
+        {
+            crate::chat_files::remove_chat_dir(artifacts, &branch_id);
+        }
+        created?
             .ok_or_else(|| AppError::new(AppErrorCode::NotFound, MESSAGE_NOT_FOUND))
             .and_then(|row| self.inner.dto(row))
     }
@@ -3459,11 +3549,20 @@ impl ChatService {
     }
 
     pub fn remove(&self, id: &ConversationId) -> Result<(), AppError> {
+        self.remove_for_cleanup(id).map(drop)
+    }
+
+    pub(crate) fn remove_for_cleanup(
+        &self,
+        id: &ConversationId,
+    ) -> Result<Option<Arc<crate::dialog_history::DialogWriter>>, AppError> {
         let id = id.to_string();
-        self.inner.conversation(&id)?;
         self.inner.require_idle(&id)?;
+        let lease = self.inner.database.reserve_dialog(&id, ACTIVE_TURN)?;
+        self.inner.conversation(&id)?;
         self.inner
-            .read(|repositories| Ok(repositories.chat.remove(&id)?))
+            .read(|repositories| Ok(repositories.chat.remove(&id)?))?;
+        Ok(lease)
     }
 
     pub fn send(&self, input: &ChatSendInput) -> Result<RunHandleDto, AppError> {
@@ -3545,6 +3644,11 @@ impl ChatService {
         let mut paused = 0;
         for row in rows {
             if let Some(goal) = row.goal.and_then(restarted) {
+                let _lease = match self.inner.database.reserve_dialog(&row.id, ACTIVE_TURN) {
+                    Ok(lease) => lease,
+                    Err(error) if error.code == AppErrorCode::Conflict => continue,
+                    Err(error) => return Err(error),
+                };
                 self.inner.set_goal(&row.id, goal)?;
                 paused += 1;
             }
@@ -3576,8 +3680,13 @@ impl ChatService {
         preceding: &[String],
     ) -> Result<RunHandleDto, AppError> {
         let conversation_id = input.conversation_id.to_string();
-        let conversation = self.get(&input.conversation_id)?;
         self.inner.require_idle(&conversation_id)?;
+        let lease = Mutex::new(
+            self.inner
+                .database
+                .reserve_dialog(&conversation_id, ACTIVE_TURN)?,
+        );
+        let conversation = self.get(&input.conversation_id)?;
         let details = &conversation.conversation;
         let provider_id = input.provider_id.unwrap_or(details.provider_id).to_string();
         let model_id = input
@@ -3769,6 +3878,7 @@ impl ChatService {
                 );
             }
             if let HostEventDraft::End { outcome } = &event.body {
+                drop(lease.lock().unwrap_or_else(PoisonError::into_inner).take());
                 waker.turn_ended(&observed, outcome.status);
                 if outcome.status == RunOutcomeStatus::Ok {
                     waker.recap(&observed, &assistant_id, goal_turn);

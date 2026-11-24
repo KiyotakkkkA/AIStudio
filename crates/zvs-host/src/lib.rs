@@ -15,6 +15,7 @@ pub mod computer;
 pub mod conversations;
 pub mod dashboards;
 pub mod data;
+pub mod dialog_history;
 pub mod documents;
 pub mod downloads;
 pub mod drivers;

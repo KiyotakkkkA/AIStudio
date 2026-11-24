@@ -81,7 +81,8 @@
       "workingFolderAccess": null,
       "createdAt": 1,
       "updatedAt": 2,
-      "messages": []
+      "messages": [],
+      "pinnedMessages": []
     }
   },
   {

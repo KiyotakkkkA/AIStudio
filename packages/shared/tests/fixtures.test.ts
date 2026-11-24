@@ -654,6 +654,8 @@ const schemas: Record<string, z.ZodType> = {
   "chat/ChatSourceDto": ChatSourceDto,
   "chat/CreateConversationInput": CreateConversationInput,
   "chat/ConversationRef": contract["chat.conversations.get"].input,
+  "chat/GetConversationInput": contract["chat.conversations.get"].input,
+  "chat/SearchConversationsInput": contract["chat.conversations.search"].input,
   "chat/ConversationExportFormat": contract["chat.conversations.export"].input.shape.format,
   "chat/ExportConversationInput": contract["chat.conversations.export"].input,
   "chat/ConversationExportDto": contract["chat.conversations.export"].output,

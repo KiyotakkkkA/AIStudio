@@ -192,6 +192,11 @@ export const CreateConversationInput = z.object({
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 export const ConversationRef = z.object({ id: ConversationId });
+export const GetConversationInput = ConversationRef.extend({
+  before: MessageId.optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+}).refine((value) => value.before === undefined || value.limit !== undefined, { path: ["limit"] });
+export const SearchConversationsInput = z.object({ query: z.string().trim().min(1).max(200) });
 
 export const EXPORT_PATH_MAX = 32767;
 
@@ -365,6 +370,8 @@ export type ChatWakeStepDto = z.infer<typeof ChatWakeStepDto>;
 export const ConversationDetailDto = ConversationFields.extend({
   messages: z.array(MessageDto),
   compactions: z.array(ChatCompactionDto).default([]),
+  older: MessageId.optional(),
+  pinnedMessages: z.array(MessageDto).optional(),
 }).refine(folderAccessMatches, { path: ["workingFolderAccess"] });
 export type ConversationDetailDto = z.infer<typeof ConversationDetailDto>;
 export const ChatSendInput = z

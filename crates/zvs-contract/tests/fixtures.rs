@@ -800,6 +800,14 @@ const TABLE: &[(&str, Check)] = &[
         round_trip::<zvs_contract::ConversationRef>,
     ),
     (
+        "chat/GetConversationInput",
+        round_trip::<zvs_contract::GetConversationInput>,
+    ),
+    (
+        "chat/SearchConversationsInput",
+        round_trip::<zvs_contract::SearchConversationsInput>,
+    ),
+    (
         "chat/ConversationExportFormat",
         round_trip::<zvs_contract::ConversationExportFormat>,
     ),

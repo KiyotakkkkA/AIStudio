@@ -1,7 +1,7 @@
 use super::*;
 use crate::notes::{NOTE_BAD_PATH, NOTE_FIELD_MISSING, parse as parse_note};
 
-const DRAFT: &str = "---\ntitle: Shutdown\ncontext: Cancelling a build left children running.\nread_when: Before changing process shutdown.\nupdate_when: When the launcher changes.\ndelete_when: After the launcher is replaced.\n---\n\n# Shutdown\n\nTerminate the whole tree.\n";
+pub(super) const DRAFT: &str = "---\ntitle: Shutdown\ncontext: Cancelling a build left children running.\nread_when: Before changing process shutdown.\nupdate_when: When the launcher changes.\ndelete_when: After the launcher is replaced.\n---\n\n# Shutdown\n\nTerminate the whole tree.\n";
 
 fn notes_folder(host: &Host, conversation: ConversationId) -> PathBuf {
     host.services

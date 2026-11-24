@@ -455,11 +455,19 @@ impl RunService {
             let token = self.inner.observers.add(&run.id, observer);
             Subscription::new(Arc::clone(&self.inner.observers), run.id.clone(), token)
         });
-        let stream = self.open_stream(&run)?;
-        stream.emit(HostEventDraft::Log {
-            line: log_line(&[("runId", json!(run.id)), ("status", json!("queued"))]),
-        })?;
-        self.launch(run, stream)?;
+        let started = (|| {
+            let stream = self.open_stream(&run)?;
+            stream.emit(HostEventDraft::Log {
+                line: log_line(&[("runId", json!(run.id)), ("status", json!("queued"))]),
+            })?;
+            self.launch(run, stream)
+        })();
+        if let Err(error) = started {
+            if let Some(subscription) = subscription {
+                subscription.unsubscribe();
+            }
+            return Err(error);
+        }
         Ok((RunHandleDto { id, stream_id }, subscription))
     }
 

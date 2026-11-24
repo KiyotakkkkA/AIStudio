@@ -151,6 +151,7 @@ pub const POLICY: &[ChannelPolicy] = &[
     studio("chat.conversations.pin", Effect::Act),
     studio("chat.conversations.remove", Effect::Act),
     studio("chat.conversations.rename", Effect::Act),
+    studio("chat.conversations.search", Effect::Read),
     studio("chat.conversations.truncate", Effect::Act),
     studio("chat.conversations.updateRelations", Effect::Act),
     studio("chat.conversations.updateRetrieval", Effect::Act),

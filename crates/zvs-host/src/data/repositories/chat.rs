@@ -16,6 +16,33 @@ pub struct ActivityDay {
     pub longest_turn_ms: u64,
 }
 
+pub(crate) fn activity_days(
+    connection: &Connection,
+    now: Timestamp,
+) -> rusqlite::Result<Vec<ActivityDay>> {
+    let mut statement = connection.prepare_cached(
+        "WITH turns AS (
+            SELECT MIN(created_at) / ?1 AS day,
+                   MAX(MAX(tokens_in, 0) + MAX(tokens_out, 0)) AS tokens,
+                   MAX(MAX(duration_ms, 0)) AS duration
+            FROM message
+            WHERE role = 'assistant' AND run_id IS NOT NULL AND partial = 0
+                AND created_at BETWEEN 0 AND ?2
+            GROUP BY run_id
+        )
+        SELECT day, SUM(tokens), MAX(duration) FROM turns GROUP BY day ORDER BY day",
+    )?;
+    statement
+        .query_map(params![DAY_MS, now], |row| {
+            Ok(ActivityDay {
+                day: row.get(0)?,
+                tokens: row.get::<_, i64>(1)?.try_into().unwrap_or_default(),
+                longest_turn_ms: row.get::<_, i64>(2)?.try_into().unwrap_or_default(),
+            })
+        })?
+        .collect()
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ConversationPatch {
     pub title: Option<String>,
@@ -183,11 +210,20 @@ impl<'c> ChatRepository<'c> {
     pub fn list(&self) -> rusqlite::Result<Vec<ConversationRow>> {
         self.connection
             .prepare_cached(&format!(
-                "SELECT {} FROM conversation ORDER BY updated_at DESC, id DESC",
+                "SELECT {} FROM conversation ORDER BY pinned DESC, updated_at DESC, id DESC",
                 ConversationRow::COLUMNS
             ))?
             .query_map([], ConversationRow::from_row)?
             .collect()
+    }
+
+    pub fn search(&self, query: &str) -> rusqlite::Result<Vec<String>> {
+        let phrase = format!("\"{}\"*", query.replace('"', "\"\""));
+        let mut statement = self.connection.prepare_cached(
+            "SELECT DISTINCT message.conversation_id FROM message_search
+             JOIN message ON message.rowid = message_search.rowid WHERE message_search MATCH ?1",
+        )?;
+        statement.query_map([phrase], |row| row.get(0))?.collect()
     }
 
     pub fn get(&self, id: &str) -> rusqlite::Result<Option<ConversationRow>> {
@@ -201,10 +237,22 @@ impl<'c> ChatRepository<'c> {
     }
 
     pub fn create(&self, row: &ConversationRow) -> rusqlite::Result<ConversationRow> {
+        self.put_metadata(row, "")
+    }
+
+    pub(crate) fn project_metadata(&self, row: &ConversationRow) -> rusqlite::Result<()> {
+        self.put_metadata(row, &upsert(ConversationRow::COLUMNS))?;
+        Ok(())
+    }
+
+    fn put_metadata(
+        &self,
+        row: &ConversationRow,
+        conflict: &str,
+    ) -> rusqlite::Result<ConversationRow> {
         self.connection
             .prepare_cached(&format!(
-                "INSERT INTO conversation (id, title, provider_id, model_id, settings, system_prompt, attached_store_ids, use_relations, retrieval_mode, working_folder, turn_folder, profile, pinned, goal, created_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) RETURNING {}",
+                "INSERT INTO conversation ({0}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16) {conflict} RETURNING {0}",
                 ConversationRow::COLUMNS
             ))?
             .query_row(
@@ -265,28 +313,7 @@ impl<'c> ChatRepository<'c> {
     }
 
     pub fn activity_days(&self, now: Timestamp) -> rusqlite::Result<Vec<ActivityDay>> {
-        // Branches copy the reply and its run ID. Count each completed run once.
-        let mut statement = self.connection.prepare(
-            "WITH turns AS (
-                SELECT MIN(created_at) / ?1 AS day,
-                       MAX(MAX(tokens_in, 0) + MAX(tokens_out, 0)) AS tokens,
-                       MAX(MAX(duration_ms, 0)) AS duration
-                FROM message
-                WHERE role = 'assistant' AND run_id IS NOT NULL AND partial = 0
-                    AND created_at BETWEEN 0 AND ?2
-                GROUP BY run_id
-            )
-            SELECT day, SUM(tokens), MAX(duration) FROM turns GROUP BY day ORDER BY day",
-        )?;
-        statement
-            .query_map(params![DAY_MS, now], |row| {
-                Ok(ActivityDay {
-                    day: row.get(0)?,
-                    tokens: row.get::<_, i64>(1)?.try_into().unwrap_or_default(),
-                    longest_turn_ms: row.get::<_, i64>(2)?.try_into().unwrap_or_default(),
-                })
-            })?
-            .collect()
+        activity_days(self.connection, now)
     }
 
     pub fn messages(&self, conversation_id: &str) -> rusqlite::Result<Vec<MessageRow>> {
@@ -299,12 +326,68 @@ impl<'c> ChatRepository<'c> {
             .collect()
     }
 
-    pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
-        self.connection
-            .prepare_cached(
-                "INSERT INTO message (id, conversation_id, role, content, reasoning, sources, selections, commands, plugins, offered_tools, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images, recap) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)",
+    pub fn message_page(
+        &self,
+        conversation_id: &str,
+        before: Option<&str>,
+        limit: u16,
+    ) -> rusqlite::Result<Vec<MessageRow>> {
+        let before = match before {
+            Some(id) => Some((
+                self.connection.query_row(
+                    "SELECT created_at FROM message WHERE id = ?1 AND conversation_id = ?2",
+                    params![id, conversation_id],
+                    |row| row.get::<_, i64>(0),
+                )?,
+                id,
+            )),
+            None => None,
+        };
+        let mut query = self.connection.prepare_cached(&format!(
+            "SELECT {} FROM message WHERE conversation_id = ?1 AND (created_at, id) < (?2, ?3)
+             ORDER BY created_at DESC, id DESC LIMIT ?4",
+            MessageRow::COLUMNS,
+        ))?;
+        let (time, id) = before.unwrap_or((i64::MAX, ""));
+        query
+            .query_map(
+                params![conversation_id, time, id, limit],
+                MessageRow::from_row,
             )?
+            .collect()
+    }
+
+    pub fn pinned_messages(&self, conversation_id: &str) -> rusqlite::Result<Vec<MessageRow>> {
+        let mut query = self.connection.prepare_cached(&format!(
+            "SELECT {} FROM message WHERE conversation_id = ?1 AND pinned = 1 ORDER BY created_at, id",
+            MessageRow::COLUMNS,
+        ))?;
+        query
+            .query_map([conversation_id], MessageRow::from_row)?
+            .collect()
+    }
+
+    pub fn add_message(&self, row: &MessageRow) -> rusqlite::Result<MessageRow> {
+        self.put_message(row, false)?;
+        self.get_message(&row.id)?
+            .ok_or(rusqlite::Error::QueryReturnedNoRows)
+    }
+
+    pub(crate) fn project_message(&self, row: &MessageRow) -> rusqlite::Result<()> {
+        self.put_message(row, true)
+    }
+
+    fn put_message(&self, row: &MessageRow, project: bool) -> rusqlite::Result<()> {
+        const COLUMNS: &str = "id, conversation_id, role, content, reasoning, sources, selections, commands, plugins, offered_tools, rounds, tokens_in, tokens_out, tokens_cached, tokens_reasoning, usage_estimated, duration_ms, run_id, partial, pinned, event, created_at, images, recap";
+        let conflict = if project {
+            upsert(COLUMNS)
+        } else {
+            String::new()
+        };
+        self.connection
+            .prepare_cached(&format!(
+                "INSERT INTO message ({COLUMNS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24) {conflict}",
+            ))?
             .execute(params![
                 row.id,
                 row.conversation_id,
@@ -331,10 +414,14 @@ impl<'c> ChatRepository<'c> {
                 json_text(&row.images)?,
                 row.recap,
             ])?;
+        if project {
+            self.connection.execute(
+                "DELETE FROM message_tool_call WHERE message_id = ?1",
+                [&row.id],
+            )?;
+        }
         let calls: Vec<(usize, &ChatToolCallDto)> = row.tool_calls.iter().enumerate().collect();
-        self.put_tool_calls(&row.id, &calls)?;
-        self.get_message(&row.id)?
-            .ok_or(rusqlite::Error::QueryReturnedNoRows)
+        self.put_tool_calls(&row.id, &calls)
     }
 
     pub fn put_tool_calls(
@@ -461,6 +548,17 @@ impl<'c> ChatRepository<'c> {
     }
 }
 
+fn upsert(columns: &str) -> String {
+    let assignments = columns
+        .split(',')
+        .skip(1)
+        .map(str::trim)
+        .map(|column| format!("{column} = excluded.{column}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("ON CONFLICT (id) DO UPDATE SET {assignments}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,6 +619,153 @@ mod tests {
             created_at,
             recap: None,
         }
+    }
+
+    #[test]
+    fn desktop_dialog_transactions_rebuild_from_history_after_the_index_is_lost() {
+        use crate::dialog_history::{DialogChange, DialogHistory};
+        use crate::testing::temporary_directory;
+
+        let storage = temporary_directory("desktop-dialogs");
+        let legacy = storage.path().join("legacy/work");
+        std::fs::create_dir_all(&legacy).expect("creates legacy folder");
+        std::fs::write(legacy.join("attachment.txt"), "keep").expect("keeps legacy files");
+        let mut database = temporary_database();
+        database.enable_dialog_history(storage.path().to_path_buf());
+        let metadata = conversation("a", "provider", 1);
+        let initial = MessageRow {
+            role: MessageRole::Assistant,
+            run_id: Some("run".to_owned()),
+            pinned: true,
+            ..message("m1", "a", 1)
+        };
+        let recent = MessageRow {
+            id: "m2".to_owned(),
+            pinned: false,
+            created_at: 2,
+            ..initial.clone()
+        };
+        let compaction = CompactionRow {
+            id: "summary".to_owned(),
+            conversation_id: "a".to_owned(),
+            boundary_message_id: "m1".to_owned(),
+            summary: "Summary".to_owned(),
+            messages: 1,
+            tokens_before: 3,
+            tokens_after: 1,
+            provider_id: "provider".to_owned(),
+            model_id: "m".to_owned(),
+            trigger: zvs_contract::CompactionTrigger::Manual,
+            created_at: 3,
+        };
+        database
+            .transaction(|transaction| {
+                let chat = ChatRepository::new(transaction);
+                chat.create(&metadata)?;
+                chat.add_message(&initial)?;
+                chat.add_message(&recent)?;
+                chat.add_compaction(&compaction)?;
+                Ok(())
+            })
+            .expect("commits a dialog");
+        let lease = database
+            .reserve_dialog("a", "busy")
+            .expect("reserves dialog")
+            .expect("locks history");
+        assert!(database.reserve_dialog("a", "busy").is_err());
+        let history = DialogHistory::new(storage.path().to_path_buf());
+        assert!(history.writer("a").is_err());
+        database
+            .with_connection(|connection| {
+                ChatRepository::new(connection).append_message("m1", " λ", "reasoning", 7, 11)?;
+                Ok(())
+            })
+            .expect("commits stream update under the turn lease");
+        drop(lease);
+        let mut journal = Vec::new();
+        let committed = history
+            .replay("a", |changes| {
+                journal.extend(changes);
+                Ok(())
+            })
+            .expect("reads durable history");
+        assert!(matches!(
+            journal.last(),
+            Some(DialogChange::StreamDelta {
+                tokens_out: 7,
+                duration_ms: 10,
+                ..
+            })
+        ));
+
+        let aborted = database.transaction(|transaction| {
+            ChatRepository::new(transaction).remove("a")?;
+            Err::<(), _>(rusqlite::Error::InvalidQuery.into())
+        });
+        assert!(aborted.is_err());
+        assert_eq!(
+            history
+                .replay("a", |_| Ok(()))
+                .expect("reads after rollback"),
+            committed
+        );
+        history
+            .writer("a")
+            .expect("locks history after the turn")
+            .append(
+                committed,
+                &[DialogChange::StreamDelta {
+                    id: "m1".to_owned(),
+                    content: " диалог".to_owned(),
+                    reasoning: String::new(),
+                    tokens_out: 8,
+                    duration_ms: 11,
+                }],
+            )
+            .expect("durable append without its index publication");
+        assert!(
+            database
+                .with_connection(|connection| Ok(ChatRepository::new(connection).remove("a")?))
+                .is_err()
+        );
+
+        let mut recovered = temporary_database();
+        recovered.with_connection(|connection| {
+            ChatRepository::new(connection).create(&metadata)?;
+            connection.execute("INSERT INTO memory (id, scope, conversation_id, content, source, created_at, updated_at) VALUES ('owned','conversation','a','fact','user',1,1)", [])?;
+            connection.execute_batch("DROP TABLE message;")?;
+            Ok(())
+        }).expect("loses the projection while keeping dialog memory");
+        recovered.enable_dialog_history(storage.path().to_path_buf());
+        recovered
+            .with_connection(|connection| {
+                let chat = ChatRepository::new(connection);
+                assert_eq!(chat.get("a")?, Some(metadata));
+                assert_eq!(
+                    Repositories::new(connection)
+                        .memory
+                        .list_conversation("a")?
+                        .len(),
+                    1
+                );
+                let saved = chat.get_message("m1")?.expect("rebuilt message");
+                assert_eq!(saved.content, "m1 λ диалог");
+                assert_eq!(saved.reasoning, "reasoning");
+                assert_eq!(saved.tokens_out, 8);
+                assert_eq!(saved.run_id.as_deref(), Some("run"));
+                assert_eq!(chat.search("ДИАЛ")?, ["a"]);
+                assert_eq!(chat.message_page("a", None, 1)?, [recent]);
+                assert_eq!(
+                    chat.message_page("a", Some("m2"), 1)?.as_slice(),
+                    std::slice::from_ref(&saved)
+                );
+                assert_eq!(chat.pinned_messages("a")?, [saved]);
+                assert_eq!(chat.compactions("a")?, [compaction]);
+                assert_eq!(chat.activity_days(12)?[0].tokens, 9);
+                Ok(())
+            })
+            .expect("restores from JSONL");
+        assert!(legacy.join("attachment.txt").is_file());
     }
 
     #[test]

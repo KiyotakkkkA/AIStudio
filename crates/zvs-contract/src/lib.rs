@@ -131,12 +131,12 @@ pub use chat::{
     ChatSettings, ChatSourceDto, ChatSourceKind, ChatStatsDto, ChatToolCallDto, ChatToolCallStatus,
     ChatWakeStepDto, ConversationDetailDto, ConversationDto, ConversationExportDto,
     ConversationExportFormat, ConversationRef, CreateConversationInput, DEFAULT_CONVERSATION_TITLE,
-    DocumentSelectionDto, ExportConversationInput, MessageDto, MessageRole, OfferedToolDto,
-    OfferedToolSource, PinConversationInput, PinMessageInput, RenameConversationInput,
-    RetrievalMode, ThinkingEffort, TruncateConversationInput, UpdateConversationRelationsInput,
-    UpdateConversationRetrievalInput, UpdateConversationStoresInput, VendorTurnOptions,
-    WAKE_STEP_DOMAIN, WEB_SOURCES_MAX, WebSourceDto, note_sources, replace_sources, vector_sources,
-    web_sources,
+    DocumentSelectionDto, ExportConversationInput, GetConversationInput, MessageDto, MessageRole,
+    OfferedToolDto, OfferedToolSource, PinConversationInput, PinMessageInput,
+    RenameConversationInput, RetrievalMode, SearchConversationsInput, ThinkingEffort,
+    TruncateConversationInput, UpdateConversationRelationsInput, UpdateConversationRetrievalInput,
+    UpdateConversationStoresInput, VendorTurnOptions, WAKE_STEP_DOMAIN, WEB_SOURCES_MAX,
+    WebSourceDto, note_sources, replace_sources, vector_sources, web_sources,
 };
 pub use cli::{
     CLI_COMMAND, CLI_CONFIRM_SETTING_KEY, CLI_IMAGE_MAX, CLI_LAUNCH_ARG, CLI_LINE_MAX,

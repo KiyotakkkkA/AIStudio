@@ -1,13 +1,19 @@
+mod dialog_upgrade;
 pub mod project_struct;
 pub mod rewrite;
+mod state_lock;
 pub mod transfer;
+
+pub use state_lock::{RESET_MARKER, StateRootLock};
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 use zvs_contract::layout::{LegacyRecord, PROJECT_STRUCT, SCHEMAS, StateFile, expected_version};
 
-use crate::platform::paths::DATABASE_FILE;
+use crate::data::dialogs::DialogJournal;
+use crate::dialog_history::DialogHistory;
+use crate::platform::paths::{DATABASE_FILE, StudioPaths};
 
 pub const LEGACY_RETENTION: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
@@ -29,6 +35,12 @@ pub enum BootError {
     Io(String),
     #[error("Перенесённые данные не совпадают с исходными: {0}")]
     Mismatch(String),
+    #[error("Не удалось проверить историю диалогов")]
+    DialogHistory(String),
+    #[error(
+        "Сброс данных ожидает завершения другого приложения AI Studio. Закройте его и запустите приложение снова."
+    )]
+    StateInUse,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -80,12 +92,54 @@ impl PartialEq for Step {
     }
 }
 
-pub const STEPS: &[Step] = &[Step {
-    schema: PROJECT_STRUCT,
-    from: 0,
-    label: project_struct::LEGACY_LABEL,
-    run: project_struct::migrate_legacy,
-}];
+pub const STEPS: &[Step] = &[
+    Step {
+        schema: PROJECT_STRUCT,
+        from: 0,
+        label: project_struct::LEGACY_LABEL,
+        run: project_struct::migrate_legacy,
+    },
+    Step {
+        schema: PROJECT_STRUCT,
+        from: 1,
+        label: "Перенос истории диалогов",
+        run: dialog_upgrade::upgrade,
+    },
+];
+
+fn validate_dialogs(
+    context: &StepContext<'_>,
+    progress: &dyn Fn(StepProgress),
+) -> Result<(), BootError> {
+    let history = DialogHistory::new(StudioPaths::conversation_root(context.root));
+    let io_error = |error: std::io::Error| BootError::Io(error.to_string());
+    if history.dialogs().map_err(io_error)?.is_empty() {
+        return Ok(());
+    }
+    progress(StepProgress { done: 0, total: 1 });
+    validate_history(&history)?;
+    progress(StepProgress { done: 1, total: 1 });
+    Ok(())
+}
+
+fn validate_history(history: &DialogHistory) -> Result<(), BootError> {
+    let io_error = |error: std::io::Error| BootError::Io(error.to_string());
+    let staging = tempfile::tempdir().map_err(io_error)?;
+    let mut connection = rusqlite::Connection::open(staging.path().join("dialogs.sqlite"))
+        .map_err(|error| BootError::Io(error.to_string()))?;
+    connection
+        .execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|error| BootError::Io(error.to_string()))?;
+    let transaction = connection
+        .transaction()
+        .map_err(|error| BootError::Io(error.to_string()))?;
+    DialogJournal::rebuild_projection(history, &transaction)
+        .map_err(|error| BootError::DialogHistory(error.to_string()))?;
+    transaction
+        .commit()
+        .map_err(|error| BootError::Io(error.to_string()))?;
+    Ok(())
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BootDecision {
@@ -145,7 +199,12 @@ impl<'a> Boot<'a> {
         })?;
         let Some(file) = file else {
             let adopted = self.root.join("data").join(DATABASE_FILE).is_file();
-            if !adopted && self.legacy_present() {
+            if adopted {
+                let mut file = StateFile::default();
+                file.schemas.insert(PROJECT_STRUCT.to_owned(), 1);
+                return Ok(BootDecision::Migrate(self.pending(&file)));
+            }
+            if self.legacy_present() {
                 return Ok(BootDecision::Migrate(self.pending(&StateFile::default())));
             }
             return Ok(BootDecision::Fresh);
@@ -185,7 +244,14 @@ impl<'a> Boot<'a> {
     ) -> Result<(), BootError> {
         match decision {
             BootDecision::Ready => Ok(()),
-            BootDecision::Fresh => self.write(&StateFile::current()),
+            BootDecision::Fresh => {
+                let context = StepContext {
+                    root: self.root,
+                    legacy: self.legacy,
+                };
+                validate_dialogs(&context, &|_| {})?;
+                self.write(&StateFile::current())
+            }
             BootDecision::Migrate(steps) => {
                 let mut file = StateFile::read(self.root)
                     .ok()
@@ -345,12 +411,20 @@ mod tests {
         let home = tempfile::tempdir().expect("a folder");
         let root = home.path().join("AIStudio");
         let legacy = legacy_at(home.path());
-        let steps = [Step {
-            schema: PROJECT_STRUCT,
-            from: 0,
-            label: "a",
-            run: counted,
-        }];
+        let steps = [
+            Step {
+                schema: PROJECT_STRUCT,
+                from: 0,
+                label: "a",
+                run: counted,
+            },
+            Step {
+                schema: PROJECT_STRUCT,
+                from: 1,
+                label: "b",
+                run: counted,
+            },
+        ];
         let boot = Boot {
             root: &root,
             legacy: Some(&legacy),
@@ -365,13 +439,22 @@ mod tests {
         .expect("runs");
         assert_eq!(
             seen.into_inner().expect("unlocks"),
-            vec![BootProgress {
-                step: 1,
-                steps: 1,
-                label: "a",
-                done: 1,
-                total: 1
-            }]
+            vec![
+                BootProgress {
+                    step: 1,
+                    steps: 2,
+                    label: "a",
+                    done: 1,
+                    total: 1
+                },
+                BootProgress {
+                    step: 2,
+                    steps: 2,
+                    label: "b",
+                    done: 1,
+                    total: 1
+                },
+            ]
         );
         let file = StateFile::read(&root).expect("reads").expect("a file");
         assert!(file.matches_build());
@@ -426,7 +509,7 @@ mod tests {
             Err(BootError::Newer {
                 schema: PROJECT_STRUCT.to_owned(),
                 found: 9,
-                supported: 1
+                supported: 2
             })
         );
         std::fs::write(
@@ -450,7 +533,40 @@ mod tests {
         std::fs::create_dir_all(root.join("data")).expect("creates");
         std::fs::write(root.join("data").join(DATABASE_FILE), b"").expect("writes");
         let boot = Boot::new(&root, Some(&legacy));
-        assert_eq!(boot.inspect().expect("inspects"), BootDecision::Fresh);
+        assert!(
+            matches!(boot.inspect().expect("inspects"), BootDecision::Migrate(steps) if steps.len() == 1 && steps[0].from == 1)
+        );
+    }
+
+    #[test]
+    fn invalid_dialog_history_leaves_the_layout_pending_and_can_be_retried() {
+        let home = tempfile::tempdir().expect("a folder");
+        let root = home.path().join("AIStudio");
+        let folder = StudioPaths::conversation_root(&root).join("dialog");
+        std::fs::create_dir_all(&folder).expect("creates owned folder");
+        std::fs::write(
+            root.join("aistudio.toml"),
+            "[schemas]\nproject_struct = 1\n",
+        )
+        .expect("writes previous layout");
+        let log = folder.join(crate::dialog_history::HISTORY_FILE);
+        std::fs::write(&log, b"{}\n").expect("writes corrupt commit");
+        let boot = Boot::new(&root, None);
+        let pending = boot.inspect().expect("inspects");
+        assert!(
+            matches!(&pending, BootDecision::Migrate(steps) if steps.len() == 1 && steps[0].schema == PROJECT_STRUCT && steps[0].from == 1)
+        );
+        assert!(matches!(
+            boot.run(&pending, 1, &|_| {}),
+            Err(BootError::DialogHistory(_))
+        ));
+        assert_eq!(boot.inspect().expect("remains pending"), pending);
+        std::fs::write(log, b"{\"interrupted\":").expect("leaves an unfinished append");
+        boot.run(&pending, 1, &|_| {}).expect("resumes validation");
+        assert_eq!(
+            boot.inspect().expect("inspects current layout"),
+            BootDecision::Ready
+        );
     }
 
     #[test]

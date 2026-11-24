@@ -31,10 +31,12 @@ fn fixture() -> Fixture {
         executable_dir: directory.join("bin"),
         packaged: false,
     });
+    let mut database = temporary_database();
+    database.enable_dialog_history(paths.conversations_dir.clone());
     Fixture {
         _directory: directory,
         paths,
-        database: temporary_database(),
+        database,
     }
 }
 
@@ -318,41 +320,19 @@ fn dialog_runs_are_exported_once_and_keep_branch_activity_deduplicated() {
 }
 
 #[test]
-fn v1_dialog_archives_still_restore_without_run_links() {
+fn legacy_dialog_archives_are_rejected() {
     let source = fixture();
     seed(&source);
     let blobs = source._directory.join("blobs");
     let mut package = package(&source, vec![Conversations], &blobs);
     package.version = 1;
-    for record in package
-        .records
-        .iter_mut()
-        .filter(|record| record.kind == "message")
-    {
-        record.fields.remove("run_id");
-    }
-    let path = source._directory.join("legacy.dbox");
-    archive::write(&package, &blobs, &path).expect("legacy format written");
-    let read_blobs = source._directory.join("legacy-blobs");
-    let (package, hash) = archive::read(&path, &read_blobs).expect("legacy format read");
-    let target = fixture();
-    restore::restore(
-        &target.paths,
-        &target.database,
-        3,
-        &package,
-        &hash,
-        &read_blobs,
-        &[Conversations],
-    )
-    .expect("legacy conversation restored");
-    let run_id: Option<String> = target
-        .database
-        .with_connection(|connection| {
-            Ok(connection.query_row("SELECT run_id FROM message", [], |row| row.get(0))?)
-        })
-        .expect("restored message");
-    assert_eq!(run_id, None);
+    assert_eq!(
+        package
+            .validate()
+            .expect_err("rejects legacy dialog data")
+            .code,
+        AppErrorCode::UnsupportedFormat
+    );
 }
 
 #[test]

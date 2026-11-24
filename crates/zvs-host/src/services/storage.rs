@@ -11,11 +11,15 @@ use crate::downloads::disk::directory_size;
 use crate::platform::clock::SharedClock;
 use crate::platform::paths::{DownloadKind, StudioPaths};
 
-pub const RESET_MARKER: &str = ".reset-requested";
+pub use crate::boot::RESET_MARKER;
 
 /// Runs before opening SQLite, log files or any WebView2 profile. Keep the marker
 /// until every deletion succeeds so an interrupted reset is retried at next boot.
 pub fn apply_pending_reset(root: &Path) -> std::io::Result<bool> {
+    if !root.join(RESET_MARKER).try_exists()? {
+        return Ok(false);
+    }
+    let _lock = crate::boot::StateRootLock::exclusive(root)?;
     if !root.join(RESET_MARKER).try_exists()? {
         return Ok(false);
     }
@@ -454,6 +458,29 @@ mod tests {
                 .matches_build()
         );
         assert!(!apply_pending_reset(&test.paths.root).expect("already reset"));
+    }
+
+    #[test]
+    fn pending_reset_waits_for_active_state_users() {
+        let test = fixture();
+        let dialog = test.paths.conversations_dir.join("c1/history.jsonl");
+        write(&dialog, 8);
+        let first = crate::boot::StateRootLock::shared(&test.paths.root).expect("opens state");
+        let second = crate::boot::StateRootLock::shared(&test.paths.root).expect("shares state");
+        test.service
+            .reset(test.service.reset_challenge())
+            .expect("schedules");
+        assert!(
+            matches!(crate::boot::StateRootLock::shared(&test.paths.root), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock)
+        );
+        drop(first);
+        let error = apply_pending_reset(&test.paths.root).expect_err("another host uses state");
+        assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
+        assert!(test.paths.root.join(RESET_MARKER).is_file());
+        assert!(dialog.is_file());
+        drop(second);
+        assert!(apply_pending_reset(&test.paths.root).expect("resets"));
+        assert!(!dialog.exists());
     }
 
     #[tokio::test]

@@ -102,6 +102,13 @@ pub struct TemporaryDatabase {
 }
 
 impl TemporaryDatabase {
+    pub fn enable_dialog_history(&mut self, root: PathBuf) {
+        Arc::get_mut(&mut self.database)
+            .expect("database is exclusively owned during setup")
+            .enable_dialog_history(root)
+            .expect("dialog history is ready");
+    }
+
     pub fn shared(&self) -> Arc<Database> {
         Arc::clone(&self.database)
     }
@@ -232,10 +239,23 @@ impl Deref for TestServices {
 }
 
 pub fn test_services(system: SystemService) -> TestServices {
+    test_services_for(system, false)
+}
+
+#[cfg(test)]
+pub(crate) fn test_services_with_history(system: SystemService) -> TestServices {
+    test_services_for(system, true)
+}
+
+fn test_services_for(system: SystemService, stored_history: bool) -> TestServices {
     let cli = FakeCliInstaller::shared();
     let audio = Arc::new(FakeAudioInput::default());
     let recognizer = Arc::new(FakeRecognizer::default());
-    let database = temporary_database();
+    let workspace = temporary_directory("studio-host-");
+    let mut database = temporary_database();
+    if stored_history {
+        database.enable_dialog_history(workspace.join(crate::conversations::CONVERSATIONS_DIR));
+    }
     let clock = Arc::new(FakeClock::default());
     let theme = RecordingTheme::shared();
     let shell = RecordingShell::shared();
@@ -327,7 +347,6 @@ pub fn test_services(system: SystemService) -> TestServices {
     run_bus.attach(run_events.clone());
     let nodes = Arc::new(NodeRegistry::new());
     let jobs = FakeJobs::shared();
-    let workspace = temporary_directory("studio-host-");
     let pty = FakePty::shared();
     std::fs::create_dir_all(workspace.join("home")).expect("creates a home folder");
     let assets_dir = workspace.join("downloads");

@@ -441,11 +441,6 @@ pub fn restore(
         })
         .cloned()
         .collect();
-    if package.version == 1 {
-        for record in records.iter_mut().filter(|record| record.kind == "message") {
-            set(record, "run_id", Value::Null);
-        }
-    }
     ids.extend(id_map(&records)?);
     let batch = uuid::Uuid::new_v4().to_string();
     let mut journal = Journal {

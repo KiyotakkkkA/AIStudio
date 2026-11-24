@@ -275,6 +275,15 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
         name: "0045_message_sources",
         sql: include_str!("../../migrations/0045_message_sources.sql"),
     },
+    Migration {
+        id: 46,
+        name: "0046_dialog_projection",
+        sql: concat!(
+            include_str!("../../migrations/0046_dialog_projection.sql"),
+            include_str!("dialogs_schema.sql"),
+            include_str!("dialogs_search.sql"),
+        ),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -573,6 +582,10 @@ mod tests {
             .collect()
     }
 
+    fn before_dialog_cutover() -> &'static [Migration<'static>] {
+        &MIGRATIONS[..MIGRATIONS.partition_point(|migration| migration.id < 46)]
+    }
+
     fn sql_migration(id: u32, name: &'static str, sql: &'static str) -> Migration<'static> {
         Migration { id, name, sql }
     }
@@ -662,7 +675,12 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("applies");
         assert_eq!(
             query(
                 &database,
@@ -723,7 +741,12 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("applies");
         let stored = query(&database, "SELECT sources FROM message ORDER BY created_at");
         let parsed: Vec<Vec<zvs_contract::ChatSourceDto>> = stored
             .iter()
@@ -829,7 +852,12 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("applies");
         assert_eq!(
             query(&database, "SELECT offered_tools FROM message ORDER BY id"),
             [
@@ -995,7 +1023,12 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("applies");
         assert_eq!(
             query(
                 &database,
@@ -1109,7 +1142,7 @@ mod tests {
         let (database, clock) = fresh();
         migrate(
             &database,
-            MIGRATIONS,
+            before_dialog_cutover(),
             &options(&database.backups_dir(), &clock),
         )
         .expect("applies");
@@ -1170,7 +1203,7 @@ mod tests {
                 .with_connection(|connection| {
                     connection.execute_batch("PRAGMA foreign_keys = OFF")?;
                     for table in names(connection, TABLES)? {
-                        connection.execute_batch(&format!("DROP TABLE \"{table}\""))?;
+                        connection.execute_batch(&format!("DROP TABLE IF EXISTS \"{table}\""))?;
                     }
                     connection.execute_batch(
                         "PRAGMA foreign_keys = ON; CREATE TABLE keepalive (id INTEGER PRIMARY KEY)",
@@ -1324,7 +1357,12 @@ mod tests {
                 Ok(())
             })
             .expect("seeds");
-        migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("applies");
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("applies");
         database
     }
 
@@ -1434,6 +1472,45 @@ mod tests {
         assert_eq!(database.file(), file);
         assert!(file.exists());
         assert!(query(&database, "SELECT key FROM setting").is_empty());
+    }
+
+    #[test]
+    fn dialog_cutover_preserves_legacy_dialogs_in_the_backup_and_keeps_shared_state() {
+        let (mut database, clock) = fresh();
+        let backups = database.backups_dir();
+        migrate(
+            &database,
+            before_dialog_cutover(),
+            &options(&backups, &clock),
+        )
+        .expect("prepares legacy state");
+        database.with_connection(|connection| {
+            connection.execute_batch("INSERT INTO conversation (id,title,provider_id,model_id,settings,system_prompt,attached_store_ids,created_at,updated_at) VALUES ('legacy','Legacy','p','m','{}','','[]',1,1);
+                INSERT INTO memory (id,scope,conversation_id,content,source,created_at,updated_at) VALUES ('shared','account',NULL,'keep','user',1,1),('owned','conversation','legacy','owner','user',1,1);")?;
+            Ok(())
+        }).expect("seeds legacy data");
+        let result = migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("cuts over");
+        let backup = Connection::open_with_flags(
+            result.backup.expect("legacy backup"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .expect("opens backup");
+        assert_eq!(
+            names(&backup, "SELECT id FROM conversation").expect("reads legacy dialog"),
+            ["legacy"]
+        );
+        assert_eq!(
+            names(&backup, "SELECT id FROM memory ORDER BY id").expect("reads legacy memory"),
+            ["owned", "shared"]
+        );
+        assert_eq!(
+            migrate(&database, MIGRATIONS, &options(&backups, &clock)).expect("resumes"),
+            MigrateReport::default()
+        );
+        let histories = database.directory().join("conversations");
+        database.enable_dialog_history(histories);
+        assert!(query(&database, "SELECT id FROM conversation").is_empty());
+        assert_eq!(query(&database, "SELECT id FROM memory"), ["shared"]);
     }
 
     #[test]

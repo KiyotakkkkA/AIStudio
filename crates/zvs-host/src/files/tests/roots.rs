@@ -167,7 +167,7 @@ async fn chat_paths_are_written_read_and_listed_without_asking() {
             &[],
             json!([
                 { "op": "write", "path": "chat:_spec.json", "content": "{\"title\": \"Реестр\"}" },
-                { "op": "write", "path": "chat:notes/summary.md", "content": "# Итоги" }
+                { "op": "write", "path": "chat:notes/summary.md", "content": super::notes::DRAFT }
             ])
         ),
         read_paths(conversation, &["apply"], &["chat:_spec.json"]),
@@ -182,7 +182,9 @@ async fn chat_paths_are_written_read_and_listed_without_asking() {
     assert!(host.approvals(&handle.id).is_empty());
     let folder = chat_folder(&host, conversation);
     assert_eq!(text(&folder.join("_spec.json")), "{\"title\": \"Реестр\"}");
-    assert_eq!(text(&folder.join("notes").join("summary.md")), "# Итоги");
+    let stored = std::fs::read(folder.join("notes/summary.md")).expect("reads note");
+    let note = crate::notes::parse(&stored).expect("a complete note");
+    assert_eq!(note.fields.title, "Shutdown");
     let read = host.output(&handle.id, "read");
     assert!(
         read["text"]

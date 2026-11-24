@@ -95,6 +95,11 @@ pub fn nested(root: &Path, parts: &[&str]) -> PathBuf {
 }
 
 impl StudioPaths {
+    pub(crate) fn conversation_root(root: &Path) -> PathBuf {
+        root.join(DATA_DIR)
+            .join(crate::conversations::CONVERSATIONS_DIR)
+    }
+
     pub fn resolve(env: &PathEnvironment) -> Self {
         let root = &env.state_dir;
         let data = root.join(DATA_DIR);
@@ -107,7 +112,7 @@ impl StudioPaths {
         Self {
             root: root.clone(),
             db_path: data.join(DATABASE_FILE),
-            conversations_dir: data.join(crate::conversations::CONVERSATIONS_DIR),
+            conversations_dir: Self::conversation_root(root),
             scenarios_dir: data.join("scenarios"),
             imports_dir: data.join("imports"),
             transfer_journals_dir: data.join("transfer-journals"),

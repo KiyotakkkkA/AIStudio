@@ -1,0 +1,23 @@
+[
+  {
+    "name": "cursor without a page size",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "before": "0199aa11-3333-7111-8111-111111111111"
+    }
+  },
+  {
+    "name": "page size too large",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "limit": 201
+    }
+  },
+  {
+    "name": "null page size",
+    "value": {
+      "id": "0199aa11-2222-7111-8111-111111111111",
+      "limit": null
+    }
+  }
+]

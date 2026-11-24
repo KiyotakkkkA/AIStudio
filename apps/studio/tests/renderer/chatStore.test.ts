@@ -72,6 +72,56 @@ function setup() {
 
 afterEach(() => vi.useRealTimers());
 
+test("loads earlier history without removing recent messages or unloaded pins", async () => {
+  const { store, bridge } = setup();
+  const earlier = MessageDto.parse({
+    id: "0199bb11-4444-7111-8111-000000000004",
+    conversationId: id,
+    role: "user",
+    content: "Earlier",
+    pinned: true,
+    tokensIn: 1,
+    tokensOut: 0,
+    usageEstimated: true,
+    durationMs: 0,
+    runId: null,
+    partial: false,
+    createdAt: 1,
+  });
+  const recent = MessageDto.parse({
+    ...earlier,
+    id: "0199bb11-4444-7111-8111-000000000005",
+    pinned: false,
+    createdAt: 2,
+  });
+  bridge.handle("chat.conversations.get", (input) => {
+    expect(input.limit).toBe(50);
+    return input.before === recent.id
+      ? { ...conversation, messages: [earlier] }
+      : { ...conversation, messages: [recent], older: recent.id, pinnedMessages: [earlier] };
+  });
+  await store.mount();
+  await store.select(conversation.id);
+  expect(store.active?.messages.map((message) => message.id)).toEqual([recent.id]);
+  expect(store.pinnedMessages.map((message) => message.id)).toEqual([earlier.id]);
+  expect(await store.loadOlder()).toBe(true);
+  expect(store.active?.messages.map((message) => message.id)).toEqual([earlier.id, recent.id]);
+  expect(store.active?.older).toBeUndefined();
+  store.dispose();
+});
+
+test("conversation search includes a dialog with matching message text", async () => {
+  const { store, bridge } = setup();
+  bridge.handle("chat.conversations.search", ({ query }) => {
+    expect(query).toBe("История");
+    return [conversation.id];
+  });
+  await store.mount();
+  store.setQuery("История");
+  await vi.waitFor(() => expect(store.visibleConversations.map((item) => item.id)).toEqual([id]));
+  store.dispose();
+});
+
 test("OpenAI registrations have distinct labels in the provider picker", () => {
   const { store } = setup();
   const first = accountFixture({ adapter: "openai", displayName: "Person · first" });

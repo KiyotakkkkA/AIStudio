@@ -1,4 +1,5 @@
 use rusqlite::Row;
+use serde::{Deserialize, Serialize};
 use zvs_contract::{
     ChatCommand, ChatEventDto, ChatGoalDto, ChatPluginDto, ChatRoundDto, ChatSettings,
     ChatSourceDto, ChatToolCallDto, CompactionTrigger, DocumentSelectionDto, MessageRole,
@@ -7,7 +8,7 @@ use zvs_contract::{
 
 use super::columns::{EnumColumn, json_column, optional_json_column};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConversationRow {
     pub id: String,
     pub title: String,
@@ -54,7 +55,7 @@ impl ConversationRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MessageRow {
     pub id: String,
     pub conversation_id: String,
@@ -120,7 +121,7 @@ impl MessageRow {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompactionRow {
     pub id: String,
     pub conversation_id: String,

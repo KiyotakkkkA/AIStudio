@@ -10,7 +10,8 @@ pub const STATE_FOLDER: &str = "AIStudio";
 pub const DEV_STATE_FOLDER: &str = "AIStudio-Dev";
 pub const LEGACY_FOLDER: &str = "com.zvs.aistudio";
 pub const PROJECT_STRUCT: &str = "project_struct";
-pub const SCHEMAS: [(&str, u32); 1] = [(PROJECT_STRUCT, 1)];
+pub const DIALOG_HISTORY: &str = "dialog_history";
+pub const SCHEMAS: [(&str, u32); 2] = [(PROJECT_STRUCT, 2), (DIALOG_HISTORY, 1)];
 pub const CLI_SETTINGS_DIR: [&str; 3] = ["data", "settings", "cli"];
 
 pub fn state_root(local_data: &Path, development: bool) -> PathBuf {
@@ -152,7 +153,7 @@ mod tests {
         let file = StateFile::current();
         let text = file.render().expect("renders");
         assert!(text.contains("[schemas]"));
-        assert!(text.contains("project_struct = 1"));
+        assert!(text.contains("project_struct = 2"));
         let parsed = StateFile::parse(&text).expect("parses");
         assert_eq!(parsed, file);
         assert!(parsed.matches_build());

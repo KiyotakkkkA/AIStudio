@@ -1,13 +1,16 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use rusqlite::{Connection, Transaction};
 use serde_json::json;
 use zvs_contract::{AppError, AppErrorCode};
 
+use crate::dialog_history::DialogWriter;
 use crate::ipc::INTERNAL_MESSAGE;
 use crate::platform::logger::{LogLevel, SharedLogger};
+
+use super::dialogs::DialogJournal;
 
 pub const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 
@@ -25,6 +28,7 @@ pub struct Database {
     connection: Mutex<Connection>,
     file: PathBuf,
     logger: SharedLogger,
+    dialogs: Option<DialogJournal>,
 }
 
 impl Database {
@@ -44,6 +48,7 @@ impl Database {
             connection: Mutex::new(connection),
             file: file.to_path_buf(),
             logger,
+            dialogs: None,
         })
     }
 
@@ -51,10 +56,46 @@ impl Database {
         &self.file
     }
 
+    pub fn enable_dialog_history(&mut self, root: PathBuf) -> Result<(), DataError> {
+        let dialogs = DialogJournal::new(root);
+        {
+            let mut connection = self.lock();
+            let transaction =
+                connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+            dialogs.rebuild(&transaction)?;
+            transaction.commit()?;
+            dialogs.clean_deleted(&connection)?;
+            dialogs.install(&connection)?;
+        }
+        self.dialogs = Some(dialogs);
+        Ok(())
+    }
+
+    pub(crate) fn reserve_dialog(
+        &self,
+        id: &str,
+        busy: &str,
+    ) -> Result<Option<Arc<DialogWriter>>, AppError> {
+        self.dialogs
+            .as_ref()
+            .map(|dialogs| dialogs.reserve(id))
+            .transpose()
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::WouldBlock {
+                    AppError::new(AppErrorCode::Conflict, busy)
+                } else {
+                    self.fail(error.into())
+                }
+            })
+    }
+
     pub fn with_connection<T>(
         &self,
         work: impl FnOnce(&Connection) -> Result<T, DataError>,
     ) -> Result<T, AppError> {
+        if self.dialogs.is_some() {
+            return self.transaction(|transaction| work(transaction));
+        }
         let connection = self.lock();
         work(&connection).map_err(|error| self.fail(error))
     }
@@ -69,7 +110,15 @@ impl Database {
             .map_err(DataError::from)
             .and_then(|transaction| {
                 let value = work(&transaction)?;
-                transaction.commit()?;
+                if let Some(dialogs) = &self.dialogs {
+                    let published = dialogs.publish(&transaction)?;
+                    if let Err(error) = transaction.commit() {
+                        DialogJournal::rollback(&published)?;
+                        return Err(error.into());
+                    }
+                } else {
+                    transaction.commit()?;
+                }
                 Ok(value)
             });
         outcome.map_err(|error| self.fail(error))

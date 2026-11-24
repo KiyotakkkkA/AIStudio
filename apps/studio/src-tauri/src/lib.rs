@@ -23,7 +23,7 @@ use zvs_contract::{NOTIFICATION_SCHEME, NotificationTargetDto};
 use zvs_host::agentic::{AgenticService, AgenticServiceOptions, register_agentic_nodes};
 use zvs_host::artifacts::{ArtifactStore, DASHBOARDS};
 use zvs_host::background::{BackgroundShellOptions, BackgroundShells, register_background_nodes};
-use zvs_host::boot::{Boot as StateBoot, BootDecision, BootError, LegacySources};
+use zvs_host::boot::{Boot as StateBoot, BootDecision, BootError, LegacySources, StateRootLock};
 use zvs_host::browser::{
     AgentControls, Browser as BrowserTools, BrowserAgent, BrowserDownloads, BrowserExtensions,
     BrowserGrants, BrowserImporter, BrowserLibrary, BrowserLifecycle, BrowserSettings, ImportRoots,
@@ -247,8 +247,21 @@ fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
     // WebView2 can briefly retain profile files after the previous process exits.
     for attempt in 0..=20 {
-        match zvs_host::services::storage::apply_pending_reset(&paths.root) {
-            Ok(_) => break,
+        let state = zvs_host::services::storage::apply_pending_reset(&paths.root)
+            .and_then(|_| StateRootLock::shared(&paths.root));
+        match state {
+            Ok(lock) => {
+                app.manage(lock);
+                break;
+            }
+            Err(error) if attempt == 20 && error.kind() == std::io::ErrorKind::WouldBlock => {
+                window::set_shell_profile(paths.boot_profile_dir.clone());
+                window::create_recovery(
+                    app,
+                    &boot_failure(&BootError::StateInUse, &paths, legacy.as_ref()),
+                )?;
+                return Ok(());
+            }
             Err(error) if attempt == 20 => return Err(error.into()),
             Err(_) => std::thread::sleep(std::time::Duration::from_millis(250)),
         }
@@ -619,7 +632,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         &[("version", json!(app.package_info().version.to_string()))],
     );
 
-    let (database, report) = match prepare_database(&PrepareOptions {
+    let (mut database, report) = match prepare_database(&PrepareOptions {
         file: &paths.db_path,
         backups_dir: &paths.backups_dir,
         logger: logger.clone(),
@@ -628,6 +641,21 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         Ok(prepared) => prepared,
         Err(failure) => return Ok(Launch::Recovery(failure)),
     };
+    let dialog_recovery = zvs_host::services::data_transfer::recover(&paths, &database)
+        .map_err(zvs_host::data::DataError::from)
+        .and_then(|()| database.enable_dialog_history(paths.conversations_dir.clone()));
+    if let Err(error) = dialog_recovery {
+        logger.log(
+            LogLevel::Error,
+            "host",
+            "Could not rebuild dialog history",
+            &[("error", json!(error.to_string()))],
+        );
+        return Ok(Launch::Recovery(MigrationFailed {
+            message: "Не удалось восстановить историю диалогов".to_owned(),
+            backups_dir: paths.backups_dir.clone(),
+        }));
+    }
     logger.log(
         LogLevel::Info,
         "host",

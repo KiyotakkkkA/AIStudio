@@ -108,7 +108,7 @@ impl ConversationFolders {
 
     pub fn remove(&self, owner: &str) {
         if let Some(folder) = self.folder(owner) {
-            let _ = std::fs::remove_dir_all(extended(&folder));
+            let _ = remove_dialog_folder(&folder);
         }
     }
 
@@ -251,6 +251,31 @@ impl ConversationFolders {
     }
 }
 
+pub(crate) fn remove_dialog_folder(folder: &Path) -> std::io::Result<()> {
+    if !std::fs::symlink_metadata(extended(folder))?
+        .file_type()
+        .is_dir()
+    {
+        return std::fs::remove_dir_all(extended(folder));
+    }
+    let history = folder.join(crate::dialog_history::HISTORY_FILE);
+    if !extended(&history).try_exists()? {
+        return std::fs::remove_dir_all(extended(folder));
+    }
+    for entry in std::fs::read_dir(extended(folder))? {
+        let entry = entry?;
+        if entry.file_name() != crate::dialog_history::HISTORY_FILE {
+            if entry.file_type()?.is_dir() {
+                std::fs::remove_dir_all(entry.path())?;
+            } else {
+                std::fs::remove_file(entry.path())?;
+            }
+        }
+    }
+    std::fs::remove_file(extended(&history))?;
+    std::fs::remove_dir(extended(folder))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,6 +298,29 @@ mod tests {
         assert_eq!(folders.work("../c1"), None);
         assert_eq!(folders.snapshots("c1", ".."), None);
         assert_eq!(folders.work(""), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_interrupted_dialog_cleanup_keeps_its_history_for_the_next_attempt() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let root = crate::testing::temporary_directory("dialog-cleanup");
+        let folder = root.join("dialog");
+        let history = folder.join(crate::dialog_history::HISTORY_FILE);
+        let work = folder.join("work").join("file.txt");
+        write(&history, "deleted");
+        write(&work, "owned");
+        let open = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&work)
+            .expect("opens owned file");
+        assert!(remove_dialog_folder(&folder).is_err());
+        assert!(history.is_file());
+        drop(open);
+        remove_dialog_folder(&folder).expect("retries cleanup");
+        assert!(!folder.exists());
     }
 
     #[test]

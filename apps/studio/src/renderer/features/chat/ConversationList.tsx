@@ -142,7 +142,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
         <TextInput
           preset="search"
           aria-label=""
-          placeholder="Поиск диалогов"
+          placeholder="Поиск по диалогам"
           value={store.query}
           onChange={(event) => store.setQuery(event.target.value)}
         />
@@ -316,7 +316,7 @@ export default observer(function ConversationList({ store }: { readonly store: C
               </section>
             ),
         )}
-        {!store.loading && store.visibleConversations.length === 0 && (
+        {!store.loading && !store.searching && store.visibleConversations.length === 0 && (
           <p className="px-2.5 py-3 text-[12px] text-main-500">
             {store.query ? "Подходящих диалогов нет." : "Диалогов пока нет."}
           </p>

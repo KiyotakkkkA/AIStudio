@@ -160,7 +160,7 @@ impl Package {
     pub fn validate(&self) -> Result<(), zvs_contract::AppError> {
         use zvs_contract::Validate;
         if self.format != "zvs-dbox"
-            || !matches!(self.version, 1 | VERSION)
+            || !(1..=VERSION).contains(&self.version)
             || self.records.len() > MAX_FILES
             || self.files.len() > MAX_FILES
         {
@@ -170,15 +170,16 @@ impl Package {
             categories: self.categories.clone(),
         }
         .validate()?;
+        if self.version < VERSION && self.categories.contains(&TransferCategory::Conversations) {
+            return Err(invalid_package());
+        }
         let mut ids = HashSet::new();
         let mut composite = HashSet::new();
         for record in &self.records {
             crate::data::repositories::data_transfer::validate_fields(record)
                 .map_err(|error| error.with_detail("recordKind", record.kind.clone()))?;
             let table = table(&record.kind).ok_or_else(invalid_package)?;
-            let columns = table
-                .archive_columns(self.version)
-                .ok_or_else(invalid_package)?;
+            let columns = table.columns;
             if !self.categories.contains(&table.category)
                 || record.fields.len() != columns.split(',').count()
                 || columns
@@ -255,6 +256,11 @@ impl Package {
                 _ => return Err(invalid_package()),
             };
             if !safe_relative(&file.path)
+                || (file.category == TransferCategory::Conversations
+                    && !matches!(
+                        file.path.split_once('/'),
+                        Some(("attachments" | "work" | "outputs" | "notes", _))
+                    ))
                 || !valid_hash(&file.hash)
                 || !ids.contains(file.owner.as_str())
                 || !owners.contains(&(kind, file.owner.as_str()))
@@ -465,7 +471,7 @@ pub fn read(source: &Path, blobs: &Path) -> Result<(Package, String), zvs_contra
     let bytes = json("data.json", MAX_JSON)?;
     let hash = digest(&bytes);
     if manifest.format != "zvs-dbox"
-        || !matches!(manifest.version, 1 | VERSION)
+        || !(1..=VERSION).contains(&manifest.version)
         || manifest.hash != hash
         || manifest.bytes != bytes.len() as u64
     {

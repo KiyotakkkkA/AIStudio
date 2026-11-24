@@ -21,9 +21,15 @@ pub fn register(server: &mut IpcServer) {
             |services: Arc<Services>, _input: ()| async move { services.chat.list() },
         )
         .handle(
+            "chat.conversations.search",
+            |services: Arc<Services>, input: zvs_contract::SearchConversationsInput| async move {
+                services.chat.search(&input)
+            },
+        )
+        .handle(
             "chat.conversations.get",
-            |services: Arc<Services>, input: ConversationRef| async move {
-                services.chat.get(&input.id)
+            |services: Arc<Services>, input: zvs_contract::GetConversationInput| async move {
+                services.chat.get_page(&input)
             },
         )
         .handle(
@@ -41,22 +47,13 @@ pub fn register(server: &mut IpcServer) {
         .handle(
             "chat.conversations.branch",
             |services: Arc<Services>, input: BranchConversationInput| async move {
-                let branch = services.chat.branch(&input.id, &input.message_id)?;
-                if let Err(error) = crate::chat_files::copy_chat_dir(
-                    &services.artifacts,
-                    &input.id.to_string(),
-                    &branch.id.to_string(),
-                ) {
-                    services.chat.remove(&branch.id)?;
-                    return Err(error);
-                }
-                Ok(branch)
+                services.chat.branch_with_files(&input.id, &input.message_id, Some(&services.artifacts))
             },
         )
         .handle(
             "chat.conversations.remove",
             |services: Arc<Services>, input: ConversationRef| async move {
-                services.chat.remove(&input.id)?;
+                let _lease = services.chat.remove_for_cleanup(&input.id)?;
                 services.terminals.close_conversation(&input.id);
                 services.shells.close_owner(&input.id.to_string()).await;
                 crate::chat_files::remove_chat_dir(&services.artifacts, &input.id.to_string());

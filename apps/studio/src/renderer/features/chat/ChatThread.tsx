@@ -138,11 +138,26 @@ export default observer(function ChatThread({
     setPinAt(currentPin(tops, element.clientHeight / 3));
   };
   useLayoutEffect(trackPin, [pinIds, store.active?.id]);
-  const jumpToPin = (id: string) => {
-    viewport.current
-      ?.querySelector(`[data-message-id="${id}"]`)
-      ?.scrollIntoView({ block: "start", behavior: level === "full" ? "smooth" : "auto" });
-    setPinAt(id);
+  const jumpToPin = async (id: string) => {
+    if (!(await store.revealMessage(id))) return;
+    pinned.current = false;
+    requestAnimationFrame(() => {
+      viewport.current
+        ?.querySelector(`[data-message-id="${id}"]`)
+        ?.scrollIntoView({ block: "start", behavior: level === "full" ? "smooth" : "auto" });
+      setPinAt(id);
+    });
+  };
+  const loadOlder = async () => {
+    const element = viewport.current;
+    if (!element) return;
+    const height = element.scrollHeight;
+    pinned.current = false;
+    if (await store.loadOlder()) {
+      requestAnimationFrame(() => {
+        if (viewport.current === element) element.scrollTop += element.scrollHeight - height;
+      });
+    }
   };
   useLayoutEffect(() => {
     if (statsOpen || focusId === null) return;
@@ -351,6 +366,13 @@ export default observer(function ChatThread({
           className="min-h-0 flex-1 px-6 pt-7 [overflow-anchor:none]"
         >
           <div ref={content} className="mx-auto w-full max-w-4xl space-y-7 pb-6">
+            {store.active?.older !== undefined && !store.loading && (
+              <div className="flex justify-center">
+                <Button disabled={store.loadingOlder} onClick={() => void loadOlder()}>
+                  {store.loadingOlder ? "Загрузка…" : "Загрузить предыдущие сообщения"}
+                </Button>
+              </div>
+            )}
             {store.loading && (
               <LoadingStatus label="Загрузка диалога…" className="space-y-7">
                 <div className="flex justify-end">
@@ -623,7 +645,7 @@ export default observer(function ChatThread({
                 : (message.images?.[0]?.name ?? pinPreview(message.content)),
             }))}
             current={pinAt}
-            onSelect={jumpToPin}
+            onSelect={(id) => void jumpToPin(id)}
           />
         )}
         {createPortal(

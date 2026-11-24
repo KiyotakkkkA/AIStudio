@@ -569,6 +569,53 @@ pub struct ConversationRef {
     pub id: ConversationId,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetConversationInput {
+    pub id: ConversationId,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub before: Option<MessageId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub limit: Option<u16>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchConversationsInput {
+    pub query: String,
+}
+
+impl Validate for SearchConversationsInput {
+    fn validate(&self) -> Result<(), AppError> {
+        check::trimmed_name("query", &self.query, 200)
+    }
+}
+
+impl Validate for GetConversationInput {
+    fn validate(&self) -> Result<(), AppError> {
+        self.id.validate()?;
+        if let Some(before) = self.before {
+            before.validate()?;
+        }
+        if self.limit.is_some_and(|limit| !(1..=200).contains(&limit))
+            || self.before.is_some() && self.limit.is_none()
+        {
+            return Err(crate::validate::invalid(
+                "limit",
+                "expected a page size between 1 and 200",
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversationDto {
@@ -810,13 +857,26 @@ pub struct ConversationDetailDto {
     pub messages: Vec<MessageDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub compactions: Vec<ChatCompactionDto>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub older: Option<MessageId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::wire::present"
+    )]
+    pub pinned_messages: Option<Vec<MessageDto>>,
 }
 
 impl Validate for ConversationDetailDto {
     fn validate(&self) -> Result<(), AppError> {
         self.conversation.validate()?;
         nested("messages", self.messages.validate())?;
-        nested("compactions", self.compactions.validate())
+        nested("compactions", self.compactions.validate())?;
+        nested("pinnedMessages", self.pinned_messages.validate())
     }
 }
 

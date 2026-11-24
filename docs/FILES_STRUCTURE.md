@@ -56,6 +56,7 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 ├── data/
 │   ├── studio.sqlite
 │   ├── conversations/<conversation-id>/
+│   │   ├── history.jsonl
 │   │   ├── attachments/
 │   │   ├── work/
 │   │   ├── outputs/
@@ -109,6 +110,14 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 
 Directories are created when their owning feature first writes to them. Folders for features
 that store no files yet are added when they need them.
+
+The sibling `AIStudio.lock` coordinates access to the state root. Hosts hold a shared OS lock
+throughout their lifetime. Factory reset requires the exclusive lock and leaves its request
+pending while another process holds it. The lock file is outside the directory reset removes.
+
+The dialog history repository places `history.jsonl` next to the dialog's owned files. Its
+writer locks live in `data/conversations/.locks/`, outside each dialog folder, so removing an
+owned folder preserves the identity of the corresponding lock.
 
 ## Root rules
 
@@ -217,7 +226,8 @@ Each state root records its versions in `aistudio.toml`:
 
 ```toml
 [schemas]
-project_struct = 1
+project_struct = 2
+dialog_history = 1
 
 [legacy]
 source = 'C:\Users\<user>\AppData\Roaming\com.zvs.aistudio'
@@ -250,6 +260,14 @@ repeat. A failed step opens the recovery window with the error and the location 
 untouched data. Only the studio application migrates: `aistudio.exe` reads its settings only
 from a root whose recorded versions match its build, and `zvs-jobd` never reads the root, it
 receives concrete paths from the host.
+
+`project_struct` 1 → 2 converts supported regular dialogs to the `dialog_history = 1`
+format. The boot step applies the pre-cutover migrations to a private SQLite snapshot,
+stages JSONL and validates the projection. It publishes each history into its existing dialog
+folder and resumes from histories already published. Unsupported dialog files move to
+`backups/dialogs-layout-v1/`. The subsequent database migration backs up the live database
+and replaces the old message, tool-call and compaction tables. Startup recovers pending
+transfers and rebuilds the projection before opening Studio.
 
 ## Migration from the old layout
 
