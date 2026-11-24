@@ -39,7 +39,7 @@ zvs-contract = { path = "../../../crates/zvs-contract" }
 tokio = { workspace = true, features = ["rt", "sync", "time", "macros"] }
 tokio-util = { workspace = true }
 url = { workspace = true }
-zeroize = { workspace = true }
+tempfile.workspace = true
 zvs-host = { path = "../../../crates/zvs-host" }
 zvs-qwen-web = { path = "../../../crates/zvs-qwen-web" }
 zvs-zai-web = { path = "../../../crates/zvs-zai-web" }
@@ -63,7 +63,6 @@ windows = { version = "=0.62.2", features = [
     "Win32_Graphics_Gdi",
     "Win32_Media_Audio",
     "Win32_Security",
-    "Win32_Security_Cryptography",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
     "Win32_System_LibraryLoader",

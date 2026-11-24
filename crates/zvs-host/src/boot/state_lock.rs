@@ -9,6 +9,12 @@ pub struct StateRootLock {
 }
 
 impl StateRootLock {
+    pub(crate) fn blocking_exclusive(root: &Path) -> io::Result<Self> {
+        let file = Self::open(root)?;
+        file.lock()?;
+        Ok(Self { _file: file })
+    }
+
     pub fn shared(root: &Path) -> io::Result<Self> {
         let file = Self::open(root)?;
         file.lock_shared()?;

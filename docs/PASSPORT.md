@@ -515,8 +515,11 @@ repositories.
 
 - `rusqlite` (bundled SQLite) opened in **WAL** mode, `foreign_keys = ON`,
   `busy_timeout = 5000`, `synchronous = NORMAL`. One connection, one writer.
-- The state root is `%LOCALAPPDATA%\ZVS\AIStudio` (`AIStudio-Dev` for an unpackaged build without
-  `ZVS_DATA_DIR`, the E2E temporary folder with it). Its top level is split by lifecycle —
+- Windows resolves the vendor base through the Local App Data known folder. Under `ZVS`,
+  `AI Studio Desktop` owns the desktop state, `AI Studio` holds shared skills, package caches,
+  provider credentials and link metadata, and `AI Studio CLI` is reserved for the standalone
+  CLI. Development roots use the `-Dev` suffix. `ZVS_DATA_DIR` keeps E2E state isolated.
+  The Desktop root is split by lifecycle —
   `data`, `assets`, `indexes`, `profiles`, `cache`, `temp`, `logs`, `backups` — and
   `StudioPaths` is the only place that names a folder in it. The tree, the lifecycle rules and
   the migration from the old `%APPDATA%\com.zvs.aistudio` root are in
@@ -528,10 +531,14 @@ repositories.
   root. The boot module (`zvs-host/src/boot`) compares them with the build's `SCHEMAS` before
   the logger, the database or any webview starts, runs the missing steps in order behind a
   progress window, and refuses a root written by a newer build with the recovery window.
-  Expected versions are constants of the build, never environment variables.
+  Expected versions are constants of the build, never environment variables. The layout
+  2 → 3 step relocates the Desktop root, moves installed skills into the shared root and
+  adopts eligible encrypted provider credentials. Either executable can initialize the
+  versioned shared root through `zvs-host::boot::shared`. Regular dialogs stay in their
+  owning app's root, and shared link metadata records their locations.
 - Paths that record where an installed resource lives (`download.target_path`, `skill.path`)
-  are stored relative to their root (`assets:models/x.gguf`), so moving a root rewrites no
-  rows.
+  are stored relative to their root (`assets:models/x.gguf`, `skills:example`), so moving
+  a root rewrites no rows that already use its prefix.
 - Row types in `zvs-host/src/data/schema/*.rs`, one module per table.
 - Migrations are hand-written SQL in `crates/zvs-host/migrations/NNNN_<name>.sql`, embedded
   with `include_str!`, recorded with a checksum in `__migrations`, and applied **on startup
@@ -579,7 +586,8 @@ repositories.
   uses its own id as the folder. Removing the conversation removes the folder. Retention
   removes a pruned run's snapshots and manifest entries, but not the files they point to.
   `storage.usage` reports bytes per category, cached until `refresh`. `storage.clearCache`
-  empties `cache/` and is refused while a run is unfinished.
+  empties the Desktop cache and is refused while a run is unfinished. Shared package caches
+  follow the shared-root lifecycle.
   `storage.resetChallenge` issues a short random confirmation string; `storage.reset`
   accepts only the current string once. Both channels are studio-only. A successful reset
   writes a durable marker in the state root and asks the shell to restart through normal
@@ -597,12 +605,17 @@ Aggregates (initial): `secret`, `identity`, `provider`, `model`, `vector_store`,
 
 **Secrets at rest**: the secret *value* is encrypted with **Windows DPAPI** (current-user
 scope, called through the `windows` crate behind a `CryptoBackend` port; on other platforms
-the backend reports itself unavailable until verified), and the ciphertext is stored in SQLite;
+the backend reports itself unavailable until verified). Desktop-private ciphertext is stored in SQLite;
 metadata (name, scope, tags, note, rotation date) is plaintext so the Secrets page can list
 and search without decrypting. Secrets have no types (D13, ADR 0006): the `type` column is a
 host-side kind, `user` for every secret the Secrets page shows and other values for
 host-internal credentials (account tokens), which `secrets.*` never lists or touches. Decryption happens in a service, only at point of use, and a
 decrypted value is never logged, never returned in a DTO, and never crosses IPC.
+The shared credential store uses the same OS protection. OpenAI OAuth refresh and revocation
+hold an OS lock for the credential while reading and applying provider changes. Existing
+OpenAI OAuth ciphertext is reused only after a decrypt-and-encrypt round trip succeeds.
+Copilot credentials belong to its vendor client. Browser-backed credentials and browser
+sessions belong to Desktop.
 
 ---
 
@@ -1603,9 +1616,9 @@ theme shipped at v1; tokens are defined so a light theme is a token swap, not a 
   written per-run so Runs & Logs can replay one execution without scanning everything.
 - **Config** — user settings in SQLite; machine-level flags in a small JSON file so a broken
   DB can still boot.
-- **Paths** — every path is resolved through `zvs-host::platform::paths` from the Tauri
-  directories handed in by the composition root. No `current_dir`, no relative IO anywhere
-  else.
+- **Paths** — `zvs-host::platform::paths` resolves the state layout from the platform's local
+  application data directory. The shell passes its resource and executable directories at
+  composition. No `current_dir`, no relative IO anywhere else.
 - **IDs** — UUID v7 (time-sortable) generated on the host.
 - **Clock** — a `Clock` trait injected into services so time-dependent logic is testable.
 - **Notifications** — native OS notifications are raised by the host, never by the renderer,

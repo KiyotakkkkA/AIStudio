@@ -15,7 +15,7 @@ import { DEVICE_TITLE, DEVICE_HINT } from "../device/deviceCopy";
 import { BROWSER_SECTION_HINT } from "../browser/browserSettingsCopy";
 import type { AppSettingKey } from "./AppSettingsStore";
 
-export const APP_NAME = "ZVS AI Studio";
+export const APP_NAME = "AI Studio Desktop";
 export const APP_DESCRIPTION = "Ваше личное рабочее пространство.";
 export const INSTALLATION_TITLE = "Сведения об установке";
 

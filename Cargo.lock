@@ -10975,6 +10975,7 @@ dependencies = [
 name = "zvs-contract"
 version = "0.1.0"
 dependencies = [
+ "dirs 7.0.0",
  "schemars 1.2.2",
  "serde",
  "serde_json",
@@ -11052,6 +11053,7 @@ dependencies = [
  "tokio-util",
  "url",
  "uuid",
+ "windows",
  "zeroize",
  "zvs-contract",
  "zvs-copilot",
@@ -11128,12 +11130,12 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-single-instance",
+ "tempfile",
  "tokio",
  "tokio-util",
  "url",
  "webview2-com",
  "windows",
- "zeroize",
  "zvs-contract",
  "zvs-host",
  "zvs-pipe",

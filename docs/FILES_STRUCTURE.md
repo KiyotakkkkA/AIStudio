@@ -1,17 +1,25 @@
 # Application File Structure
 
-This document describes where ZVS AI Studio keeps its files on Windows, how each folder is
+This document describes where AI Studio keeps its files on Windows, how each folder is
 maintained, and how the application moves data from one layout version to the next.
 [PASSPORT.md](PASSPORT.md) §9 holds the binding summary.
 
 ## Location policy
 
-The state root is `%LOCALAPPDATA%\ZVS\AIStudio`. Program files and bundled resources stay in
-the installation directory, separately from writable state.
+The Windows Local App Data known folder contains three sibling roots under `ZVS`.
+`AI Studio Desktop` owns Desktop state, `AI Studio` owns shared resources, and
+`AI Studio CLI` is reserved for the standalone CLI.
 
-Locations are resolved through Tauri's path API (`local_data_dir`, `resource_dir`), never by
-assembling a user name or a drive letter. Environment-variable paths in this document describe
-their usual locations.
+```text
+%LOCALAPPDATA%/ZVS/
+├── AI Studio Desktop/    Desktop settings, dialogs, profiles and indexes
+├── AI Studio/            Shared skills, caches, credentials and discovery metadata
+└── AI Studio CLI/        Standalone CLI settings and dialogs (TASK_088)
+```
+
+Program files and bundled resources stay in the installation directory. Tauri resolves
+bundled resources; the host resolves the state layout independently through the OS known
+folder. Environment-variable paths in this document describe their usual locations.
 
 ### Local and Roaming
 
@@ -19,7 +27,7 @@ Local holds everything: the working database, installed resources, indexes, WebV
 caches, temporary files, logs and automatic backups. These files are large, machine-specific
 or need coordinated migration.
 
-Roaming is not used. Preferences have one source of truth in SQLite. If cross-machine transfer
+Roaming is not used. Desktop preferences have one source of truth in SQLite. If cross-machine transfer
 of preferences becomes a requirement, a small, explicitly defined set may move to Roaming, with
 ownership and conflict handling defined first. Local paths, credentials, browser sessions,
 device configuration and machine-specific grants stay local. Explicit export and import, not
@@ -27,10 +35,11 @@ Roaming, is the way to move data between machines.
 
 ### Installation directory
 
-A per-user installation uses `%LOCALAPPDATA%\Programs\ZVS AI Studio`:
+A new per-user installation defaults to `%LOCALAPPDATA%\AI Studio Desktop`. An upgrade
+from ZVS AI Studio reuses its registered installation directory.
 
 ```text
-ZVS AI Studio/
+AI Studio Desktop/
 ├── zvs-studio.exe
 ├── zvs-jobd.exe
 ├── cli/
@@ -44,14 +53,43 @@ that ship with the program are bundled resources (`bundle.resources` in `tauri.c
 read from `resource_dir()`; the application never copies its own files into the state root.
 Downloaded runtimes and models belong in the state root.
 
-## State tree
-
-The top level classifies files by lifecycle; the second level names the owner. Each top-level
-root has one rule for backup, cleanup, uninstall and relocation, and no root contains another.
-`StudioPaths` (`zvs-host/src/platform/paths.rs`) is the only code that names these folders.
+## Shared state
 
 ```text
-%LOCALAPPDATA%/ZVS/AIStudio/
+%LOCALAPPDATA%/ZVS/AI Studio/
+├── layout.json
+├── skills/<skill-key>/
+├── cache/
+│   └── packages/
+│       ├── npm/
+│       ├── uv/
+│       └── pip/
+└── metadata/
+    └── credentials/
+        ├── <credential-id>.json
+        └── <credential-id>.json.lock
+```
+
+The sibling `AI Studio.lock` serializes shared initialization and metadata registration.
+
+| Path in `AI Studio`     | Owner and cleanup                                                                                                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layout.json`           | The shared initializer records its schema version and the app-owned dialog roots. Desktop records its executable for CLI link discovery.                                                                   |
+| `skills/`               | Both apps use the same installed skill files. Explicit skill removal deletes them.                                                                                                                         |
+| `cache/packages/`       | Package managers share their download caches. These caches can be rebuilt. Desktop cache clearing leaves them available to other processes.                                                                |
+| `metadata/credentials/` | The shared credential store owns provider references and DPAPI-sealed values. Unlinking an OpenAI account removes its credential. The OS locks are kept so peers continue to coordinate on the same files. |
+
+Desktop reset and uninstall preserve shared state. OpenAI OAuth can use the shared store;
+the Copilot client owns its credentials. Desktop owns browser sessions and the secrets
+that depend on them. Desktop-private API keys remain in its encrypted Secrets store.
+
+## Desktop state tree
+
+The top level classifies files by lifecycle. `StudioPaths` in
+`zvs-host/src/platform/paths.rs` resolves these paths.
+
+```text
+%LOCALAPPDATA%/ZVS/AI Studio Desktop/
 ├── aistudio.toml
 ├── data/
 │   ├── studio.sqlite
@@ -65,7 +103,6 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 │   ├── imports/<batch-id>/stores/<store-id>/
 │   ├── transfer-journals/<batch-id>.json
 │   ├── library/
-│   │   ├── skills/
 │   │   ├── dashboards/
 │   │   └── policy/
 │   └── settings/
@@ -93,11 +130,7 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 │   ├── thumbnails/
 │   ├── favicons/
 │   ├── capture/
-│   ├── voice/
-│   └── packages/
-│       ├── npm/
-│       ├── uv/
-│       └── pip/
+│   └── voice/
 ├── temp/
 │   ├── downloads/<download-id>/
 │   ├── staging/
@@ -111,7 +144,7 @@ root has one rule for backup, cleanup, uninstall and relocation, and no root con
 Directories are created when their owning feature first writes to them. Folders for features
 that store no files yet are added when they need them.
 
-The sibling `AIStudio.lock` coordinates access to the state root. Hosts hold a shared OS lock
+The sibling `AI Studio Desktop.lock` coordinates access to the state root. Hosts hold a shared OS lock
 throughout their lifetime. Factory reset requires the exclusive lock and leaves its request
 pending while another process holds it. The lock file is outside the directory reset removes.
 
@@ -121,16 +154,18 @@ owned folder preserves the identity of the corresponding lock.
 
 ## Root rules
 
-| Root       | Backup                 | Cleanup                                           | Uninstall                    | Relocation    |
-| ---------- | ---------------------- | ------------------------------------------------- | ---------------------------- | ------------- |
-| `data`     | Full                   | Never                                             | Kept unless the user opts in | No            |
-| `assets`   | No; reinstallable      | Never; explicit uninstall only                    | Removed                      | `models` only |
-| `indexes`  | Optional               | Never; explicit rebuild only                      | Kept with `data`             | Yes           |
-| `profiles` | No                     | Never; explicit sign-out or reset only            | Removed                      | No            |
-| `cache`    | No                     | «Очистить кэш», when no run is unfinished         | Removed                      | No            |
-| `temp`     | No                     | At startup and with the cache, except `downloads` | Removed                      | No            |
-| `logs`     | No                     | Rotation                                          | Removed                      | No            |
-| `backups`  | Is the recovery source | Retention policy                                  | Kept with `data`             | No            |
+Desktop uninstall preserves the Desktop state tree by default. The app-data option removes it.
+
+| Root       | Backup                 | Cleanup                                           | Relocation    |
+| ---------- | ---------------------- | ------------------------------------------------- | ------------- |
+| `data`     | Full                   | Never                                             | No            |
+| `assets`   | No; reinstallable      | Never; explicit uninstall only                    | `models` only |
+| `indexes`  | Optional               | Never; explicit rebuild only                      | Yes           |
+| `profiles` | No                     | Never; explicit sign-out or reset only            | No            |
+| `cache`    | No                     | «Очистить кэш», when no run is unfinished         | No            |
+| `temp`     | No                     | At startup and with the cache, except `downloads` | No            |
+| `logs`     | No                     | Rotation                                          | No            |
+| `backups`  | Is the recovery source | Retention policy                                  | No            |
 
 ## Directory responsibilities
 
@@ -140,7 +175,7 @@ owned folder preserves the identity of the corresponding lock.
 | `data/studio.sqlite`           | Source of truth for settings and structured records, together with its `-wal` and `-shm` files.                                 |
 | `data/conversations`           | Attachments, working files, retained outputs with their `manifest.json`, and pre-run snapshots owned by a conversation.         |
 | `data/scenarios`               | Persistent files written by scenarios.                                                                                          |
-| `data/library`                 | User-authored or adopted skills, dashboards and policy packs.                                                                   |
+| `data/library`                 | User-authored or adopted dashboards and policy packs.                                                                           |
 | `data/settings/cli`            | `theme.json` and `shortcuts.json`, read by `aistudio.exe`, which has no database access.                                        |
 | `assets/models`, `embeddings`  | Downloaded model files. Discovery reads the folder, so the purpose is part of the location.                                     |
 | `assets/runtimes`              | Engines such as llama.cpp and whisper.cpp, one folder per runtime id.                                                           |
@@ -149,17 +184,41 @@ owned folder preserves the identity of the corresponding lock.
 | `assets/environments/computer` | The computer-use sidecar scripts and their environment.                                                                         |
 | `assets/extensions`            | Unpacked browser extensions; turning one off moves it from `enabled` to `disabled`.                                             |
 | `indexes/vectors`              | LanceDB vector stores. Rebuilding may need unavailable sources, time or paid requests.                                          |
-| `profiles/shell`               | WebView2 profile shared by the studio, recovery, computer and browser-chrome webviews.                                          |
+| `profiles/shell`               | WebView2 profile shared by the studio, computer and browser-chrome webviews.                                                    |
 | `profiles/browser/work`        | The integrated browser's work profile with the user's site sessions.                                                            |
-| `cache`                        | Files that can be deleted without loss: document representations, thumbnails, favicons, the capture profile, package caches.    |
+| `cache`                        | Disposable document representations, thumbnails, favicons, the capture profile and voice cache.                                 |
 | `temp/downloads`               | Downloads in progress, one folder per download id, with resumable `.part` files.                                                |
 | `temp/runs`                    | Working folders of script runs without a conversation folder. Kept results are copied into the conversation's `outputs`.        |
-| `temp/boot`                    | WebView2 profile of the migration progress window, kept apart from `profiles/shell`, which the migration fills.                 |
+| `temp/boot`                    | WebView2 profile for the development boot and recovery previews. Actual file relocation uses a separate temporary profile.      |
 | `logs`                         | Rotated `studio.jsonl` files and dated stream logs under `logs/streams`.                                                        |
 | `backups`                      | Database snapshots taken before database migrations. A database snapshot is not a complete backup of user files.                |
 
 Secrets use the host's existing protected storage. Nothing here introduces plaintext
 credential files or changes the permission model.
+
+## Standalone CLI state tree (TASK_088)
+
+```text
+%LOCALAPPDATA%/ZVS/AI Studio CLI/
+├── config.toml
+└── data/
+    └── conversations/
+        ├── .locks/
+        └── <conversation-id>/
+            ├── history.jsonl
+            ├── attachments/
+            ├── work/
+            ├── outputs/
+            └── snapshots/<run-id>/
+```
+
+`config.toml` will hold CLI-wide settings, workspace configuration, dialog aliases, access
+rules, MCP configuration and the Desktop link. Per-dialog settings will live with their
+dialog history. Sensitive provider and MCP values use protected storage. Desktop reset and
+uninstall preserve this root. The shared layout records its dialog path for discovery.
+
+TASK_087 reserves the path. TASK_088 creates the CLI state and defines its boot and cleanup
+rules. The bundled thin client currently reads settings from Desktop's `data/settings/cli/`.
 
 ## Downloads and installation
 
@@ -184,7 +243,7 @@ directory. The shell bootstrap passes concrete folders to services; services onl
 validated child paths under the folders they receive. The renderer reaches files through IPC.
 
 Columns that record where an installed resource lives are stored relative to their root:
-`download.target_path` as `assets:models/<file>`, `skill.path` as `data:library/skills/<key>`.
+`download.target_path` as `assets:models/<file>`, `skill.path` as `skills:<key>`.
 `StoredPaths` encodes and decodes them; DTOs carry absolute paths. Moving a root changes the
 root and rewrites no rows. Other text that mentions a path, such as message bodies and
 settings JSON, keeps absolute paths and is rewritten by the migration step that moves it.
@@ -201,10 +260,10 @@ part of this layout version.
 
 ## Development and test isolation
 
-An unpackaged build without `ZVS_DATA_DIR` uses `%LOCALAPPDATA%\ZVS\AIStudio-Dev`, and a debug
-`aistudio.exe` reads its settings from the same root. E2E runs set `ZVS_DATA_DIR` to a
-temporary folder, and every root, both WebView profiles included, resolves beneath it. Unit
-tests use temporary folders. The production override surface is unchanged.
+Unpackaged builds use the `-Dev` variants of the app and shared directories. A debug
+`aistudio.exe` reads its settings from `AI Studio Desktop-Dev`. E2E runs set `ZVS_DATA_DIR` to a
+temporary Desktop root, with the shared and CLI paths beneath it. Unit tests use temporary
+folders.
 
 ## Boot and schema migrations
 
@@ -226,7 +285,7 @@ Each state root records its versions in `aistudio.toml`:
 
 ```toml
 [schemas]
-project_struct = 2
+project_struct = 3
 dialog_history = 1
 
 [legacy]
@@ -268,6 +327,19 @@ folder and resumes from histories already published. Unsupported dialog files mo
 `backups/dialogs-layout-v1/`. The subsequent database migration backs up the live database
 and replaces the old message, tool-call and compaction tables. Startup recovers pending
 transfers and rebuilds the projection before opening Studio.
+
+`project_struct` 2 → 3 renames `AIStudio` to `AI Studio Desktop` while holding the old
+root's exclusive lock. It moves installed skills one entry at a time into the independently
+versioned shared root, adopts OpenAI OAuth credentials after validating the DPAPI handoff,
+and rewrites stored paths in SQLite. The SQLite transaction clears the old ciphertext
+after the shared copy has been read back and verified. Desktop sends OpenAI OAuth reads
+and refreshes to the shared credential store after the upgrade.
+
+The version stays at 2 until these steps finish. A restart resumes from the relocated
+Desktop root and can continue after skills were partially moved. An existing populated
+Desktop destination or a conflicting shared skill stops the upgrade and preserves both
+copies. Desktop's existing private cache is disposable. Shared package caches populate
+on demand.
 
 ## Migration from the old layout
 
@@ -320,7 +392,7 @@ form, only at a path boundary.
 The old root is kept for 30 days. After that, a packaged build removes it, together with the
 old shell profile, if nothing in it changed since the migration; a change means an older build
 still uses it, and it stays. Development builds never remove it. Because the development root
-is separate, a development build copies the old root into `AIStudio-Dev` on its own and leaves
+is separate, a development build copies the old root into its own Desktop state and leaves
 it for the packaged build.
 
 ## Windows references

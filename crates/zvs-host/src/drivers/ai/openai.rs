@@ -15,6 +15,7 @@ use zvs_openai::{API_BASE, Credentials, TOKEN_URL, TokenResponse};
 use super::errors::cancelled;
 use super::http::HttpClient;
 use super::transport::SecretResolver;
+use crate::boot::StateRootLock;
 use crate::services::accounts::AccountBrowser;
 use crate::services::crypto::Plaintext;
 
@@ -196,7 +197,7 @@ pub async fn authorize(
         };
         let valid = !matches!(result, Err(zvs_openai::CallbackError::Invalid));
         let reply = if valid {
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\nВход завершён. Можно вернуться в ZVS AI Studio."
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\nВход завершён. Можно вернуться в AI Studio Desktop."
         } else {
             "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nInvalid callback"
         };
@@ -270,6 +271,7 @@ async fn refresh_credentials(
     secret_id: &str,
 ) -> Result<Credentials, AppError> {
     let _lock = REFRESH.lock().await;
+    let _process_lock = refresh_lock(resolver, secret_id).await?;
     let mut saved: Credentials =
         serde_json::from_str(resolver.resolve(secret_id)?.expose()).map_err(|_| auth_error())?;
     if saved.expires_at > now_seconds() + 60 {
@@ -321,6 +323,20 @@ async fn refresh_credentials(
     Ok(saved)
 }
 
+async fn refresh_lock(
+    resolver: &dyn SecretResolver,
+    secret_id: &str,
+) -> Result<Option<StateRootLock>, AppError> {
+    let Some(target) = resolver.refresh_lock_target(secret_id)? else {
+        return Ok(None);
+    };
+    tokio::task::spawn_blocking(move || StateRootLock::blocking_exclusive(&target))
+        .await
+        .map_err(|_| failure())?
+        .map(Some)
+        .map_err(|_| failure())
+}
+
 pub fn permission_error() -> AppError {
     AppError::new(
         AppErrorCode::PermissionDenied,
@@ -331,6 +347,7 @@ pub fn permission_error() -> AppError {
 
 pub async fn revoke(resolver: &dyn SecretResolver, secret_id: &str) -> Result<(), AppError> {
     let _lock = REFRESH.lock().await;
+    let _process_lock = refresh_lock(resolver, secret_id).await?;
     let saved: Credentials =
         serde_json::from_str(resolver.resolve(secret_id)?.expose()).map_err(|_| auth_error())?;
     let http = HttpClient::new()?;

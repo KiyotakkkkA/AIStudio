@@ -62,7 +62,7 @@ export default function NavRail({
         <AppLogo size={32} className="drop-shadow-[0_2px_6px_rgb(180_80_20/0.25)]" />
         {collapsed ? null : (
           <span className="min-w-0 flex-1 truncate text-[14px] font-semibold tracking-[-0.01em] text-main-50">
-            ZVS AI Studio
+            AI Studio Desktop
           </span>
         )}
       </div>

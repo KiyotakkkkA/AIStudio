@@ -247,6 +247,7 @@ mod tests {
             &StepContext {
                 root: root.path(),
                 legacy: None,
+                layout: None,
             },
             &|_| {},
         )
@@ -261,7 +262,7 @@ mod tests {
                 .expect("reads version")
                 .expect("state file")
                 .version(zvs_contract::layout::PROJECT_STRUCT),
-            2
+            3
         );
         assert_eq!(
             fs::read_to_string(owned.join("file.txt")).expect("retains owned files"),

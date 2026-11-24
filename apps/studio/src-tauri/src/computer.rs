@@ -234,7 +234,7 @@ impl ComputerShell {
         }
         let mut builder =
             WebviewWindowBuilder::new(&self.0.app, label, WebviewUrl::App(PAGE.into()))
-                .title("ZVS AI Studio")
+                .title("AI Studio Desktop")
                 .decorations(false)
                 .transparent(true)
                 .always_on_top(true)

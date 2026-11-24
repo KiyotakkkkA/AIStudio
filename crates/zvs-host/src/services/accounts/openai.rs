@@ -1,10 +1,17 @@
 use super::*;
 use crate::drivers::ai::identity::AccountIdentity;
 use crate::drivers::ai::openai::{auth_error, authorize, credentials, failure};
-use crate::drivers::ai::transport::AccountToken;
+use crate::drivers::ai::transport::{AccountToken, SharedSecretResolver};
 use zvs_openai::Credentials;
 
 impl Inner {
+    pub(super) fn openai_secrets(&self) -> SharedSecretResolver {
+        self.shared_credentials.as_ref().map_or_else(
+            || self.secrets.clone() as SharedSecretResolver,
+            |shared| shared.clone() as SharedSecretResolver,
+        )
+    }
+
     pub(super) async fn link_openai(
         &self,
         account_id: Option<&str>,
@@ -17,7 +24,7 @@ impl Inner {
                     return Err(auth_error());
                 }
                 let secret = self
-                    .secrets
+                    .openai_secrets()
                     .resolve(row.token_secret_id.as_deref().ok_or_else(auth_error)?)?;
                 serde_json::from_str::<Credentials>(secret.expose()).map_err(|_| auth_error())
             })
@@ -136,7 +143,7 @@ impl Inner {
         cancel: &CancellationToken,
     ) -> Result<AccountDto, AppError> {
         let secret_id = row.token_secret_id.as_deref().ok_or_else(auth_error)?;
-        match credentials(self.secrets.clone(), secret_id, cancel).await {
+        match credentials(self.openai_secrets(), secret_id, cancel).await {
             Ok(saved) => {
                 if cancel.is_cancelled() {
                     return Err(operation_cancelled());
@@ -144,10 +151,30 @@ impl Inner {
                 if saved.identity_key() != row.external_id {
                     return Err(auth_error());
                 }
-                if let AccountLinkResult::Linked { account, .. } = self.save_openai(saved)? {
-                    return Ok(account);
-                }
-                Err(failure())
+                let now = self.clock.now();
+                let permitted = saved.allows_inference();
+                let status = if permitted {
+                    AccountStatus::Linked
+                } else {
+                    AccountStatus::NeedsRelink
+                };
+                let updated = self.database.transaction(|transaction| {
+                    Ok(Repositories::new(transaction).accounts.update(
+                        &row.id,
+                        &AccountPatch {
+                            token_expires_at: Some(Some(saved.expires_at)),
+                            status: Some(status),
+                            status_detail: Some((!permitted).then(|| {
+                                "Разрешите использование подписки в настройках ChatGPT".to_owned()
+                            })),
+                            last_checked_at: Some(Some(now)),
+                            updated_at: Some(now),
+                            ..AccountPatch::default()
+                        },
+                        now,
+                    )?)
+                })?;
+                self.dto(&updated.ok_or_else(auth_error)?)
             }
             Err(error) => {
                 if is_session_expired(&error) {

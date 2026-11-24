@@ -91,6 +91,7 @@ pub struct DatabaseAccounts {
     database: Arc<Database>,
     sessions: Option<SessionFactory>,
     secrets: SharedSecretResolver,
+    openai_secrets: Option<SharedSecretResolver>,
     logger: SharedLogger,
 }
 
@@ -105,8 +106,14 @@ impl DatabaseAccounts {
             database,
             sessions,
             secrets,
+            openai_secrets: None,
             logger,
         }
+    }
+
+    pub fn with_openai_secrets(mut self, secrets: SharedSecretResolver) -> Self {
+        self.openai_secrets = Some(secrets);
+        self
     }
 
     fn find(&self, account_id: &str) -> Result<Option<AccountRow>, AppError> {
@@ -211,7 +218,11 @@ impl AccountPort for DatabaseAccounts {
                 secret_id: account
                     .token_secret_id
                     .ok_or_else(super::openai::auth_error)?,
-                secrets: self.secrets.clone(),
+                secrets: self
+                    .openai_secrets
+                    .as_ref()
+                    .unwrap_or(&self.secrets)
+                    .clone(),
                 http: HttpClient::new()?,
                 timeout_seconds: provider.settings.timeout_seconds(),
             }));

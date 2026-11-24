@@ -1,6 +1,58 @@
 use std::path::{Path, PathBuf};
 
 use zvs_contract::Timestamp;
+use zvs_contract::layout::{self, CLI_STATE_FOLDER, SHARED_STATE_FOLDER};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StudioLayout {
+    pub desktop: PathBuf,
+    pub previous_desktop: Option<PathBuf>,
+    pub shared: SharedPaths,
+    pub cli: PathBuf,
+}
+
+impl StudioLayout {
+    pub fn resolve(local_data: &Path, development: bool) -> Self {
+        Self {
+            desktop: layout::state_root(local_data, development),
+            previous_desktop: Some(layout::app_root(local_data, "AIStudio", development)),
+            shared: SharedPaths::new(layout::app_root(
+                local_data,
+                SHARED_STATE_FOLDER,
+                development,
+            )),
+            cli: layout::app_root(local_data, CLI_STATE_FOLDER, development),
+        }
+    }
+
+    pub fn isolated(root: PathBuf) -> Self {
+        Self {
+            shared: SharedPaths::new(root.join(SHARED_STATE_FOLDER)),
+            cli: root.join(CLI_STATE_FOLDER),
+            desktop: root,
+            previous_desktop: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedPaths {
+    pub root: PathBuf,
+    pub skills: PathBuf,
+    pub package_cache: PathBuf,
+    pub metadata: PathBuf,
+}
+
+impl SharedPaths {
+    pub fn new(root: PathBuf) -> Self {
+        Self {
+            skills: root.join("skills"),
+            package_cache: root.join("cache").join("packages"),
+            metadata: root.join("metadata"),
+            root,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathEnvironment {
@@ -152,16 +204,26 @@ impl StudioPaths {
         }
     }
 
+    pub fn with_shared(mut self, shared: &SharedPaths) -> Self {
+        self.skills_dir.clone_from(&shared.skills);
+        self.package_cache_dir.clone_from(&shared.package_cache);
+        self
+    }
+
     pub fn download_dir(&self, kind: DownloadKind) -> PathBuf {
         kind.dir(&self.assets_dir)
     }
 
     pub fn stored_paths(&self) -> StoredPaths {
-        StoredPaths::new(vec![
+        let mut roots = vec![
             (StoredRoot::Data, self.data_dir.clone()),
             (StoredRoot::Assets, self.assets_dir.clone()),
             (StoredRoot::Indexes, self.indexes_dir.clone()),
-        ])
+        ];
+        if !self.skills_dir.starts_with(&self.data_dir) {
+            roots.push((StoredRoot::Skills, self.skills_dir.clone()));
+        }
+        StoredPaths::new(roots)
     }
 }
 
@@ -170,16 +232,18 @@ pub enum StoredRoot {
     Data,
     Assets,
     Indexes,
+    Skills,
 }
 
 impl StoredRoot {
-    pub const ALL: [Self; 3] = [Self::Data, Self::Assets, Self::Indexes];
+    pub const ALL: [Self; 4] = [Self::Data, Self::Assets, Self::Indexes, Self::Skills];
 
     pub const fn prefix(self) -> &'static str {
         match self {
             Self::Data => "data:",
             Self::Assets => "assets:",
             Self::Indexes => "indexes:",
+            Self::Skills => "skills:",
         }
     }
 }

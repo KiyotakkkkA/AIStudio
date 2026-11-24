@@ -3,6 +3,8 @@ pub mod audio;
 pub mod clock;
 pub mod device;
 pub mod disk;
+#[cfg(windows)]
+pub mod dpapi;
 pub mod events;
 pub mod external;
 pub mod gpu;

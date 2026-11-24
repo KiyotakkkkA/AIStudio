@@ -16,6 +16,17 @@ pub use crate::boot::RESET_MARKER;
 /// Runs before opening SQLite, log files or any WebView2 profile. Keep the marker
 /// until every deletion succeeds so an interrupted reset is retried at next boot.
 pub fn apply_pending_reset(root: &Path) -> std::io::Result<bool> {
+    reset(root, zvs_contract::layout::StateFile::current())
+}
+
+pub fn apply_pending_reset_before_relocation(root: &Path) -> std::io::Result<bool> {
+    let mut file = zvs_contract::layout::StateFile::current();
+    file.schemas
+        .insert(zvs_contract::layout::PROJECT_STRUCT.to_owned(), 2);
+    reset(root, file)
+}
+
+fn reset(root: &Path, file: zvs_contract::layout::StateFile) -> std::io::Result<bool> {
     if !root.join(RESET_MARKER).try_exists()? {
         return Ok(false);
     }
@@ -46,9 +57,7 @@ pub fn apply_pending_reset(root: &Path) -> std::io::Result<bool> {
         }
     }
     // Prevent legacy data from being imported back after a deliberate reset.
-    zvs_contract::layout::StateFile::current()
-        .write(root)
-        .map_err(std::io::Error::other)?;
+    file.write(root).map_err(std::io::Error::other)?;
     std::fs::remove_file(root.join(RESET_MARKER))?;
     Ok(true)
 }

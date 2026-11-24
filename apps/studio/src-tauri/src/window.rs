@@ -184,7 +184,7 @@ pub fn create_recovery<R: Runtime>(
     let handle = app.clone();
     let mut builder =
         WebviewWindowBuilder::new(app, RECOVERY, WebviewUrl::App(recovery_url(failure).into()))
-            .title("ZVS AI Studio — восстановление")
+            .title("AI Studio Desktop — восстановление")
             .inner_size(720.0, 480.0)
             .on_navigation(move |url| {
                 let allowed = origin
@@ -208,7 +208,7 @@ pub fn create_recovery<R: Runtime>(
 pub fn create_boot<R: Runtime>(app: &AppHandle<R>, closable: bool) -> tauri::Result<()> {
     let origin = app_origin(app, false);
     let mut builder = WebviewWindowBuilder::new(app, BOOT, WebviewUrl::App(BOOT_PAGE.into()))
-        .title("ZVS AI Studio")
+        .title("AI Studio Desktop")
         .inner_size(520.0, 220.0)
         .resizable(false)
         .maximizable(false)

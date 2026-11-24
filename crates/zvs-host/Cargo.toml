@@ -58,5 +58,12 @@ axum.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt", "time", "macros", "test-util", "net", "sync", "process", "io-util"] }
 
-[lints]
-workspace = true
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+
+[lints.rust]
+warnings = "deny"
+unsafe_code = "deny"
+
+[lints.clippy]
+all = "deny"

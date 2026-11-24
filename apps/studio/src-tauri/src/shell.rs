@@ -13,7 +13,7 @@ use crate::window;
 
 pub const AUTOSTART_ARG: &str = "--autostart";
 pub const TRAY_ID: &str = "studio-tray";
-const TRAY_TOOLTIP: &str = "ZVS AI Studio";
+const TRAY_TOOLTIP: &str = "AI Studio Desktop";
 const TRAY_OPEN: &str = "Открыть";
 const TRAY_QUIT: &str = "Выход";
 const MENU_OPEN: &str = "open";

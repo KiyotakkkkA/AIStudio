@@ -360,6 +360,7 @@ mod tests {
         let context = StepContext {
             root: &root,
             legacy: Some(&legacy),
+            layout: None,
         };
         let seen = std::sync::Mutex::new(Vec::new());
 

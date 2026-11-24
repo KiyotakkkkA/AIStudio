@@ -54,6 +54,13 @@ pub trait CryptoBackend: Send + Sync {
 
 pub type SharedCryptoBackend = Arc<dyn CryptoBackend>;
 
+pub fn os_backend() -> SharedCryptoBackend {
+    #[cfg(windows)]
+    return Arc::new(crate::platform::dpapi::DpapiBackend::probe());
+    #[cfg(not(windows))]
+    Arc::new(UnavailableBackend)
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct UnavailableBackend;
 

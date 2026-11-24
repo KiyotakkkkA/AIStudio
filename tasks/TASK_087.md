@@ -2,7 +2,7 @@
 task: TASK_087
 title: Add shared AI Studio resources and rename the Desktop app
 phase: C — Shared dialogs and standalone CLI
-status: todo
+status: in-progress
 depends_on: [TASK_086]
 unblocks: [TASK_088]
 estimate: 1–2 engineer-weeks
@@ -98,8 +98,14 @@ Run the shared initializer independently and verify it resolves the same resourc
 
 ## Handoff
 
-> Filled in by the agent that completes this task. Delete this line when writing it.
+**Built:** Boot layout 2 → 3 relocates Desktop state, publishes installed skills in the shared
+root and verifies OpenAI OAuth credentials before clearing their old ciphertext. The Tauri-free
+shared initializer records both app-owned dialog stores and Desktop's executable for discovery.
+The Windows installer and public Desktop surfaces use AI Studio Desktop.
 
-**Built:**
-**Deviated from plan:**
-**Next session should know:**
+**Deviated from plan:** Shared package caches populate on demand. The private CLI root is
+reserved for TASK_088. A conflicting destination is preserved and startup reports its path.
+
+**Next session should know:** Exercise a clean installation and an in-place upgrade in an
+isolated Windows profile, including real account use, shortcuts, tray and protocol activation.
+Refer to [Application File Structure](../docs/FILES_STRUCTURE.md) for all three roots.

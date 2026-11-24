@@ -2,14 +2,14 @@
 
 use std::slice;
 
+use crate::services::Plaintext;
+use crate::services::crypto::{BackendFailure, CryptoBackend};
 use ::windows::Win32::Foundation::{HLOCAL, LocalFree};
 use ::windows::Win32::Security::Cryptography::{
     CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
 };
 use ::windows::core::PCWSTR;
 use zeroize::Zeroize;
-use zvs_host::services::Plaintext;
-use zvs_host::services::crypto::{BackendFailure, CryptoBackend};
 
 pub const CIPHER_PREFIX: u8 = 0x01;
 

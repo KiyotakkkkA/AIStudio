@@ -11,7 +11,6 @@ with `#![allow(unsafe_code)]` (the only other opt-in in the shell is one functio
 
 | Port (`zvs-host`)    | Implementation                | How                                                                                             |
 | -------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------- |
-| `CryptoBackend`      | `dpapi::DpapiBackend`         | `CryptProtectData` / `CryptUnprotectData` bound to the user account, no UI                      |
 | `GpuProbe`           | `dxgi::DxgiProbe`             | DXGI adapter enumeration: name, vendor, dedicated video memory                                  |
 | `AudioInput`         | `audio::WasapiInput`          | WASAPI shared-mode capture from the default (or chosen) microphone, PCM                         |
 | `FileLauncher`       | `assoc::ShellLauncher`        | Default application lookup per extension, open via the shell, installed browsers                |
@@ -23,12 +22,6 @@ with `#![allow(unsafe_code)]` (the only other opt-in in the shell is one functio
 | installed browsers   | `browsers.rs`                 | `SOFTWARE\Clients\StartMenuInternet` under HKCU and HKLM                                        |
 
 ## Notes per adapter
-
-**DPAPI.** Ciphertext is `0x01` (`CIPHER_PREFIX`) followed by the DPAPI blob, so a future
-scheme can be told apart. `DpapiBackend::probe` round-trips a fixed string at start-up; if
-that fails the backend reports `is_available() == false` and `CryptoService` refuses to store
-secrets up front instead of failing later. Non-Windows builds use the host's
-`UnavailableBackend`. Decrypted buffers are zeroed before `LocalFree`.
 
 **User `PATH`.** The value is read and written as `REG_EXPAND_SZ` without expansion
 (`RRF_NOEXPAND`), so `%USERPROFILE%`-style entries survive. Membership and edits go through

@@ -71,7 +71,7 @@ use zvs_host::platform::ids::system_ids;
 use zvs_host::platform::logger::{FileLogger, LogLevel, LoggerOptions, SharedLogger};
 use zvs_host::platform::metrics::nvidia_monitor;
 use zvs_host::platform::navigation::SharedNavigator;
-use zvs_host::platform::paths::{PathEnvironment, StudioPaths};
+use zvs_host::platform::paths::{PathEnvironment, SharedPaths, StudioLayout, StudioPaths};
 use zvs_host::platform::recorder::{FileEventRecorder, recording_enabled_from_env};
 use zvs_host::platform::shell::SharedShellPort;
 use zvs_host::platform::shutdown::{
@@ -91,6 +91,7 @@ use zvs_host::scenarios::{
     ScenarioService, ScenarioServiceOptions, register_scenario_nodes,
 };
 use zvs_host::services::rerank::local_rerankers;
+use zvs_host::services::shared_credentials::SharedCredentials;
 use zvs_host::services::system::DEMO_INTERVAL;
 use zvs_host::services::{
     AccountService, AccountServiceOptions, ChatService, ChatServiceOptions, CryptoService,
@@ -189,16 +190,18 @@ pub fn run() {
         ])
         .setup(|app| start(app.handle()))
         .build(tauri::generate_context!())
-        .expect("ZVS AI Studio failed to start")
+        .expect("AI Studio Desktop failed to start")
         .run(on_run_event);
 }
 
-fn resolve_paths(app: &AppHandle) -> tauri::Result<(StudioPaths, Option<LegacySources>)> {
+fn resolve_paths(
+    app: &AppHandle,
+) -> Result<(StudioPaths, StudioLayout, Option<LegacySources>), Box<dyn Error>> {
     let packaged = !tauri::is_dev();
-    let (state_dir, legacy) = match e2e::data_dir() {
-        Some(dir) => (dir, None),
+    let (layout, legacy) = match e2e::data_dir() {
+        Some(dir) => (StudioLayout::isolated(dir), None),
         None => (
-            zvs_contract::layout::state_root(&app.path().local_data_dir()?, !packaged),
+            StudioLayout::resolve(&local_data_dir(app)?, !packaged),
             Some(LegacySources {
                 roaming: app.path().app_data_dir()?,
                 local: app.path().app_local_data_dir().ok(),
@@ -206,15 +209,33 @@ fn resolve_paths(app: &AppHandle) -> tauri::Result<(StudioPaths, Option<LegacySo
         ),
     };
     let paths = StudioPaths::resolve(&PathEnvironment {
-        state_dir,
+        state_dir: layout.desktop.clone(),
         resource_dir: app.path().resource_dir()?,
         executable_dir: std::env::current_exe()?
             .parent()
             .map(Path::to_path_buf)
             .unwrap_or_default(),
         packaged,
-    });
-    Ok((paths, legacy))
+    })
+    .with_shared(&layout.shared);
+    Ok((paths, layout, legacy))
+}
+
+#[cfg(windows)]
+fn local_data_dir(_app: &AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    Ok(zvs_contract::layout::local_data_dir()?)
+}
+
+#[cfg(not(windows))]
+fn local_data_dir(app: &AppHandle) -> Result<PathBuf, Box<dyn Error>> {
+    Ok(app.path().local_data_dir()?)
+}
+
+fn setup_migration_profile(app: &AppHandle) -> std::io::Result<()> {
+    let profile = tempfile::tempdir()?;
+    window::set_shell_profile(profile.path().to_path_buf());
+    app.manage(profile);
+    Ok(())
 }
 
 fn boot_failure(
@@ -235,9 +256,17 @@ fn boot_failure(
 }
 
 fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
-    let (paths, legacy) = resolve_paths(app)?;
-    if paths
-        .root
+    let (paths, layout, legacy) = resolve_paths(app)?;
+    let boot = StateBoot::new(&paths.root, legacy.as_ref()).with_layout(&layout);
+    let reset_root = match boot.working_root() {
+        Ok(root) => root,
+        Err(error) => {
+            setup_migration_profile(app)?;
+            window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
+            return Ok(());
+        }
+    };
+    if reset_root
         .join(zvs_host::services::storage::RESET_MARKER)
         .try_exists()?
         && e2e::data_dir().is_none()
@@ -247,15 +276,22 @@ fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
     // WebView2 can briefly retain profile files after the previous process exits.
     for attempt in 0..=20 {
-        let state = zvs_host::services::storage::apply_pending_reset(&paths.root)
-            .and_then(|_| StateRootLock::shared(&paths.root));
+        use zvs_host::services::storage::{
+            apply_pending_reset, apply_pending_reset_before_relocation,
+        };
+        let reset = if reset_root == paths.root {
+            apply_pending_reset(reset_root)
+        } else {
+            apply_pending_reset_before_relocation(reset_root)
+        };
+        let state = reset.and_then(|_| StateRootLock::shared(&paths.root));
         match state {
             Ok(lock) => {
                 app.manage(lock);
                 break;
             }
             Err(error) if attempt == 20 && error.kind() == std::io::ErrorKind::WouldBlock => {
-                window::set_shell_profile(paths.boot_profile_dir.clone());
+                setup_migration_profile(app)?;
                 window::create_recovery(
                     app,
                     &boot_failure(&BootError::StateInUse, &paths, legacy.as_ref()),
@@ -281,19 +317,18 @@ fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         }
         DevApp::Studio | DevApp::Browser | DevApp::Computer => {}
     }
-    let boot = StateBoot::new(&paths.root, legacy.as_ref());
     let decision = match boot.inspect() {
         Ok(decision) => decision,
         Err(error) => {
-            window::set_shell_profile(paths.boot_profile_dir.clone());
+            setup_migration_profile(app)?;
             window::create_recovery(app, &boot_failure(&error, &paths, legacy.as_ref()))?;
             return Ok(());
         }
     };
     match decision {
         BootDecision::Migrate(_) => {
-            window::set_shell_profile(paths.boot_profile_dir.clone());
-            migrate_then_launch(app, paths, legacy, decision)
+            setup_migration_profile(app)?;
+            migrate_then_launch(app, paths, layout, legacy, decision)
         }
         _ => {
             window::set_shell_profile(paths.shell_profile_dir.clone());
@@ -303,7 +338,7 @@ fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
             }
             let packaged = paths.packaged;
             let root = paths.root.clone();
-            launch(app, paths)?;
+            launch(app, paths, &layout.shared)?;
             if packaged && let Some(legacy) = legacy {
                 std::thread::spawn(move || {
                     zvs_host::boot::sweep_legacy(&root, &legacy, SystemClock.now());
@@ -317,6 +352,7 @@ fn start(app: &AppHandle) -> Result<(), Box<dyn Error>> {
 fn migrate_then_launch(
     app: &AppHandle,
     paths: StudioPaths,
+    layout: StudioLayout,
     legacy: Option<LegacySources>,
     decision: BootDecision,
 ) -> Result<(), Box<dyn Error>> {
@@ -326,20 +362,22 @@ fn migrate_then_launch(
         .name("state-migration".to_owned())
         .spawn(move || {
             let reporter = window::BootReporter::new(app.clone());
-            let outcome = StateBoot::new(&paths.root, legacy.as_ref()).run(
-                &decision,
-                SystemClock.now(),
-                &|progress| reporter.report(progress),
-            );
+            let outcome = StateBoot::new(&paths.root, legacy.as_ref())
+                .with_layout(&layout)
+                .run(&decision, SystemClock.now(), &|progress| {
+                    reporter.report(progress)
+                });
             let handle = app.clone();
             let _ = app.run_on_main_thread(move || {
                 let failure = match outcome {
                     Ok(()) => {
                         window::set_shell_profile(paths.shell_profile_dir.clone());
-                        launch(&handle, paths).err().map(|error| MigrationFailed {
-                            message: error.to_string(),
-                            backups_dir: PathBuf::new(),
-                        })
+                        launch(&handle, paths, &layout.shared)
+                            .err()
+                            .map(|error| MigrationFailed {
+                                message: error.to_string(),
+                                backups_dir: PathBuf::new(),
+                            })
                     }
                     Err(error) => Some(boot_failure(&error, &paths, legacy.as_ref())),
                 };
@@ -352,8 +390,9 @@ fn migrate_then_launch(
     Ok(())
 }
 
-fn launch(app: &AppHandle, paths: StudioPaths) -> Result<(), Box<dyn Error>> {
-    match compose(app, paths)? {
+fn launch(app: &AppHandle, paths: StudioPaths, shared: &SharedPaths) -> Result<(), Box<dyn Error>> {
+    zvs_host::boot::shared::register_desktop(shared, &std::env::current_exe()?)?;
+    match compose(app, paths, shared)? {
         Launch::Studio {
             host,
             window,
@@ -618,8 +657,12 @@ fn on_run_event(app: &AppHandle, event: RunEvent) {
     }
 }
 
-const APP_NAME: &str = "ZVS AI Studio";
-fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>> {
+const APP_NAME: &str = "AI Studio Desktop";
+fn compose(
+    app: &AppHandle,
+    paths: StudioPaths,
+    shared: &SharedPaths,
+) -> Result<Launch, Box<dyn Error>> {
     let clock: SharedClock = Arc::new(SystemClock);
 
     let mut options = LoggerOptions::new(paths.logs_dir.clone(), LogLevel::Info, clock.clone());
@@ -717,7 +760,8 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
             .as_ref(),
     );
 
-    let crypto = Arc::new(CryptoService::new(platform::crypto_backend()));
+    let crypto = Arc::new(CryptoService::new(zvs_host::services::crypto::os_backend()));
+    let shared_credentials = Arc::new(SharedCredentials::new(shared, Arc::clone(&crypto)));
     let secrets = Arc::new(SecretService::new(
         Arc::clone(&database),
         crypto,
@@ -799,12 +843,15 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         secrets.clone(),
         http.clone(),
     );
-    registry.accounts = Arc::new(DatabaseAccounts::new(
-        Arc::clone(&database),
-        Some(sessions.clone()),
-        secrets.clone(),
-        logger.clone(),
-    ));
+    registry.accounts = Arc::new(
+        DatabaseAccounts::new(
+            Arc::clone(&database),
+            Some(sessions.clone()),
+            secrets.clone(),
+            logger.clone(),
+        )
+        .with_openai_secrets(shared_credentials.clone()),
+    );
     registry.local_models = Some(Arc::new(FileSystemModelStore::new(
         paths.assets_dir.clone(),
     )));
@@ -822,6 +869,7 @@ fn compose(app: &AppHandle, paths: StudioPaths) -> Result<Launch, Box<dyn Error>
         clock: clock.clone(),
         logger: logger.clone(),
         runtime: Some(runtime.clone()),
+        shared_credentials: Some(shared_credentials),
         ..AccountServiceOptions::new(
             Arc::clone(&database),
             Arc::clone(&secrets),

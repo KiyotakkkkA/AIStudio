@@ -1,6 +1,8 @@
+mod desktop_upgrade;
 mod dialog_upgrade;
 pub mod project_struct;
 pub mod rewrite;
+pub mod shared;
 mod state_lock;
 pub mod transfer;
 
@@ -13,7 +15,7 @@ use zvs_contract::layout::{LegacyRecord, PROJECT_STRUCT, SCHEMAS, StateFile, exp
 
 use crate::data::dialogs::DialogJournal;
 use crate::dialog_history::DialogHistory;
-use crate::platform::paths::{DATABASE_FILE, StudioPaths};
+use crate::platform::paths::{DATABASE_FILE, StudioLayout, StudioPaths};
 
 pub const LEGACY_RETENTION: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
@@ -37,6 +39,8 @@ pub enum BootError {
     Mismatch(String),
     #[error("Не удалось проверить историю диалогов")]
     DialogHistory(String),
+    #[error("В новом каталоге уже есть данные: {0}")]
+    DestinationConflict(PathBuf),
     #[error(
         "Сброс данных ожидает завершения другого приложения AI Studio. Закройте его и запустите приложение снова."
     )]
@@ -64,6 +68,7 @@ pub struct StepProgress {
 pub struct StepContext<'a> {
     pub root: &'a Path,
     pub legacy: Option<&'a LegacySources>,
+    pub layout: Option<&'a StudioLayout>,
 }
 
 pub type StepRun = fn(&StepContext<'_>, &dyn Fn(StepProgress)) -> Result<(), BootError>;
@@ -104,6 +109,12 @@ pub const STEPS: &[Step] = &[
         from: 1,
         label: "Перенос истории диалогов",
         run: dialog_upgrade::upgrade,
+    },
+    Step {
+        schema: PROJECT_STRUCT,
+        from: 2,
+        label: "Перенос данных AI Studio Desktop",
+        run: desktop_upgrade::upgrade,
     },
 ];
 
@@ -161,6 +172,7 @@ pub struct Boot<'a> {
     pub root: &'a Path,
     pub legacy: Option<&'a LegacySources>,
     pub steps: &'a [Step],
+    layout: Option<&'a StudioLayout>,
 }
 
 impl<'a> Boot<'a> {
@@ -169,7 +181,33 @@ impl<'a> Boot<'a> {
             root,
             legacy,
             steps: STEPS,
+            layout: None,
         }
+    }
+
+    pub fn with_layout(mut self, layout: &'a StudioLayout) -> Self {
+        self.layout = Some(layout);
+        self
+    }
+
+    pub fn working_root(&self) -> Result<&Path, BootError> {
+        if let Some(previous) = self
+            .layout
+            .and_then(|layout| layout.previous_desktop.as_deref())
+            && previous.try_exists().map_err(shared::io)?
+        {
+            match std::fs::read_dir(self.root) {
+                Ok(mut entries) => {
+                    if entries.next().transpose().map_err(shared::io)?.is_some() {
+                        return Err(BootError::DestinationConflict(self.root.to_path_buf()));
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(shared::io(error)),
+            }
+            return Ok(previous);
+        }
+        Ok(self.root)
     }
 
     fn pending(&self, file: &StateFile) -> Vec<Step> {
@@ -193,12 +231,13 @@ impl<'a> Boot<'a> {
     }
 
     pub fn inspect(&self) -> Result<BootDecision, BootError> {
-        let file = StateFile::read(self.root).map_err(|error| match error {
+        let root = self.working_root()?;
+        let file = StateFile::read(root).map_err(|error| match error {
             zvs_contract::layout::StateFileError::Malformed(reason) => BootError::Malformed(reason),
             zvs_contract::layout::StateFileError::Io(error) => BootError::Io(error.to_string()),
         })?;
         let Some(file) = file else {
-            let adopted = self.root.join("data").join(DATABASE_FILE).is_file();
+            let adopted = root.join("data").join(DATABASE_FILE).is_file();
             if adopted {
                 let mut file = StateFile::default();
                 file.schemas.insert(PROJECT_STRUCT.to_owned(), 1);
@@ -206,6 +245,11 @@ impl<'a> Boot<'a> {
             }
             if self.legacy_present() {
                 return Ok(BootDecision::Migrate(self.pending(&StateFile::default())));
+            }
+            if root != self.root {
+                let mut file = StateFile::current();
+                file.schemas.insert(PROJECT_STRUCT.to_owned(), 2);
+                return Ok(BootDecision::Migrate(self.pending(&file)));
             }
             return Ok(BootDecision::Fresh);
         };
@@ -231,8 +275,8 @@ impl<'a> Boot<'a> {
         }
     }
 
-    fn write(&self, file: &StateFile) -> Result<(), BootError> {
-        file.write(self.root)
+    fn write(root: &Path, file: &StateFile) -> Result<(), BootError> {
+        file.write(root)
             .map_err(|error| BootError::Io(error.to_string()))
     }
 
@@ -243,24 +287,35 @@ impl<'a> Boot<'a> {
         progress: &dyn Fn(BootProgress),
     ) -> Result<(), BootError> {
         match decision {
-            BootDecision::Ready => Ok(()),
+            BootDecision::Ready => self.layout.map_or(Ok(()), shared::initialize),
             BootDecision::Fresh => {
+                if let Some(layout) = self.layout {
+                    shared::initialize(layout)?;
+                }
                 let context = StepContext {
                     root: self.root,
                     legacy: self.legacy,
+                    layout: self.layout,
                 };
                 validate_dialogs(&context, &|_| {})?;
-                self.write(&StateFile::current())
+                Self::write(self.root, &StateFile::current())
             }
             BootDecision::Migrate(steps) => {
-                let mut file = StateFile::read(self.root)
-                    .ok()
-                    .flatten()
-                    .unwrap_or_default();
-                let context = StepContext {
-                    root: self.root,
-                    legacy: self.legacy,
+                let mut root = self.working_root()?;
+                let _previous_lock = if root != self.root {
+                    Some(StateRootLock::exclusive(root).map_err(|error| {
+                        if error.kind() == std::io::ErrorKind::WouldBlock {
+                            BootError::StateInUse
+                        } else {
+                            shared::io(error)
+                        }
+                    })?)
+                } else {
+                    None
                 };
+                let mut file = StateFile::read(root)
+                    .map_err(shared::io)?
+                    .unwrap_or_default();
                 for (index, step) in steps.iter().enumerate() {
                     let report = |current: StepProgress| {
                         progress(BootProgress {
@@ -271,7 +326,19 @@ impl<'a> Boot<'a> {
                             total: current.total,
                         });
                     };
-                    (step.run)(&context, &report)?;
+                    let context = StepContext {
+                        root,
+                        legacy: self.legacy,
+                        layout: self.layout,
+                    };
+                    if step.schema == PROJECT_STRUCT && step.from == 2 {
+                        file.schemas.insert(PROJECT_STRUCT.to_owned(), 2);
+                        Self::write(root, &file)?;
+                        (step.run)(&context, &report)?;
+                        root = self.root;
+                    } else {
+                        (step.run)(&context, &report)?;
+                    }
                     file.schemas.insert(step.schema.to_owned(), step.from + 1);
                     if step.schema == PROJECT_STRUCT
                         && step.from == 0
@@ -283,12 +350,12 @@ impl<'a> Boot<'a> {
                             migrated_at: now,
                         });
                     }
-                    self.write(&file)?;
+                    Self::write(root, &file)?;
                 }
                 for (schema, version) in SCHEMAS {
                     file.schemas.entry(schema.to_owned()).or_insert(version);
                 }
-                self.write(&file)
+                Self::write(root, &file)
             }
         }
     }
@@ -424,11 +491,18 @@ mod tests {
                 label: "b",
                 run: counted,
             },
+            Step {
+                schema: PROJECT_STRUCT,
+                from: 2,
+                label: "c",
+                run: counted,
+            },
         ];
         let boot = Boot {
             root: &root,
             legacy: Some(&legacy),
             steps: &steps,
+            layout: None,
         };
         let decision = boot.inspect().expect("inspects");
         assert_eq!(decision, BootDecision::Migrate(steps.to_vec()));
@@ -439,22 +513,17 @@ mod tests {
         .expect("runs");
         assert_eq!(
             seen.into_inner().expect("unlocks"),
-            vec![
-                BootProgress {
-                    step: 1,
-                    steps: 2,
-                    label: "a",
+            steps
+                .iter()
+                .enumerate()
+                .map(|(index, step)| BootProgress {
+                    step: index + 1,
+                    steps: steps.len(),
+                    label: step.label,
                     done: 1,
-                    total: 1
-                },
-                BootProgress {
-                    step: 2,
-                    steps: 2,
-                    label: "b",
-                    done: 1,
-                    total: 1
-                },
-            ]
+                    total: 1,
+                })
+                .collect::<Vec<_>>()
         );
         let file = StateFile::read(&root).expect("reads").expect("a file");
         assert!(file.matches_build());
@@ -483,6 +552,7 @@ mod tests {
             root: &root,
             legacy: Some(&legacy),
             steps: &steps,
+            layout: None,
         };
         let decision = boot.inspect().expect("inspects");
         assert_eq!(
@@ -509,7 +579,7 @@ mod tests {
             Err(BootError::Newer {
                 schema: PROJECT_STRUCT.to_owned(),
                 found: 9,
-                supported: 2
+                supported: 3
             })
         );
         std::fs::write(
@@ -534,7 +604,7 @@ mod tests {
         std::fs::write(root.join("data").join(DATABASE_FILE), b"").expect("writes");
         let boot = Boot::new(&root, Some(&legacy));
         assert!(
-            matches!(boot.inspect().expect("inspects"), BootDecision::Migrate(steps) if steps.len() == 1 && steps[0].from == 1)
+            matches!(boot.inspect().expect("inspects"), BootDecision::Migrate(steps) if steps.iter().map(|step| step.from).eq([1, 2]))
         );
     }
 
@@ -554,7 +624,7 @@ mod tests {
         let boot = Boot::new(&root, None);
         let pending = boot.inspect().expect("inspects");
         assert!(
-            matches!(&pending, BootDecision::Migrate(steps) if steps.len() == 1 && steps[0].schema == PROJECT_STRUCT && steps[0].from == 1)
+            matches!(&pending, BootDecision::Migrate(steps) if steps.iter().map(|step| step.from).eq([1, 2]))
         );
         assert!(matches!(
             boot.run(&pending, 1, &|_| {}),

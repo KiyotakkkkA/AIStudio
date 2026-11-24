@@ -20,7 +20,6 @@ use zvs_host::platform::audio::SharedAudioInput;
 use zvs_host::platform::external::SharedFileLauncher;
 use zvs_host::platform::gpu::SharedGpuProbe;
 use zvs_host::platform::logger::SharedLogger;
-use zvs_host::services::SharedCryptoBackend;
 
 use crate::toast::{ActivationSlot, Toaster};
 
@@ -38,16 +37,6 @@ pub fn cli_installer(binary: std::path::PathBuf) -> zvs_host::cli::SharedCliInst
 #[cfg(not(windows))]
 pub fn cli_installer(_binary: std::path::PathBuf) -> zvs_host::cli::SharedCliInstaller {
     Arc::new(zvs_host::cli::NoCliInstaller)
-}
-
-#[cfg(windows)]
-pub fn crypto_backend() -> SharedCryptoBackend {
-    Arc::new(windows::dpapi::DpapiBackend::probe())
-}
-
-#[cfg(not(windows))]
-pub fn crypto_backend() -> SharedCryptoBackend {
-    Arc::new(zvs_host::services::UnavailableBackend)
 }
 
 #[cfg(windows)]

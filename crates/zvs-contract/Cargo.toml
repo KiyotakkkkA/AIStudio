@@ -21,5 +21,8 @@ zeroize.workspace = true
 [build-dependencies]
 serde_json.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+dirs = "=7.0.0"
+
 [lints]
 workspace = true

@@ -6,21 +6,36 @@ use serde::{Deserialize, Serialize};
 
 pub const STATE_FILE: &str = "aistudio.toml";
 pub const STATE_VENDOR: &str = "ZVS";
-pub const STATE_FOLDER: &str = "AIStudio";
-pub const DEV_STATE_FOLDER: &str = "AIStudio-Dev";
+pub const STATE_FOLDER: &str = "AI Studio Desktop";
+pub const SHARED_STATE_FOLDER: &str = "AI Studio";
+pub const CLI_STATE_FOLDER: &str = "AI Studio CLI";
 pub const LEGACY_FOLDER: &str = "com.zvs.aistudio";
 pub const PROJECT_STRUCT: &str = "project_struct";
 pub const DIALOG_HISTORY: &str = "dialog_history";
-pub const SCHEMAS: [(&str, u32); 2] = [(PROJECT_STRUCT, 2), (DIALOG_HISTORY, 1)];
+pub const SCHEMAS: [(&str, u32); 2] = [(PROJECT_STRUCT, 3), (DIALOG_HISTORY, 1)];
 pub const CLI_SETTINGS_DIR: [&str; 3] = ["data", "settings", "cli"];
 
 pub fn state_root(local_data: &Path, development: bool) -> PathBuf {
-    let folder = if development {
-        DEV_STATE_FOLDER
+    app_root(local_data, STATE_FOLDER, development)
+}
+
+pub fn app_root(local_data: &Path, folder: &str, development: bool) -> PathBuf {
+    let vendor = local_data.join(STATE_VENDOR);
+    if development {
+        vendor.join(format!("{folder}-Dev"))
     } else {
-        STATE_FOLDER
-    };
-    local_data.join(STATE_VENDOR).join(folder)
+        vendor.join(folder)
+    }
+}
+
+#[cfg(windows)]
+pub fn local_data_dir() -> std::io::Result<PathBuf> {
+    dirs::data_local_dir().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Local application data is unavailable",
+        )
+    })
 }
 
 pub fn cli_settings_dir(root: &Path) -> PathBuf {
@@ -136,11 +151,11 @@ mod tests {
         let local = Path::new("C:").join("Local");
         assert_eq!(
             state_root(&local, false),
-            local.join("ZVS").join("AIStudio")
+            local.join("ZVS").join("AI Studio Desktop")
         );
         assert_eq!(
             state_root(&local, true),
-            local.join("ZVS").join("AIStudio-Dev")
+            local.join("ZVS").join("AI Studio Desktop-Dev")
         );
         assert_eq!(
             cli_settings_dir(&local),
@@ -153,7 +168,7 @@ mod tests {
         let file = StateFile::current();
         let text = file.render().expect("renders");
         assert!(text.contains("[schemas]"));
-        assert!(text.contains("project_struct = 2"));
+        assert!(text.contains("project_struct = 3"));
         let parsed = StateFile::parse(&text).expect("parses");
         assert_eq!(parsed, file);
         assert!(parsed.matches_build());
@@ -164,7 +179,7 @@ mod tests {
         let older = StateFile::parse("[schemas]\nproject_struct = 0\n").expect("parses");
         assert_eq!(older.version(PROJECT_STRUCT), 0);
         assert!(!older.matches_build());
-        let newer = StateFile::parse("[schemas]\nproject_struct = 2\n").expect("parses");
+        let newer = StateFile::parse("[schemas]\nproject_struct = 4\n").expect("parses");
         assert!(!newer.matches_build());
         let unknown =
             StateFile::parse("[schemas]\nproject_struct = 1\nprofiles = 1\n").expect("parses");

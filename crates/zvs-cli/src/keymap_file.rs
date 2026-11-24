@@ -17,8 +17,13 @@ pub fn settings_dir_in(local_data: &Path, development: bool) -> Option<PathBuf> 
 }
 
 pub fn settings_dir() -> Option<PathBuf> {
-    let local = std::env::var_os("LOCALAPPDATA")?;
-    settings_dir_in(Path::new(&local), cfg!(debug_assertions))
+    #[cfg(windows)]
+    {
+        let local = layout::local_data_dir().ok()?;
+        settings_dir_in(&local, cfg!(debug_assertions))
+    }
+    #[cfg(not(windows))]
+    None
 }
 
 pub fn default_path() -> Option<PathBuf> {

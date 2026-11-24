@@ -84,6 +84,7 @@ pub fn system_random() -> RandomSource {
 pub struct AccountServiceOptions {
     pub database: Arc<Database>,
     pub secrets: Arc<SecretService>,
+    pub shared_credentials: Option<Arc<super::shared_credentials::SharedCredentials>>,
     pub probes: ProbeFactory,
     pub sessions: SessionFactory,
     pub browser: SharedAccountBrowser,
@@ -111,6 +112,7 @@ impl AccountServiceOptions {
         Self {
             database,
             secrets,
+            shared_credentials: None,
             probes: identity_probes(),
             sessions,
             browser,
@@ -138,6 +140,7 @@ struct Pending<T: Clone> {
 struct Inner {
     database: Arc<Database>,
     secrets: Arc<SecretService>,
+    shared_credentials: Option<Arc<super::shared_credentials::SharedCredentials>>,
     probes: ProbeFactory,
     sessions: SessionFactory,
     browser: SharedAccountBrowser,
@@ -257,6 +260,7 @@ impl AccountService {
         let inner = Arc::new(Inner {
             database: options.database,
             secrets: options.secrets,
+            shared_credentials: options.shared_credentials,
             probes: options.probes,
             sessions: options.sessions,
             browser: options.browser,
@@ -491,6 +495,11 @@ impl AccountService {
         }
         lock(&self.inner.attempts).remove(id);
         let now = self.inner.clock.now();
+        if row.family() == Some(AccountFamily::Openai)
+            && let (Some(shared), Some(id)) = (&self.inner.shared_credentials, &row.token_secret_id)
+        {
+            shared.remove(id)?;
+        }
         self.inner.database.transaction(|transaction| {
             let repositories = Repositories::new(transaction);
             let removal = repositories.accounts.remove(id, now)?;
@@ -514,7 +523,8 @@ impl AccountService {
                 pending.cancel.cancel();
             }
             if let Some(secret_id) = &row.token_secret_id {
-                crate::drivers::ai::openai::revoke(self.inner.secrets.as_ref(), secret_id).await?;
+                crate::drivers::ai::openai::revoke(self.inner.openai_secrets().as_ref(), secret_id)
+                    .await?;
             }
         }
         self.unlink(id)
@@ -964,18 +974,24 @@ impl Inner {
             let previous_secret = matching
                 .as_ref()
                 .and_then(|row| row.token_secret_id.clone());
+            let shared = self
+                .shared_credentials
+                .as_ref()
+                .filter(|_| adapter == AccountFamily::Openai);
             let token_secret_id = match &credential {
                 None => None,
                 Some(credential) => Some(match &previous_secret {
                     Some(secret_id) => {
-                        self.secrets.update_in(
-                            &repositories,
-                            secret_id,
-                            SecretUpdateInput {
-                                value: Some(Plaintext::new(credential.token.clone())),
-                                ..SecretUpdateInput::default()
-                            },
-                        )?;
+                        if shared.is_none() {
+                            self.secrets.update_in(
+                                &repositories,
+                                secret_id,
+                                SecretUpdateInput {
+                                    value: Some(Plaintext::new(credential.token.clone())),
+                                    ..SecretUpdateInput::default()
+                                },
+                            )?;
+                        }
                         secret_id.clone()
                     }
                     None => {
@@ -988,7 +1004,9 @@ impl Inner {
                             },
                             SecretScope::Personal,
                         );
-                        input.value = Some(Plaintext::new(credential.token.clone()));
+                        if shared.is_none() {
+                            input.value = Some(Plaintext::new(credential.token.clone()));
+                        }
                         self.secrets.create_in(&repositories, input)?.id
                     }
                 }),
@@ -1055,6 +1073,10 @@ impl Inner {
                     "Attached providers to the linked account",
                     &[("accountId", json!(row.id)), ("providers", json!(attached))],
                 );
+            }
+            if let (Some(shared), Some(credential)) = (shared, &credential) {
+                let reference = super::shared_credentials::CredentialReference::openai(&row)?;
+                shared.put(reference, &Plaintext::new(credential.token.clone()))?;
             }
             Ok((row, replaced))
         })?;

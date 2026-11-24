@@ -32,6 +32,10 @@ pub trait SecretResolver: Send + Sync {
     fn replace(&self, _id: &str, _value: Plaintext) -> Result<(), AppError> {
         Err(crate::drivers::ai::openai::auth_error())
     }
+
+    fn refresh_lock_target(&self, _id: &str) -> Result<Option<std::path::PathBuf>, AppError> {
+        Ok(None)
+    }
 }
 
 impl SecretResolver for SecretService {

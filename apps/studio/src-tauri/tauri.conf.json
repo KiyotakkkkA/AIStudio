@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ZVS AI Studio",
+  "productName": "AI Studio Desktop",
   "mainBinaryName": "zvs-studio",
   "identifier": "com.zvs.aistudio",
   "build": {
@@ -16,7 +16,7 @@
         "label": "studio",
         "create": false,
         "url": "index.html",
-        "title": "ZVS AI Studio",
+        "title": "AI Studio Desktop",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,
@@ -50,6 +50,7 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
+        "installerHooks": "windows/installer.nsh",
         "languages": ["Russian"]
       }
     },

@@ -3,7 +3,6 @@ pub mod audio;
 pub mod browsers;
 pub mod chrome;
 pub mod cli_path;
-pub mod dpapi;
 pub mod dxgi;
 pub mod overlay;
 pub mod toast;

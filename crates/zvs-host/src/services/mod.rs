@@ -33,6 +33,7 @@ pub mod runs;
 pub mod secret_policy;
 pub mod secrets;
 pub mod settings;
+pub mod shared_credentials;
 pub mod storage;
 pub mod stored;
 pub mod subagents;
