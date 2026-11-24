@@ -6,9 +6,7 @@ use zvs_contract::{
     Timestamp,
 };
 
-use crate::data::repositories::{
-    SecretDraft, SecretFilter, SecretPatch, SecretUsageDraft, secret_in_use,
-};
+use crate::data::repositories::{SecretDraft, SecretFilter, SecretPatch, secret_in_use};
 use crate::data::schema::{SecretConsumerKind, SecretRow};
 use crate::data::{DataError, Database, Repositories};
 use crate::platform::clock::SharedClock;
@@ -333,19 +331,12 @@ impl SecretService {
         kind: SecretConsumerKind,
         consumer_id: &str,
     ) -> Result<(), AppError> {
-        let created_at = self.clock.now();
         self.database.transaction(|transaction| {
             let secrets = Repositories::new(transaction).secrets;
             secrets
                 .find_by_id(secret_id)?
                 .ok_or_else(|| not_found(secret_id))?;
-            secrets.add_usage(&SecretUsageDraft {
-                secret_id,
-                consumer_kind: kind,
-                consumer_id,
-                created_at,
-            })?;
-            Ok(())
+            Ok(secrets.add_usage(secret_id, kind, consumer_id)?)
         })
     }
 

@@ -635,11 +635,10 @@ impl IntegrationService {
     }
 
     pub fn set_cursor(&self, account_id: &str, key: &str, value: &str) -> Result<(), AppError> {
-        let at = self.now();
         self.database().with_connection(|connection| {
             Ok(Repositories::new(connection)
                 .integrations
-                .set_cursor(account_id, key, value, at)?)
+                .set_cursor(account_id, key, value)?)
         })
     }
 

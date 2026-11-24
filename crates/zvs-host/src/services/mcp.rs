@@ -1068,11 +1068,10 @@ impl McpService {
         let json = serde_json::to_string(grant)
             .map_err(|cause| AppError::new(AppErrorCode::Unknown, cause.to_string()))?;
         let cipher = self.inner.options.secrets.seal(&Plaintext::new(json))?;
-        let now = self.now();
         self.database().with_connection(|connection| {
             Ok(Repositories::new(connection)
                 .mcp_servers
-                .save_oauth(id, &cipher, now)?)
+                .save_oauth(id, &cipher)?)
         })
     }
 

@@ -5,7 +5,7 @@ use zvs_contract::{
     ProviderStatus, Timestamp,
 };
 
-use super::secret::{SecretRepository, SecretUsageDraft};
+use super::secret::SecretRepository;
 use crate::data::DataError;
 use crate::data::schema::columns::{EnumColumn, json_text};
 use crate::data::schema::{ProviderRow, ProviderSettings, SecretConsumerKind};
@@ -292,12 +292,11 @@ impl<'c> ProviderRepository<'c> {
                 ProviderRow::from_row,
             )?;
         if let Some(secret_id) = &row.secret_id {
-            SecretRepository::new(self.connection).add_usage(&SecretUsageDraft {
+            SecretRepository::new(self.connection).add_usage(
                 secret_id,
-                consumer_kind: SecretConsumerKind::Provider,
-                consumer_id: &row.id,
-                created_at: row.created_at,
-            })?;
+                SecretConsumerKind::Provider,
+                &row.id,
+            )?;
         }
         Ok(row)
     }
@@ -384,12 +383,7 @@ impl<'c> ProviderRepository<'c> {
                 secrets.remove_usage(old, SecretConsumerKind::Provider, id)?;
             }
             if let Some(new) = &row.secret_id {
-                secrets.add_usage(&SecretUsageDraft {
-                    secret_id: new,
-                    consumer_kind: SecretConsumerKind::Provider,
-                    consumer_id: id,
-                    created_at: row.updated_at,
-                })?;
+                secrets.add_usage(new, SecretConsumerKind::Provider, id)?;
             }
         }
         Ok(Some(row))

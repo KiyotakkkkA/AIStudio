@@ -85,14 +85,6 @@ impl SecretPatch {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SecretUsageDraft<'a> {
-    pub secret_id: &'a str,
-    pub consumer_kind: SecretConsumerKind,
-    pub consumer_id: &'a str,
-    pub created_at: Timestamp,
-}
-
 pub fn secret_in_use(id: &str, usage: &[SecretUsageRow]) -> AppError {
     AppError::new(
         AppErrorCode::Conflict,
@@ -287,23 +279,19 @@ impl<'c> SecretRepository<'c> {
             .collect()
     }
 
-    pub fn add_usage(&self, entry: &SecretUsageDraft<'_>) -> rusqlite::Result<SecretUsageRow> {
+    pub fn add_usage(
+        &self,
+        secret_id: &str,
+        consumer_kind: SecretConsumerKind,
+        consumer_id: &str,
+    ) -> rusqlite::Result<()> {
         self.connection
-            .prepare_cached(&format!(
-                "INSERT INTO secret_usage (secret_id, consumer_kind, consumer_id, created_at) VALUES (?1, ?2, ?3, ?4) \
-                 ON CONFLICT (secret_id, consumer_kind, consumer_id) DO UPDATE SET created_at = excluded.created_at \
-                 RETURNING {}",
-                SecretUsageRow::COLUMNS
-            ))?
-            .query_row(
-                params![
-                    entry.secret_id,
-                    entry.consumer_kind,
-                    entry.consumer_id,
-                    entry.created_at
-                ],
-                SecretUsageRow::from_row,
-            )
+            .prepare_cached(
+                "INSERT INTO secret_usage (secret_id, consumer_kind, consumer_id) VALUES (?1, ?2, ?3) \
+                 ON CONFLICT (secret_id, consumer_kind, consumer_id) DO NOTHING",
+            )?
+            .execute(params![secret_id, consumer_kind, consumer_id])?;
+        Ok(())
     }
 
     pub fn remove_usage(
@@ -352,20 +340,6 @@ mod tests {
             r#type: r#type.to_owned(),
             name: name.to_owned(),
             ..draft()
-        }
-    }
-
-    fn usage<'a>(
-        secret_id: &'a str,
-        consumer_kind: SecretConsumerKind,
-        consumer_id: &'a str,
-        created_at: Timestamp,
-    ) -> SecretUsageDraft<'a> {
-        SecretUsageDraft {
-            secret_id,
-            consumer_kind,
-            consumer_id,
-            created_at,
         }
     }
 
@@ -475,12 +449,7 @@ mod tests {
             .with_connection(|connection| {
                 let secrets = Repositories::new(connection).secrets;
                 let created = secrets.create(&draft())?;
-                secrets.add_usage(&usage(
-                    &created.id,
-                    SecretConsumerKind::Provider,
-                    "provider-1",
-                    NOW,
-                ))?;
+                secrets.add_usage(&created.id, SecretConsumerKind::Provider, "provider-1")?;
                 Ok(created)
             })
             .expect("creates");
@@ -531,14 +500,9 @@ mod tests {
                     (SecretConsumerKind::McpServer, "mcp-1"),
                     (SecretConsumerKind::Integration, "integration-1"),
                 ] {
-                    secrets.add_usage(&usage(&first.id, kind, consumer, NOW))?;
+                    secrets.add_usage(&first.id, kind, consumer)?;
                 }
-                secrets.add_usage(&usage(
-                    &first.id,
-                    SecretConsumerKind::Provider,
-                    "provider-1",
-                    NOW + 5,
-                ))?;
+                secrets.add_usage(&first.id, SecretConsumerKind::Provider, "provider-1")?;
 
                 assert_eq!(secrets.count_usage(&first.id)?, 5);
                 assert_eq!(secrets.count_usage(&second.id)?, 0);
@@ -559,13 +523,6 @@ mod tests {
                         "provider:provider-2",
                         "vector_store:store-1",
                     ]
-                );
-                assert_eq!(
-                    listed
-                        .iter()
-                        .find(|entry| entry.consumer_id == "provider-1")
-                        .map(|entry| entry.created_at),
-                    Some(NOW + 5)
                 );
                 assert_eq!(
                     secrets.count_usage_by_secret()?,
@@ -705,12 +662,7 @@ mod tests {
         let failed = database.transaction(|transaction| {
             let secrets = Repositories::new(transaction).secrets;
             let created = secrets.create(&draft())?;
-            secrets.add_usage(&usage(
-                &created.id,
-                SecretConsumerKind::Provider,
-                "provider-1",
-                NOW,
-            ))?;
+            secrets.add_usage(&created.id, SecretConsumerKind::Provider, "provider-1")?;
             Err::<(), DataError>(
                 AppError::new(AppErrorCode::Unknown, "the unit of work failed halfway").into(),
             )

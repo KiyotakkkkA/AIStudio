@@ -284,6 +284,11 @@ pub const MIGRATIONS: &[Migration<'static>] = &[
             include_str!("dialogs_search.sql"),
         ),
     },
+    Migration {
+        id: 47,
+        name: "0047_remove_unused_timestamps",
+        sql: include_str!("../../migrations/0047_remove_unused_timestamps.sql"),
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -987,7 +992,7 @@ mod tests {
             .with_connection(|connection| {
                 connection.execute_batch(
                     "INSERT INTO integration_account (id, kind, name, created_at, updated_at) VALUES ('a3', 'github', 'GitHub', 1, 1), ('a4', 'gitlab', 'GitLab', 1, 1);
-                    INSERT INTO integration_cursor (account_id, key, value, updated_at) VALUES ('a3', 'o/r:items', '1', 1);
+                    INSERT INTO integration_cursor (account_id, key, value) VALUES ('a3', 'o/r:items', '1');
                     DELETE FROM integration_account WHERE id = 'a3';",
                 )?;
                 Ok(())
@@ -1511,6 +1516,63 @@ mod tests {
         database.enable_dialog_history(histories);
         assert!(query(&database, "SELECT id FROM conversation").is_empty());
         assert_eq!(query(&database, "SELECT id FROM memory"), ["shared"]);
+    }
+
+    #[test]
+    fn unused_timestamps_are_removed_without_losing_their_records() {
+        let (database, clock) = fresh();
+        let backups = database.backups_dir();
+        let options = options(&backups, &clock);
+        migrate(
+            &database,
+            &MIGRATIONS[..MIGRATIONS.partition_point(|migration| migration.id < 47)],
+            &options,
+        )
+        .expect("applies through migration 46");
+        database.with_connection(|connection| {
+            connection.execute_batch(
+                "INSERT INTO integration_account (id, kind, name, created_at, updated_at) VALUES ('mail', 'mail', 'Mail', 1, 1);
+                 INSERT INTO integration_cursor VALUES ('mail', 'INBOX', '1:12', 2);
+                 INSERT INTO mcp_server (id, name, namespace, transport, created_at, updated_at) VALUES ('server', 'MCP', 'mcp', 'http', 1, 1);
+                 INSERT INTO mcp_oauth VALUES ('server', X'ABCD', 2);
+                 INSERT INTO secret (id, type, name, scope, created_at, updated_at) VALUES ('secret', 'api_key', 'API key', 'personal', 1, 1);
+                 INSERT INTO secret_usage VALUES ('secret', 'mcp_server', 'server', 2);",
+            )?;
+            Ok(())
+        }).expect("seeds records on the old schema");
+
+        let report = migrate(&database, MIGRATIONS, &options).expect("applies migration 47");
+        assert_eq!(report.applied, ["0047_remove_unused_timestamps"]);
+        assert!(report.backup.expect("backs up the old schema").is_file());
+        for (table, columns) in [
+            ("integration_cursor", &["account_id", "key", "value"][..]),
+            ("mcp_oauth", &["server_id", "cipher"]),
+            (
+                "secret_usage",
+                &["secret_id", "consumer_kind", "consumer_id"],
+            ),
+        ] {
+            assert_eq!(
+                query(
+                    &database,
+                    &format!("SELECT name FROM pragma_table_info('{table}') ORDER BY cid")
+                ),
+                columns
+            );
+        }
+        assert_eq!(
+            query(&database, "SELECT value FROM integration_cursor"),
+            ["1:12"]
+        );
+        assert_eq!(
+            query(&database, "SELECT hex(cipher) FROM mcp_oauth"),
+            ["ABCD"]
+        );
+        assert_eq!(
+            query(&database, "SELECT consumer_id FROM secret_usage"),
+            ["server"]
+        );
+        assert!(query(&database, "PRAGMA foreign_key_check").is_empty());
     }
 
     #[test]

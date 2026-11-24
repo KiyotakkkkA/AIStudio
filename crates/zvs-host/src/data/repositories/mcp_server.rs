@@ -249,17 +249,13 @@ impl<'c> McpServerRepository<'c> {
             .collect()
     }
 
-    pub fn save_oauth(
-        &self,
-        server_id: &str,
-        cipher: &[u8],
-        updated_at: Timestamp,
-    ) -> rusqlite::Result<()> {
+    pub fn save_oauth(&self, server_id: &str, cipher: &[u8]) -> rusqlite::Result<()> {
         self.connection
             .prepare_cached(
-                "INSERT INTO mcp_oauth (server_id, cipher, updated_at) VALUES (?1, ?2, ?3)                  ON CONFLICT(server_id) DO UPDATE SET cipher = excluded.cipher,                  updated_at = excluded.updated_at",
+                "INSERT INTO mcp_oauth (server_id, cipher) VALUES (?1, ?2) \
+                 ON CONFLICT (server_id) DO UPDATE SET cipher = excluded.cipher",
             )?
-            .execute(params![server_id, cipher, updated_at])?;
+            .execute(params![server_id, cipher])?;
         Ok(())
     }
 

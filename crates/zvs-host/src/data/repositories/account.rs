@@ -2,7 +2,7 @@ use rusqlite::types::Value as SqlValue;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use zvs_contract::{AccountFamily, AccountStatus, ProviderStatus, Timestamp};
 
-use crate::data::repositories::{SecretRepository, SecretUsageDraft};
+use crate::data::repositories::SecretRepository;
 use crate::data::schema::{AccountRow, SecretConsumerKind};
 use crate::platform::ids::new_id;
 
@@ -177,12 +177,11 @@ impl<'c> AccountRepository<'c> {
                 AccountRow::from_row,
             )?;
         if let Some(secret_id) = &row.token_secret_id {
-            SecretRepository::new(self.connection).add_usage(&SecretUsageDraft {
+            SecretRepository::new(self.connection).add_usage(
                 secret_id,
-                consumer_kind: SecretConsumerKind::Account,
-                consumer_id: &row.id,
-                created_at: row.linked_at,
-            })?;
+                SecretConsumerKind::Account,
+                &row.id,
+            )?;
         }
         Ok(row)
     }
@@ -260,12 +259,7 @@ impl<'c> AccountRepository<'c> {
                 secrets.remove_usage(old, SecretConsumerKind::Account, id)?;
             }
             if let Some(new) = &row.token_secret_id {
-                secrets.add_usage(&SecretUsageDraft {
-                    secret_id: new,
-                    consumer_kind: SecretConsumerKind::Account,
-                    consumer_id: id,
-                    created_at: row.updated_at,
-                })?;
+                secrets.add_usage(new, SecretConsumerKind::Account, id)?;
             }
         }
         Ok(Some(row))

@@ -57,9 +57,7 @@ pub use run::{
     decode_run_cursor, encode_run_cursor,
 };
 pub use scenario::ScenarioRepository;
-pub use secret::{
-    SecretDraft, SecretFilter, SecretPatch, SecretRepository, SecretUsageDraft, secret_in_use,
-};
+pub use secret::{SecretDraft, SecretFilter, SecretPatch, SecretRepository, secret_in_use};
 pub use setting::SettingRepository;
 pub use skill::SkillRepository;
 pub use tool::{ToolPatch, ToolRepository};

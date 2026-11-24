@@ -195,18 +195,13 @@ impl<'c> IntegrationRepository<'c> {
             .optional()
     }
 
-    pub fn set_cursor(
-        &self,
-        account_id: &str,
-        key: &str,
-        value: &str,
-        at: Timestamp,
-    ) -> rusqlite::Result<()> {
+    pub fn set_cursor(&self, account_id: &str, key: &str, value: &str) -> rusqlite::Result<()> {
         self.connection
             .prepare_cached(
-                "INSERT INTO integration_cursor (account_id, key, value, updated_at)                  VALUES (?1, ?2, ?3, ?4) ON CONFLICT (account_id, key)                  DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+                "INSERT INTO integration_cursor (account_id, key, value) VALUES (?1, ?2, ?3) \
+                 ON CONFLICT (account_id, key) DO UPDATE SET value = excluded.value",
             )?
-            .execute(params![account_id, key, value, at])?;
+            .execute(params![account_id, key, value])?;
         Ok(())
     }
 
@@ -301,8 +296,8 @@ mod tests {
                 let integrations = Repositories::new(connection).integrations;
                 integrations.insert(&account("a"))?;
                 assert_eq!(integrations.cursor("a", "uid:INBOX")?, None);
-                integrations.set_cursor("a", "uid:INBOX", "7:10", 1)?;
-                integrations.set_cursor("a", "uid:INBOX", "7:12", 2)?;
+                integrations.set_cursor("a", "uid:INBOX", "7:10")?;
+                integrations.set_cursor("a", "uid:INBOX", "7:12")?;
                 assert_eq!(
                     integrations.cursor("a", "uid:INBOX")?.as_deref(),
                     Some("7:12")
